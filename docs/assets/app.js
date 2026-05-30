@@ -1107,7 +1107,7 @@
     const [c1, c2] = colorFor(cleanName);
     const cos = (s.companies || []).map((c) => `<span class="story-card__co">${c}</span>`).join("");
     const badges = [];
-    if (s.tier === 1) badges.push('<span class="story-card__badge story-card__badge--bt">Big Tech</span>');
+    // "Big Tech" tier-1 badge removed per request — the company chips already convey it.
     if (s.premium) badges.push('<span class="story-card__badge story-card__badge--prem">Premium</span>');
     if (s.anonymous) {
       badges.push(`<span class="story-card__badge story-card__badge--anon">${currentLang === "en" ? "Anonymous" : "Ẩn danh"}</span>`);
@@ -1394,7 +1394,7 @@
       );
 
       const badges = [];
-      if (s.tier === 1) badges.push(el("span", { class: "story-card__badge story-card__badge--bt" }, "Big Tech"));
+      // "Big Tech" tier-1 badge removed per request — keep stories sorted by tier server-side instead.
       if (s.premium) badges.push(el("span", { class: "story-card__badge story-card__badge--prem" }, "Premium"));
       if (s.anonymous) {
         badges.push(el(
