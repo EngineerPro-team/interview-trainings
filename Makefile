@@ -68,6 +68,10 @@ translate-stories:
 	@echo "→ Translating originalHtml + originalTitle of each story to English ..."
 	@$(PYTHON) scripts/translate_stories.py
 
+translate-courses:
+	@echo "→ Translating course body HTML to English ..."
+	@$(PYTHON) scripts/translate_courses.py
+
 fix-translations:
 	@echo "→ Post-processing common MT artifacts in story translations ..."
 	@$(PYTHON) scripts/fix_translations.py

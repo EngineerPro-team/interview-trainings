@@ -675,12 +675,16 @@
     const title = en && tx.title ? tx.title : c.title;
     const blurb = en && tx.blurb ? tx.blurb : c.blurb;
 
-    const cover = c.cover
-      ? `<img class="article__cover" src="${escapeAttr(asset(c.cover))}" alt="${escapeAttr(title)}" />`
+    // Body priority:
+    //   EN mode  → c.htmlEn (machine-translated full body); fall back to c.html with a banner.
+    //   VI mode  → c.html (original Vietnamese).
+    const body = (en && c.htmlEn) ? c.htmlEn : c.html;
+    const langNote = (en && !c.htmlEn)
+      ? '<p class="lang-note">📌 The original course body below is in Vietnamese. Use your browser\'s auto-translate for the full read.</p>'
       : "";
 
-    const langNote = en
-      ? '<p class="lang-note">📌 The original course body below is in Vietnamese. Use your browser\'s auto-translate for the full read.</p>'
+    const cover = c.cover
+      ? `<img class="article__cover" src="${escapeAttr(asset(c.cover))}" alt="${escapeAttr(title)}" />`
       : "";
 
     wrap.innerHTML = `
@@ -691,7 +695,7 @@
       </header>
       ${cover}
       ${langNote}
-      <div class="article__body">${sanitizeHtml(c.html)}</div>
+      <div class="article__body">${sanitizeHtml(body)}</div>
       <div class="article__cta">
         <a class="btn btn--primary" href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">
           ${escapeText(t("course.cta"))}
