@@ -3667,6 +3667,15 @@ p {
   border: 5px solid transparent;
   border-left-color: var(--navy);
 }
+/* In dark mode, --navy is swapped to a light grey for headings, which would
+   make the social-rail tooltip white-on-light-grey (invisible). Force a real
+   dark bg + matching arrow so the tooltip stays readable in both themes. */
+:root[data-theme="dark"] .social-rail__tip {
+  background: #1c2a45;
+}
+:root[data-theme="dark"] .social-rail__tip::after {
+  border-left-color: #1c2a45;
+}
 .social-rail__btn:hover .social-rail__tip,
 .social-rail__btn:focus-visible .social-rail__tip {
   opacity: 1;
