@@ -129,6 +129,13 @@ window.SITE_DATA = {
       previous: { role: "Software Engineer",        company: "Amazon · Sea Group" },
       linkedin: "https://www.linkedin.com/in/manhdx/",
     },
+    {
+      name: "Đức",
+      photo: "assets/img/mentors/duc-than.jpg",
+      current:  { role: "Software Engineer",        company: "Uber (USA)" },
+      previous: null,
+      linkedin: "https://www.linkedin.com/in/duc-than-a15045122/",
+    },
   ],
 
   contact: {
