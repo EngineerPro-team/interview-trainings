@@ -17,7 +17,7 @@ src/                          ← authored source (never edit docs/ directly)
 │   ├── style.css             ← single stylesheet, ~3.7K lines, light + dark themes
 │   ├── i18n.js               ← VI/EN dictionary, ~150 keys, dot.separated
 │   ├── data.js               ← mentors, contact, book, roadmap, partners, companies
-│   ├── courses-data.js       ← AUTO-GEN by scripts/crawl_courses.py
+│   ├── courses-data.js       ← AUTO-GEN by scripts/crawl_courses.py (html=VI) + scripts/translate_courses.py (htmlEn=EN)
 │   ├── courses-i18n.js       ← hand EN translations for course title/blurb
 │   ├── podcasts-data.js      ← AUTO-GEN by scripts/crawl_podcasts.py
 │   ├── faqs-data.js          ← AUTO-GEN by crawl_faqs.py + translate_faqs.py
@@ -39,7 +39,7 @@ Makefile                       ← single entry-point for every workflow
 
 ```
 make github
-  ├─ make stats          ← scripts/check_stats.py (fails if counts drift)
+  ├─ make stats          ← scripts/check_stats.py (fails if counts drift across docs/code)
   ├─ make seo            ← scripts/make_seo.py → src/sitemap.xml + src/robots.txt
   ├─ rm -rf docs && cp src/. docs/
   ├─ scripts/build_pages.py  → prerender 115 HTML pages into docs/
@@ -48,10 +48,22 @@ make github
 
 Override deploy target via env:
 ```bash
+# Project Pages (current setup)
 EP_BASE_URL=https://engineerpro-team.github.io \
 EP_BASE_PATH=/interview-trainings \
 make github
+
+# Custom domain / user org pages (no subpath)
+EP_BASE_URL=https://engineerpro.com EP_BASE_PATH= make github
 ```
+
+## Local preview build (port 8001)
+
+```bash
+make dev    # = local-build + serve
+```
+
+`make local-build` writes to `_local/` (gitignored) with `EP_BASE_PATH=""` so served at localhost root works. Never serves from `docs/` — `docs/` has the subpath baked in.
 
 ## SPA router
 

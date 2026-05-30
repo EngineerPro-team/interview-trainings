@@ -14,6 +14,7 @@ make crawl-courses        # engineerprogurus.com/blogs/khoa-hoc → courses-data
 make crawl-podcasts       # Substack archive (audio-only) → podcasts-data.js
 make crawl-faqs           # engineerprogurus.com/blogs/faqs → faqs-data.js
 make crawl-resources      # YouTube playlists + oEmbed → resources-data.js
+make translate-courses    # Translate full course body Vietnamese → English (htmlEn field)
 
 # Success stories — 3-stage pipeline
 make parse-stories        # Google Sheet (Markdown) → stories-data.js
@@ -21,7 +22,7 @@ make crawl-story-bodies   # Google Docs HTML → originalHtml + originalTitle + 
 make crawl-story-images   # Substack covers as fallback
 make clean-story-html     # strip Google redirects, dead bullets, etc.
 make translate-stories    # Google Translate free endpoint → originalHtmlEn (Vietnamese → English)
-make fix-translations     # post-process MT artifacts (SKATE → FAILED, Mr. honorifics, etc.)
+make fix-translations     # post-process MT artifacts (SKATE → FAILED, Mr. honorifics, "Bạn học viên" → "Our student", etc.)
 
 make crawl                # = crawl-courses + crawl-podcasts + crawl-faqs + crawl-resources
 ```
@@ -75,8 +76,23 @@ Stories live in a private Google Sheet. The Markdown export must be on disk:
 
 `scripts/crawl_resources.py` sorts Foundation playlist by lesson number from titles (`Foundation N`). If you add a new playlist that doesn't follow this pattern, edit `lesson_key()`.
 
+## Course translation pipeline (similar to stories)
+
+`scripts/translate_courses.py` mirrors `translate_stories.py` exactly but operates on `courses-data.js`. For each course it walks `html` text nodes, batches them through Google Translate's free endpoint with `@@SPLIT@@` sentinels, then stores the result back as `htmlEn`. Idempotent — re-running skips courses that already have `htmlEn`.
+
+Workflow when course content changes upstream:
+
+```bash
+make crawl-courses        # refresh from EngineerPro blog
+# (delete htmlEn from any changed course in courses-data.js if you want it re-translated)
+make translate-courses    # ~60s for 10 courses
+make github               # build + ship
+```
+
+`renderCourseDetail()` in `src/assets/app.js` picks `c.htmlEn` when in EN mode and falls back to `c.html` + a "use browser translate" banner if `htmlEn` is missing.
+
 ## Tooling
 
 All scripts use **stdlib + BeautifulSoup4 + Pillow** only. No paid APIs.
 - LinkedIn scraping is **hard-blocked** (HTTP 999 even after IP rotation). `scripts/retry_linkedin.py` exists but expect 100% failure rate — mentor data must be entered by hand.
-- Google Translate free endpoint sometimes garbles separators. `scripts/fix_translations.py` cleans the most common artifacts.
+- Google Translate free endpoint sometimes garbles separators. `scripts/fix_translations.py` cleans the most common artifacts (SKATE, LYING, Mr. honorifics, "you guys", "gossip", "Bạn học viên", "tản mạn", marketing boilerplate). Add new SUBS rules to the `SUBS` list as new artifacts surface.

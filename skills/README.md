@@ -13,6 +13,7 @@ the task with minimal back-and-forth.
 | [update-content-counts](update-content-counts/SKILL.md) | Stats / counts need updating |
 | [deploy-and-preview](deploy-and-preview/SKILL.md) | "Push lên", "preview local", deploy/build questions |
 | [content-pipeline](content-pipeline/SKILL.md) | Refresh stories / courses / podcast / FAQ |
+| [translate-content](translate-content/SKILL.md) | Translate / re-translate VI → EN, fix MT artifacts |
 
 These are READMEs, not magic. They follow the Cursor SKILL.md format
 (YAML frontmatter + concise body) so they can also be loaded as agent

@@ -84,3 +84,10 @@ GitHub Pages rebuilds in ~1 min. Tell the user to hard-reload.
 ## Existing photo-handle map (for reference)
 
 `scripts/retry_linkedin.py` has the canonical LinkedIn-slug → local-filename map. Reuse those filenames if the LinkedIn slug already appears.
+
+## Card layout notes
+
+- The mentor card uses CSS Grid (`grid-template-rows: auto auto 1fr auto`) so the LinkedIn CTA is bottom-pinned across all cards in a row regardless of whether the mentor has an "ex-" line. Don't change this without understanding the alignment tradeoff.
+- Avatar is always 80×80 with `box-sizing: border-box`. The photo variant has `border: 2px solid #fff`; the gradient-initials variant has `border: 2px solid transparent` for matching dimensions.
+- If a mentor has neither `current` nor `previous` company info, use `company: "Đang cập nhật"` — the renderer auto-translates to "Coming soon" in EN mode.
+

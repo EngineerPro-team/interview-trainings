@@ -50,3 +50,18 @@ When `make stats` reports drift, it shows `file:line  expected N, got M` — jus
 ## After updating
 
 `make github` runs `make stats` as a precondition, so the build will fail if any text reference is stale. Fix and re-run.
+
+## Audit script — what gets checked
+
+`scripts/check_stats.py` compares against the live data sources:
+- `data.mentors.length` (counts mentor entries by regex)
+- `len(COURSES)` from `courses-data.js`
+- `len(PODCASTS)` from `podcasts-data.js`
+- `len(STORIES)` from `stories-data.js`
+- `len(FAQS)` from `faqs-data.js`
+
+Then greps for stale numbers in:
+- `<span id="mentorsCount/coursesCount/podcastCount/storiesCount/faqCount">N</span>`
+- `NN mentors`, `NN giảng viên`, `NN+ stories`, `NN+ học viên EngineerPro`, `NN courses`, `NN khoá đào tạo`
+
+If a new kind of count reference is added, extend the `common_strings` list in `check_stats.py`.
