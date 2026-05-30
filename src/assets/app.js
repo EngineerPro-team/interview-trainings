@@ -13,6 +13,24 @@
     return p || "";
   }
 
+  // Resolve any asset path so it works at both root (/) and project-Pages
+  // subpath (/interview-trainings/). Pass through absolute URLs, root-relative
+  // paths, and data: URIs unchanged.
+  function asset(p) {
+    if (!p) return p;
+    if (typeof p !== "string") return p;
+    if (/^(?:https?:|data:|blob:|\/\/)/i.test(p)) return p;          // absolute / data
+    if (p.charAt(0) === "/") {                                       // root-relative
+      // Already includes BASE_PATH? leave as-is. Otherwise prepend it.
+      if (BASE_PATH && p.indexOf(BASE_PATH + "/") !== 0 && p !== BASE_PATH) {
+        return BASE_PATH + p;
+      }
+      return p;
+    }
+    // bare "assets/..." — prefix with BASE_PATH (or "" if root deploy)
+    return BASE_PATH + "/" + p;
+  }
+
   // If we got here via 404.html (e.g. user opened a non-prerendered URL),
   // 404.html stashed the original path in sessionStorage. Restore it before
   // the router runs so the SPA still ends up at the right route.
@@ -73,9 +91,10 @@
     });
     // Swap any <img data-src-vi="..." data-src-en="..."> based on currentLang
     document.querySelectorAll("img[data-src-vi][data-src-en]").forEach((img) => {
-      const next = currentLang === "en"
+      const raw = currentLang === "en"
         ? img.getAttribute("data-src-en")
         : img.getAttribute("data-src-vi");
+      const next = asset(raw);
       if (next && img.getAttribute("src") !== next) img.setAttribute("src", next);
     });
     // Refresh dynamic count spans (their innerHTML was just clobbered by data-i18n-html).
@@ -574,7 +593,7 @@
       const cardBlurb = en && tx.blurb ? tx.blurb : c.blurb;
       const filterTitle = en ? `Filter by ${"%t%"}` : `Lọc theo ${"%t%"}`;
       const cover = c.cover
-        ? el("img", { class: "card--course__cover", src: c.cover, alt: cardTitle, loading: "lazy" })
+        ? el("img", { class: "card--course__cover", src: asset(c.cover), alt: cardTitle, loading: "lazy" })
         : el("div", { class: "card--course__cover card--course__cover--placeholder" }, "EP");
 
       const tagRow = el(
@@ -647,7 +666,7 @@
     const blurb = en && tx.blurb ? tx.blurb : c.blurb;
 
     const cover = c.cover
-      ? `<img class="article__cover" src="${c.cover}" alt="${escapeAttr(title)}" />`
+      ? `<img class="article__cover" src="${escapeAttr(asset(c.cover))}" alt="${escapeAttr(title)}" />`
       : "";
 
     const langNote = en
@@ -717,7 +736,7 @@
       if (m.photo) {
         avatar = el("img", {
           class: "avatar avatar--photo",
-          src: m.photo,
+          src: asset(m.photo),
           alt: m.name,
           loading: "lazy",
         });
@@ -1125,7 +1144,7 @@
     dispBody = sanitizeHtml(stripDuplicateHeading(dispBody, dispTitle));
 
     const cover = s.cover
-      ? `<img class="story-detail__cover" src="${s.cover}" alt="${escapeAttr(dispTitle || cleanName)}" />`
+      ? `<img class="story-detail__cover" src="${escapeAttr(asset(s.cover))}" alt="${escapeAttr(dispTitle || cleanName)}" />`
       : "";
 
     wrap.innerHTML = `
@@ -1375,7 +1394,7 @@
 
       const cover = s.cover
         ? el("div", { class: "story-row__cover" }, [
-            el("img", { src: s.cover, alt: dispTitle || cleanName, loading: "lazy" }),
+            el("img", { src: asset(s.cover), alt: dispTitle || cleanName, loading: "lazy" }),
             el(
               "span",
               { class: "story-row__cover-tag" },
@@ -1455,7 +1474,7 @@
             },
             [
               el("div", { class: "video-card__thumb" }, [
-                el("img", { src: v.thumbnail, alt: v.title, loading: "lazy" }),
+                el("img", { src: asset(v.thumbnail), alt: v.title, loading: "lazy" }),
                 v.duration ? el("span", { class: "video-card__dur" }, v.duration) : null,
                 el("span", { class: "video-card__play" }, "▶"),
               ]),
@@ -1520,7 +1539,7 @@
         const tEn = cvEn.tool || {};
         const node = document.getElementById("cvTool");
         if (node) node.href = tool.url;
-        document.getElementById("cvToolThumb").src = tool.thumbnail;
+        document.getElementById("cvToolThumb").src = asset(tool.thumbnail);
         document.getElementById("cvToolTitle").textContent = (en && tEn.title) ? tEn.title : tool.title;
         document.getElementById("cvToolAuthor").textContent = `EngineerPro · YouTube`;
       }
@@ -1591,7 +1610,7 @@
         el("header", { class: "partner-page__head" }, [
           el("img", {
             class: "partner-page__logo",
-            src: p.logo,
+            src: asset(p.logo),
             alt: `${p.name} logo`,
             loading: "lazy",
           }),
@@ -1724,8 +1743,9 @@
       if (c.logo) {
         const mark = document.createElement("span");
         mark.className = "logo-tile__svg";
-        mark.style.setProperty("-webkit-mask-image", `url(${c.logo})`);
-        mark.style.setProperty("mask-image", `url(${c.logo})`);
+        const u = asset(c.logo);
+        mark.style.setProperty("-webkit-mask-image", `url(${u})`);
+        mark.style.setProperty("mask-image", `url(${u})`);
         tile.appendChild(mark);
       } else {
         const wm = document.createElement("span");
