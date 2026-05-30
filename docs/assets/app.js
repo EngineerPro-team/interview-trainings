@@ -391,12 +391,14 @@
     const dataRoute = a.dataset.route;
     const rawHref = a.getAttribute("href") || "";
 
-    // Anchor-style on home page (#home-format etc.) — route home + scroll
+    // Anchor-style on home page (#home-format etc.) — route home + scroll.
+    // Use pathFor() so the URL stays under BASE_PATH on project Pages deploys
+    // (e.g. /interview-trainings/ instead of jumping to the origin root).
     const anchor = dataHref || (rawHref.startsWith("#home-") ? rawHref : null);
     if (anchor && anchor.startsWith("#home-")) {
       e.preventDefault();
       const anchorId = anchor.slice(1);
-      history.pushState(null, "", "/");
+      history.pushState(null, "", pathFor("home", null));
       showRoute({ route: "home", slug: null });
       requestAnimationFrame(() => {
         const target = document.getElementById(anchorId);
