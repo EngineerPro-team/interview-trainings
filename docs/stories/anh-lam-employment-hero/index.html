@@ -15,7 +15,7 @@
       og:image / twitter:image must be ABSOLUTE URLs for some scrapers
       (FB usually resolves relative against og:url) — change to your URL.
     -->
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="article" />
     <meta property="og:site_name" content="EngineerPro" />
     <meta property="og:title" content="CHUYỂN NGÀNH THÀNH CÔNG, CHINH PHỤC EMPLOYMENT HERO" />
     <meta property="og:description" content="Đây là câu chuyện của Anh Lam (ẩn danh) — chi tiết từ khâu chuẩn bị tới buổi onsite cuối cùng." />
@@ -28,7 +28,7 @@
     <meta property="og:url" content="https://engineerpro-team.github.io/interview-trainings/stories/anh-lam-employment-hero/" />
     <meta property="og:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/stories/anh-lam-employment-hero-img1.webp" />
     <meta property="og:image:secure_url" content="https://engineerpro-team.github.io/interview-trainings/assets/img/stories/anh-lam-employment-hero-img1.webp" />
-    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:type" content="image/webp" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="EngineerPro — Chinh phục Big Tech cùng mentor thực chiến" />
@@ -42,12 +42,11 @@
     <meta name="twitter:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/stories/anh-lam-employment-hero-img1.webp" />
 
     <!-- Zalo OpenGraph (uses Facebook spec, already covered above) -->
-    <meta property="zalo:title" content="EngineerPro — Chinh phục Big Tech" />
-    <meta property="zalo:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/og-share.png" />
+    <meta property="zalo:title" content="CHUYỂN NGÀNH THÀNH CÔNG, CHINH PHỤC EMPLOYMENT HERO" />
+    <meta property="zalo:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/stories/anh-lam-employment-hero-img1.webp" />
 
     <!-- hreflang signals for VI/EN alternates -->
     <link rel="alternate" hreflang="vi" href="https://engineerpro-team.github.io/interview-trainings/stories/anh-lam-employment-hero/" />
-    <link rel="alternate" hreflang="en" href="https://engineerpro-team.github.io/interview-trainings/stories/anh-lam-employment-hero/?lang=en" />
     <link rel="alternate" hreflang="x-default" href="https://engineerpro-team.github.io/interview-trainings/stories/anh-lam-employment-hero/" />
 
     <!-- Structured data: Organization + WebSite + EducationalOrganization -->
@@ -167,23 +166,7 @@
     <link rel="apple-touch-icon" href="/interview-trainings/assets/img/logo.png" />
     <link rel="stylesheet" href="/interview-trainings/assets/style.css" />
   
-    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->
-    <script>
-      (function () {
-        try {
-          var basePath = "/interview-trainings";
-          var p = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
-          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);
-          if (p) {
-            var m;
-            if ((m = p.match(/^\/courses\/([^/]+)$/))) location.hash = "#course/" + m[1];
-            else if ((m = p.match(/^\/stories\/([^/]+)$/))) location.hash = "#story/" + m[1];
-            else if ((m = p.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))
-              location.hash = "#" + m[1];
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <style id="prerenderShowRoute">section.route[data-route="story"][hidden]{display:block !important;}section.route[data-route="story"]{display:block !important;}section.route:not([data-route="story"]){display:none !important;}</style>
   </head>
   <body>
     <!-- Skip to main content (a11y) -->
@@ -704,13 +687,13 @@
 
       <!-- ============== STORY DETAIL ============== -->
       <section class="route" data-route="story" hidden>
-<!-- prerendered SEO content -->
-<article class="article story-detail" id="storyArticle">  <header class="story-detail__head">    <div class="story-detail__chips"><span class="story-card__co">Employment Hero</span></div>    <h1>CHUYỂN NGÀNH THÀNH CÔNG, CHINH PHỤC EMPLOYMENT HERO</h1>    <p class="muted">by Anh Lam</p>  </header>  <img class="story-detail__cover" src="https://engineerpro-team.github.io/interview-trainings/assets/img/stories/anh-lam-employment-hero-img1.webp" alt="CHUYỂN NGÀNH THÀNH CÔNG, CHINH PHỤC EMPLOYMENT HERO" loading="lazy" />  <p class="article__lede">Đây là câu chuyện của Anh Lam (ẩn danh) — chi tiết từ khâu chuẩn bị tới buổi onsite cuối cùng.</p>  <p class="muted"><a href="/interview-trainings/stories/" data-href="#stories">← All stories</a></p></article>
         <div class="container section">
           <a class="back-link" href="/interview-trainings/stories/" data-href="/interview-trainings/stories/" data-i18n="stories.back">← Tất cả câu chuyện</a>
           <article class="article story-detail" id="storyArticle">
-            <!-- populated by app.js -->
-          </article>
+<!-- prerendered SEO content -->
+  <header class="story-detail__head">    <div class="story-detail__chips"><span class="story-card__co">Employment Hero</span></div>    <h1>CHUYỂN NGÀNH THÀNH CÔNG, CHINH PHỤC EMPLOYMENT HERO</h1>    <p class="muted">by Anh Lam</p>  </header>  <img class="story-detail__cover" src="https://engineerpro-team.github.io/interview-trainings/assets/img/stories/anh-lam-employment-hero-img1.webp" alt="CHUYỂN NGÀNH THÀNH CÔNG, CHINH PHỤC EMPLOYMENT HERO" loading="lazy" />  <p class="article__lede">Đây là câu chuyện của Anh Lam (ẩn danh) — chi tiết từ khâu chuẩn bị tới buổi onsite cuối cùng.</p>  <p class="muted"><a href="/interview-trainings/stories/" data-href="#stories">← All stories</a></p>
+<!-- /prerendered -->
+</article>
         </div>
       </section>
 

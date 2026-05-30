@@ -42,12 +42,11 @@
     <meta name="twitter:image" content="https://file.hstatic.net/200000696647/article/lo_trinh__84b22ca1a0274850ad6bef3a094381af.png" />
 
     <!-- Zalo OpenGraph (uses Facebook spec, already covered above) -->
-    <meta property="zalo:title" content="EngineerPro — Chinh phục Big Tech" />
-    <meta property="zalo:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/og-share.png" />
+    <meta property="zalo:title" content="Khóa học BACKEND GOLANG cùng 100% Mentor đến từ BIG TECH tại Engineer Pro" />
+    <meta property="zalo:image" content="https://file.hstatic.net/200000696647/article/lo_trinh__84b22ca1a0274850ad6bef3a094381af.png" />
 
     <!-- hreflang signals for VI/EN alternates -->
     <link rel="alternate" hreflang="vi" href="https://engineerpro-team.github.io/interview-trainings/courses/khoa-hoc-backend-golang/" />
-    <link rel="alternate" hreflang="en" href="https://engineerpro-team.github.io/interview-trainings/courses/khoa-hoc-backend-golang/?lang=en" />
     <link rel="alternate" hreflang="x-default" href="https://engineerpro-team.github.io/interview-trainings/courses/khoa-hoc-backend-golang/" />
 
     <!-- Structured data: Organization + WebSite + EducationalOrganization -->
@@ -163,23 +162,7 @@
     <link rel="apple-touch-icon" href="/interview-trainings/assets/img/logo.png" />
     <link rel="stylesheet" href="/interview-trainings/assets/style.css" />
   
-    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->
-    <script>
-      (function () {
-        try {
-          var basePath = "/interview-trainings";
-          var p = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
-          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);
-          if (p) {
-            var m;
-            if ((m = p.match(/^\/courses\/([^/]+)$/))) location.hash = "#course/" + m[1];
-            else if ((m = p.match(/^\/stories\/([^/]+)$/))) location.hash = "#story/" + m[1];
-            else if ((m = p.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))
-              location.hash = "#" + m[1];
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <style id="prerenderShowRoute">section.route[data-route="course"][hidden]{display:block !important;}section.route[data-route="course"]{display:block !important;}section.route:not([data-route="course"]){display:none !important;}</style>
   </head>
   <body>
     <!-- Skip to main content (a11y) -->
@@ -606,13 +589,13 @@
 
       <!-- ============== COURSE DETAIL ============== -->
       <section class="route" data-route="course" hidden>
-<!-- prerendered SEO content -->
-<article class="article" id="courseArticle">  <header class="article__head">    <h1>Khóa học BACKEND GOLANG cùng 100% Mentor đến từ BIG TECH tại Engineer Pro</h1>    <p class="article__lede">Tham khảo: Khóa học BACKEND JAVA Theo khảo sát của TopDev năm 2021 về các vị trí lập trình mà nhà tuyển dụng cần nhất, vị trí lập trình viên Backend đứng thứ hai với 65.1% lượt bình chọn từ nhà tuyển dụng. Trong số các công nghệ Backend…</p>    <p class="muted"><a href="/interview-trainings/courses/" data-href="#courses">← All courses</a></p>  </header>  <img class="article__cover" src="https://file.hstatic.net/200000696647/article/lo_trinh__84b22ca1a0274850ad6bef3a094381af.png" alt="Khóa học BACKEND GOLANG cùng 100% Mentor đến từ BIG TECH tại Engineer Pro" loading="lazy" /></article>
         <div class="container section">
           <a class="back-link" href="/interview-trainings/courses/" data-route="courses" data-i18n="course.back">← Quay lại danh sách khoá học</a>
           <article class="article" id="courseArticle">
-            <!-- populated by app.js -->
-          </article>
+<!-- prerendered SEO content -->
+  <header class="article__head">    <h1>Khóa học BACKEND GOLANG cùng 100% Mentor đến từ BIG TECH tại Engineer Pro</h1>    <p class="article__lede">Tham khảo: Khóa học BACKEND JAVA Theo khảo sát của TopDev năm 2021 về các vị trí lập trình mà nhà tuyển dụng cần nhất, vị trí lập trình viên Backend đứng thứ hai với 65.1% lượt bình chọn từ nhà tuyển dụng. Trong số các công nghệ Backend…</p>    <p class="muted"><a href="/interview-trainings/courses/" data-href="#courses">← All courses</a></p>  </header>  <img class="article__cover" src="https://file.hstatic.net/200000696647/article/lo_trinh__84b22ca1a0274850ad6bef3a094381af.png" alt="Khóa học BACKEND GOLANG cùng 100% Mentor đến từ BIG TECH tại Engineer Pro" loading="lazy" />
+<!-- /prerendered -->
+</article>
         </div>
       </section>
 

@@ -104,6 +104,11 @@ github: stats seo
 	@touch $(DOCS_DIR)/.nojekyll
 	@echo "→ Prerendering route pages ..."
 	@$(PYTHON) scripts/build_pages.py
+	@echo "→ Guarding against localhost URLs in production artifact ..."
+	@if grep -rIE "https?://(localhost|127\.0\.0\.1)" $(DOCS_DIR) $(SRC_DIR)/sitemap.xml $(SRC_DIR)/robots.txt 2>/dev/null; then \
+		echo "✗ Production artifact contains localhost URLs above. Fix EP_BASE_URL / EP_BASE_PATH before deploying."; \
+		exit 1; \
+	fi
 	@echo "✓ $(DOCS_DIR)/ ready — commit & push, then enable GitHub Pages on /docs."
 
 # Local build into $(LOCAL_DIR)/ with EP_BASE_PATH="" — for local preview ONLY.
@@ -115,6 +120,7 @@ local-build:
 	@mkdir -p $(LOCAL_DIR)
 	@cp -R $(SRC_DIR)/. $(LOCAL_DIR)/
 	@touch $(LOCAL_DIR)/.nojekyll
+	@EP_BASE_URL=http://localhost:$(PORT) EP_BASE_PATH= EP_OUT=$(LOCAL_DIR) $(PYTHON) scripts/make_seo.py
 	@EP_BASE_URL=http://localhost:$(PORT) EP_BASE_PATH= EP_OUT=$(LOCAL_DIR) $(PYTHON) scripts/build_pages.py
 	@echo "✓ $(LOCAL_DIR)/ ready for localhost (production docs/ untouched)."
 

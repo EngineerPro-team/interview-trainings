@@ -42,12 +42,11 @@
     <meta name="twitter:image" content="https://file.hstatic.net/200000696647/article/behaviour_interview_course_avt_7f71644eddbc4d5c9f121f1f080ed2de.png" />
 
     <!-- Zalo OpenGraph (uses Facebook spec, already covered above) -->
-    <meta property="zalo:title" content="EngineerPro — Chinh phục Big Tech" />
-    <meta property="zalo:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/og-share.png" />
+    <meta property="zalo:title" content="BEHAVIOUR INTERVIEW COURSE IN ENGLISH" />
+    <meta property="zalo:image" content="https://file.hstatic.net/200000696647/article/behaviour_interview_course_avt_7f71644eddbc4d5c9f121f1f080ed2de.png" />
 
     <!-- hreflang signals for VI/EN alternates -->
     <link rel="alternate" hreflang="vi" href="https://engineerpro-team.github.io/interview-trainings/courses/behaviour-interview-course/" />
-    <link rel="alternate" hreflang="en" href="https://engineerpro-team.github.io/interview-trainings/courses/behaviour-interview-course/?lang=en" />
     <link rel="alternate" hreflang="x-default" href="https://engineerpro-team.github.io/interview-trainings/courses/behaviour-interview-course/" />
 
     <!-- Structured data: Organization + WebSite + EducationalOrganization -->
@@ -163,23 +162,7 @@
     <link rel="apple-touch-icon" href="/interview-trainings/assets/img/logo.png" />
     <link rel="stylesheet" href="/interview-trainings/assets/style.css" />
   
-    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->
-    <script>
-      (function () {
-        try {
-          var basePath = "/interview-trainings";
-          var p = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
-          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);
-          if (p) {
-            var m;
-            if ((m = p.match(/^\/courses\/([^/]+)$/))) location.hash = "#course/" + m[1];
-            else if ((m = p.match(/^\/stories\/([^/]+)$/))) location.hash = "#story/" + m[1];
-            else if ((m = p.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))
-              location.hash = "#" + m[1];
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <style id="prerenderShowRoute">section.route[data-route="course"][hidden]{display:block !important;}section.route[data-route="course"]{display:block !important;}section.route:not([data-route="course"]){display:none !important;}</style>
   </head>
   <body>
     <!-- Skip to main content (a11y) -->
@@ -606,13 +589,13 @@
 
       <!-- ============== COURSE DETAIL ============== -->
       <section class="route" data-route="course" hidden>
-<!-- prerendered SEO content -->
-<article class="article" id="courseArticle">  <header class="article__head">    <h1>BEHAVIOUR INTERVIEW COURSE IN ENGLISH</h1>    <p class="article__lede">Khóa học BEHAVIOUR INTERVIEW COURSE tại EngineerPro Academy bao gồm 12 buổi học với 9 Topic hướng đến mục tiêu giúp các học viên: Trả lời các câu hỏi BEHAVIOUR INTERVIEW phổ biến bằng tiếng Anh. Chuẩn bị và trình bày về các LEADERSHIP…</p>    <p class="muted"><a href="/interview-trainings/courses/" data-href="#courses">← All courses</a></p>  </header>  <img class="article__cover" src="https://file.hstatic.net/200000696647/article/behaviour_interview_course_avt_7f71644eddbc4d5c9f121f1f080ed2de.png" alt="BEHAVIOUR INTERVIEW COURSE IN ENGLISH" loading="lazy" /></article>
         <div class="container section">
           <a class="back-link" href="/interview-trainings/courses/" data-route="courses" data-i18n="course.back">← Quay lại danh sách khoá học</a>
           <article class="article" id="courseArticle">
-            <!-- populated by app.js -->
-          </article>
+<!-- prerendered SEO content -->
+  <header class="article__head">    <h1>BEHAVIOUR INTERVIEW COURSE IN ENGLISH</h1>    <p class="article__lede">Khóa học BEHAVIOUR INTERVIEW COURSE tại EngineerPro Academy bao gồm 12 buổi học với 9 Topic hướng đến mục tiêu giúp các học viên: Trả lời các câu hỏi BEHAVIOUR INTERVIEW phổ biến bằng tiếng Anh. Chuẩn bị và trình bày về các LEADERSHIP…</p>    <p class="muted"><a href="/interview-trainings/courses/" data-href="#courses">← All courses</a></p>  </header>  <img class="article__cover" src="https://file.hstatic.net/200000696647/article/behaviour_interview_course_avt_7f71644eddbc4d5c9f121f1f080ed2de.png" alt="BEHAVIOUR INTERVIEW COURSE IN ENGLISH" loading="lazy" />
+<!-- /prerendered -->
+</article>
         </div>
       </section>
 

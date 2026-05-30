@@ -15,6 +15,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
+# Where to write sitemap.xml + robots.txt. Default: src/ (so `make github`
+# picks them up when copying src/ -> docs/). Local builds override via
+# EP_OUT=_local to keep tracked src/ files clean.
+OUT_DIR = os.path.join(ROOT, os.environ.get("EP_OUT", "src"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES  # noqa: E402
@@ -69,6 +73,8 @@ def main() -> int:
         '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ]
     for loc, lastmod, prio, freq in urls:
+        # NOTE: dropping hreflang="en" advertisements until we generate real
+        # /en/ pages with English source HTML + self-canonicals. Re-add later.
         sm.append(
             "  <url>\n"
             f"    <loc>{loc}</loc>\n"
@@ -76,13 +82,13 @@ def main() -> int:
             f"    <changefreq>{freq}</changefreq>\n"
             f"    <priority>{prio}</priority>\n"
             f'    <xhtml:link rel="alternate" hreflang="vi" href="{loc}" />\n'
-            f'    <xhtml:link rel="alternate" hreflang="en" href="{loc}?lang=en" />\n'
             f'    <xhtml:link rel="alternate" hreflang="x-default" href="{loc}" />\n'
             "  </url>"
         )
     sm.append("</urlset>\n")
 
-    with open(os.path.join(SRC, "sitemap.xml"), "w", encoding="utf-8") as f:
+    os.makedirs(OUT_DIR, exist_ok=True)
+    with open(os.path.join(OUT_DIR, "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write("\n".join(sm))
 
     robots = (
@@ -91,10 +97,11 @@ def main() -> int:
         "Allow: /\n"
         f"Sitemap: {SITE_BASE}/sitemap.xml\n"
     )
-    with open(os.path.join(SRC, "robots.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT_DIR, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(robots)
 
-    print(f"[seo] wrote sitemap.xml with {len(urls)} clean URLs + robots.txt (base={SITE_BASE})")
+    rel_out = os.path.relpath(OUT_DIR, ROOT)
+    print(f"[seo] wrote {rel_out}/sitemap.xml ({len(urls)} URLs) + robots.txt (base={SITE_BASE})")
     return 0
 
 

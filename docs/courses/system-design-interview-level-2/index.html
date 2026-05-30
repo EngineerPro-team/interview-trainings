@@ -28,7 +28,7 @@
     <meta property="og:url" content="https://engineerpro-team.github.io/interview-trainings/courses/system-design-interview-level-2/" />
     <meta property="og:image" content="https://file.hstatic.net/200000696647/article/system_design_level_2_5ed6c206adef47ee8ab9be1f1fe18448.jpg" />
     <meta property="og:image:secure_url" content="https://file.hstatic.net/200000696647/article/system_design_level_2_5ed6c206adef47ee8ab9be1f1fe18448.jpg" />
-    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="EngineerPro — Chinh phục Big Tech cùng mentor thực chiến" />
@@ -42,12 +42,11 @@
     <meta name="twitter:image" content="https://file.hstatic.net/200000696647/article/system_design_level_2_5ed6c206adef47ee8ab9be1f1fe18448.jpg" />
 
     <!-- Zalo OpenGraph (uses Facebook spec, already covered above) -->
-    <meta property="zalo:title" content="EngineerPro — Chinh phục Big Tech" />
-    <meta property="zalo:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/og-share.png" />
+    <meta property="zalo:title" content="Khóa học System Design Interview Level 2" />
+    <meta property="zalo:image" content="https://file.hstatic.net/200000696647/article/system_design_level_2_5ed6c206adef47ee8ab9be1f1fe18448.jpg" />
 
     <!-- hreflang signals for VI/EN alternates -->
     <link rel="alternate" hreflang="vi" href="https://engineerpro-team.github.io/interview-trainings/courses/system-design-interview-level-2/" />
-    <link rel="alternate" hreflang="en" href="https://engineerpro-team.github.io/interview-trainings/courses/system-design-interview-level-2/?lang=en" />
     <link rel="alternate" hreflang="x-default" href="https://engineerpro-team.github.io/interview-trainings/courses/system-design-interview-level-2/" />
 
     <!-- Structured data: Organization + WebSite + EducationalOrganization -->
@@ -163,23 +162,7 @@
     <link rel="apple-touch-icon" href="/interview-trainings/assets/img/logo.png" />
     <link rel="stylesheet" href="/interview-trainings/assets/style.css" />
   
-    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->
-    <script>
-      (function () {
-        try {
-          var basePath = "/interview-trainings";
-          var p = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
-          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);
-          if (p) {
-            var m;
-            if ((m = p.match(/^\/courses\/([^/]+)$/))) location.hash = "#course/" + m[1];
-            else if ((m = p.match(/^\/stories\/([^/]+)$/))) location.hash = "#story/" + m[1];
-            else if ((m = p.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))
-              location.hash = "#" + m[1];
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <style id="prerenderShowRoute">section.route[data-route="course"][hidden]{display:block !important;}section.route[data-route="course"]{display:block !important;}section.route:not([data-route="course"]){display:none !important;}</style>
   </head>
   <body>
     <!-- Skip to main content (a11y) -->
@@ -606,13 +589,13 @@
 
       <!-- ============== COURSE DETAIL ============== -->
       <section class="route" data-route="course" hidden>
-<!-- prerendered SEO content -->
-<article class="article" id="courseArticle">  <header class="article__head">    <h1>Khóa học System Design Interview Level 2</h1>    <p class="article__lede">Tham khảo: Khóa học System Design Interview Level 1 Ngoài kiến thức nền tảng về Data Structures and Algorithms, kỹ năng System Design đang trở thành "chìa khóa vàng" mở ra cánh cửa vào các công ty công nghệ hàng đầu. Hiểu được nhu cầu này…</p>    <p class="muted"><a href="/interview-trainings/courses/" data-href="#courses">← All courses</a></p>  </header>  <img class="article__cover" src="https://file.hstatic.net/200000696647/article/system_design_level_2_5ed6c206adef47ee8ab9be1f1fe18448.jpg" alt="Khóa học System Design Interview Level 2" loading="lazy" /></article>
         <div class="container section">
           <a class="back-link" href="/interview-trainings/courses/" data-route="courses" data-i18n="course.back">← Quay lại danh sách khoá học</a>
           <article class="article" id="courseArticle">
-            <!-- populated by app.js -->
-          </article>
+<!-- prerendered SEO content -->
+  <header class="article__head">    <h1>Khóa học System Design Interview Level 2</h1>    <p class="article__lede">Tham khảo: Khóa học System Design Interview Level 1 Ngoài kiến thức nền tảng về Data Structures and Algorithms, kỹ năng System Design đang trở thành "chìa khóa vàng" mở ra cánh cửa vào các công ty công nghệ hàng đầu. Hiểu được nhu cầu này…</p>    <p class="muted"><a href="/interview-trainings/courses/" data-href="#courses">← All courses</a></p>  </header>  <img class="article__cover" src="https://file.hstatic.net/200000696647/article/system_design_level_2_5ed6c206adef47ee8ab9be1f1fe18448.jpg" alt="Khóa học System Design Interview Level 2" loading="lazy" />
+<!-- /prerendered -->
+</article>
         </div>
       </section>
 

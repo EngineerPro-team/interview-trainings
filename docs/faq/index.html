@@ -42,12 +42,11 @@
     <meta name="twitter:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/og-share.png" />
 
     <!-- Zalo OpenGraph (uses Facebook spec, already covered above) -->
-    <meta property="zalo:title" content="EngineerPro — Chinh phục Big Tech" />
+    <meta property="zalo:title" content="Câu hỏi thường gặp · EngineerPro" />
     <meta property="zalo:image" content="https://engineerpro-team.github.io/interview-trainings/assets/img/og-share.png" />
 
     <!-- hreflang signals for VI/EN alternates -->
     <link rel="alternate" hreflang="vi" href="https://engineerpro-team.github.io/interview-trainings/faq/" />
-    <link rel="alternate" hreflang="en" href="https://engineerpro-team.github.io/interview-trainings/faq/?lang=en" />
     <link rel="alternate" hreflang="x-default" href="https://engineerpro-team.github.io/interview-trainings/faq/" />
 
     <!-- Structured data: Organization + WebSite + EducationalOrganization -->
@@ -138,23 +137,7 @@
     <link rel="apple-touch-icon" href="/interview-trainings/assets/img/logo.png" />
     <link rel="stylesheet" href="/interview-trainings/assets/style.css" />
   
-    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->
-    <script>
-      (function () {
-        try {
-          var basePath = "/interview-trainings";
-          var p = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
-          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);
-          if (p) {
-            var m;
-            if ((m = p.match(/^\/courses\/([^/]+)$/))) location.hash = "#course/" + m[1];
-            else if ((m = p.match(/^\/stories\/([^/]+)$/))) location.hash = "#story/" + m[1];
-            else if ((m = p.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))
-              location.hash = "#" + m[1];
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <style id="prerenderShowRoute">section.route[data-route="faq"][hidden]{display:block !important;}section.route[data-route="faq"]{display:block !important;}section.route:not([data-route="faq"]){display:none !important;}</style>
   </head>
   <body>
     <!-- Skip to main content (a11y) -->

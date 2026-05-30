@@ -151,11 +151,14 @@ HEAD_REPLACEMENTS = [
         ),
         '<link rel="alternate" hreflang="vi" href="{canonical}" />',
     ),
+    # Strip the EN hreflang — until /en/ pages exist with their own English
+    # source HTML + self-canonical, advertising ?lang=en is a Vietnamese page
+    # canonicalising back to itself, which Google ignores as a language alt.
     (
         re.compile(
-            r'<link\s+rel="alternate"\s+hreflang="en"\s+href="[^"]*"\s*/?>',
+            r'<link\s+rel="alternate"\s+hreflang="en"\s+href="[^"]*"\s*/?>\s*\n?',
         ),
-        '<link rel="alternate" hreflang="en" href="{canonical}?lang=en" />',
+        '',
     ),
     (
         re.compile(
@@ -176,13 +179,51 @@ HEAD_REPLACEMENTS = [
         ),
         '<meta property="og:image:secure_url" content="{og_image}" />',
     ),
+    # MIME type should match the actual image extension (webp/png/jpg/svg).
+    (
+        re.compile(
+            r'<meta\s+property="og:image:type"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="og:image:type" content="{og_image_type}" />',
+    ),
     (
         re.compile(
             r'<meta\s+name="twitter:image"\s+content="[^"]*"\s*/?>',
         ),
         '<meta name="twitter:image" content="{og_image}" />',
     ),
+    # Zalo previews — use the same image/title as OG so detail pages don't
+    # fall back to the generic home share card.
+    (
+        re.compile(
+            r'<meta\s+property="zalo:title"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="zalo:title" content="{og_title}" />',
+    ),
+    (
+        re.compile(
+            r'<meta\s+property="zalo:image"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="zalo:image" content="{og_image}" />',
+    ),
+    # og:type per page kind (article vs website vs ...)
+    (
+        re.compile(
+            r'<meta\s+property="og:type"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="og:type" content="{og_type}" />',
+    ),
 ]
+
+
+def _mime_for(url: str) -> str:
+    """Best-effort MIME from URL extension; falls back to image/png."""
+    u = (url or "").lower().split("?")[0].split("#")[0]
+    if u.endswith(".webp"): return "image/webp"
+    if u.endswith(".jpg") or u.endswith(".jpeg"): return "image/jpeg"
+    if u.endswith(".svg"): return "image/svg+xml"
+    if u.endswith(".gif"): return "image/gif"
+    return "image/png"
 
 
 PLACEHOLDER_ORIGIN = "https://engineerpro-academy.github.io"
@@ -222,14 +263,17 @@ def fix_asset_paths(template: str) -> str:
 
 
 def patch_head(template: str, *, title: str, description: str, canonical: str,
-               og_image: str, og_title: str | None = None) -> str:
+               og_image: str, og_title: str | None = None,
+               og_type: str = "website") -> str:
     og_title = og_title or title
     ctx = {
         "title": attr(title),
         "description": attr(description),
         "canonical": attr(canonical),
         "og_image": attr(og_image),
+        "og_image_type": attr(_mime_for(og_image)),
         "og_title": attr(og_title),
+        "og_type": attr(og_type),
     }
     out = template
     for pat, repl in HEAD_REPLACEMENTS:
@@ -265,57 +309,51 @@ def patch_jsonld(template: str, extra_nodes: list[dict]) -> str:
 
 # Prepend the bootstrap script that turns /courses/foo/ → #course/foo BEFORE
 # app.js runs, so the SPA renders the right route immediately.
-PATH_BOOT_SCRIPT = (
-    "\n    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->\n"
-    "    <script>\n"
-    "      (function () {\n"
-    "        try {\n"
-    "          var basePath = \"" + BASE_PATH + "\";\n"
-    "          var p = location.pathname.replace(/\\/index\\.html$/, \"\").replace(/\\/+$/, \"\");\n"
-    "          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);\n"
-    "          if (p) {\n"
-    "            var m;\n"
-    "            if ((m = p.match(/^\\/courses\\/([^/]+)$/))) location.hash = \"#course/\" + m[1];\n"
-    "            else if ((m = p.match(/^\\/stories\\/([^/]+)$/))) location.hash = \"#story/\" + m[1];\n"
-    "            else if ((m = p.match(/^\\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))\n"
-    "              location.hash = \"#\" + m[1];\n"
-    "          }\n"
-    "        } catch (e) {}\n"
-    "      })();\n"
-    "    </script>\n"
-)
+# The previous version of build_pages injected a boot script that did
+# `location.hash = "#course/foo"` so a hash-based router could pick it up.
+# That mutated clean URLs (/courses/foo/) into hash URLs (/courses/foo/#course/foo)
+# which weakened the SPA's clean-URL UX. parseHash() in app.js now reads
+# `location.pathname` directly, so no bootstrap is needed.
+PATH_BOOT_SCRIPT = ""
 
 
 def inject_boot_script(template: str) -> str:
-    # Put it right before the closing </head>
+    if not PATH_BOOT_SCRIPT:
+        return template
     return template.replace("</head>", PATH_BOOT_SCRIPT + "  </head>", 1)
 
 
-# Pre-render a snippet inside the right <section data-route="X"> so crawlers
-# see real text before JS runs. The SPA's renderer will then overwrite/augment.
-SECTION_INJECT_RE_TMPL = (
-    r'(<section[^>]*\bdata-route="{route}"[^>]*>)'
-)
-
-
-def inject_section_content(template: str, route: str, snippet_html: str) -> str:
-    pat = re.compile(SECTION_INJECT_RE_TMPL.format(route=re.escape(route)))
+# Inject prerendered HTML INTO an existing mount node (e.g. the empty
+# <article id="storyArticle"></article>) — replaces its inner contents in
+# place. Prevents duplicate IDs and lets the SPA hydrate the same element.
+def inject_into_mount(template: str, mount_id: str, inner_html: str) -> str:
+    pat = re.compile(
+        r'(<(\w+)[^>]*\bid="' + re.escape(mount_id) + r'"[^>]*>)(.*?)(</\2>)',
+        re.S,
+    )
     return pat.sub(
-        lambda m: m.group(1) + "\n<!-- prerendered SEO content -->\n" + snippet_html,
+        lambda m: m.group(1) + "\n<!-- prerendered SEO content -->\n"
+                  + inner_html + "\n<!-- /prerendered -->\n" + m.group(4),
         template,
         count=1,
     )
 
 
-# Show the right route on first paint (the SPA hides every .route until JS
-# matches one). For prerendered pages, also un-hide the static snippet.
-SHOW_ROUTE_STYLE_TMPL = """
-    <style>
-      /* Prerender: show only the current route on first paint, no JS needed */
-      .route[data-route="{route}"] { display: block !important; }
-      .route[data-route="{route}"][hidden] { display: block !important; }
-    </style>
-"""
+# For a single prerendered page, also un-hide the matching <section> so the
+# crawler/no-JS user actually sees the body. The SPA's hashchange/popstate
+# handler will continue to manage `hidden` after hydration.
+SHOW_ROUTE_STYLE_TMPL = (
+    "\n    <style id=\"prerenderShowRoute\">"
+    "section.route[data-route=\"{route}\"][hidden]{{display:block !important;}}"
+    "section.route[data-route=\"{route}\"]{{display:block !important;}}"
+    "section.route:not([data-route=\"{route}\"]){{display:none !important;}}"
+    "</style>\n"
+)
+
+
+def show_route_style(template: str, route: str) -> str:
+    style = SHOW_ROUTE_STYLE_TMPL.format(route=route)
+    return template.replace("</head>", style + "  </head>", 1)
 
 # ---------- per-route builders ----------------------------------------------
 
@@ -338,8 +376,7 @@ def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
         "inLanguage": "vi",
     }]
     out = patch_jsonld(out, extra)
-    if snippet_html:
-        out = inject_section_content(out, slug, snippet_html)
+    out = show_route_style(out, slug)
     out = inject_boot_script(out)
     return out
 
@@ -351,8 +388,10 @@ def build_home(template: str) -> str:
         "Uber. Lộ trình rõ ràng để chinh phục offer Big Tech."
     )
     canonical = f"{SITE_BASE}/"
-    return patch_head(template, title=title, description=description,
-                      canonical=canonical, og_image=SITE_BASE + OG_IMAGE)
+    out = patch_head(template, title=title, description=description,
+                     canonical=canonical, og_image=SITE_BASE + OG_IMAGE)
+    out = show_route_style(out, "home")
+    return out
 
 
 def build_course_detail(template: str, c: dict, en: dict) -> str:
@@ -391,17 +430,18 @@ def build_course_detail(template: str, c: dict, en: dict) -> str:
     }]
     out = patch_jsonld(out, extra)
 
+    # Inner contents only — no wrapping <article id="courseArticle">, since we
+    # inject INTO the existing mount in the template (avoid duplicate IDs).
     snippet = (
-        f'<article class="article" id="courseArticle">'
         f'  <header class="article__head">'
         f'    <h1>{text(title_vi)}</h1>'
         f'    <p class="article__lede">{text(blurb_vi)}</p>'
         f'    <p class="muted"><a href="{attr(BASE_PATH)}/courses/" data-href="#courses">← All courses</a></p>'
         f'  </header>'
         f'  <img class="article__cover" src="{attr(cover)}" alt="{attr(title_vi)}" loading="lazy" />'
-        f'</article>'
     )
-    out = inject_section_content(out, "course", snippet)
+    out = inject_into_mount(out, "courseArticle", snippet)
+    out = show_route_style(out, "course")
     out = inject_boot_script(out)
     return out
 
@@ -419,7 +459,8 @@ def build_story_detail(template: str, s: dict) -> str:
     canonical = f"{SITE_BASE}/stories/{s['slug']}/"
 
     out = patch_head(template, title=title, description=description,
-                     canonical=canonical, og_image=cover, og_title=title_vi)
+                     canonical=canonical, og_image=cover, og_title=title_vi,
+                     og_type="article")
 
     extra = [{
         "@type": "Article",
@@ -454,7 +495,6 @@ def build_story_detail(template: str, s: dict) -> str:
     lede = f'<p class="article__lede">{text(lead_vi)}</p>' if lead_vi else ""
 
     snippet = (
-        f'<article class="article story-detail" id="storyArticle">'
         f'  <header class="story-detail__head">'
         f'    <div class="story-detail__chips">{cos_html}</div>'
         f'    <h1>{text(title_vi)}</h1>'
@@ -463,9 +503,9 @@ def build_story_detail(template: str, s: dict) -> str:
         f'  <img class="story-detail__cover" src="{attr(cover)}" alt="{attr(title_vi)}" loading="lazy" />'
         f'  {lede}'
         f'  <p class="muted"><a href="{attr(BASE_PATH)}/stories/" data-href="#stories">← All stories</a></p>'
-        f'</article>'
     )
-    out = inject_section_content(out, "story", snippet)
+    out = inject_into_mount(out, "storyArticle", snippet)
+    out = show_route_style(out, "story")
     out = inject_boot_script(out)
     return out
 

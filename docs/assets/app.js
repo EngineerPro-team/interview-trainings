@@ -232,6 +232,10 @@
   }
 
   function showRoute({ route, slug }) {
+    // Remove the prerender-time style that forces one route visible — once
+    // JS hydrates we let `.route[hidden]` CSS do the work as usual.
+    const preStyle = document.getElementById("prerenderShowRoute");
+    if (preStyle) preStyle.remove();
     document.querySelectorAll(".route").forEach((s) => {
       s.hidden = s.dataset.route !== route;
     });
@@ -288,13 +292,17 @@
             ? "EngineerPro — Conquering Big Tech with battle-tested mentors"
             : "EngineerPro — Chinh phục Big Tech cùng mentor thực chiến")
         : `${label} · ${SUFFIX}`;
+      // Counts derived from live data so descriptions can never drift.
+      const nCourses  = (typeof courses  !== "undefined") ? courses.length  : 10;
+      const nMentors  = (data && data.mentors) ? data.mentors.length : 19;
+      const nStories  = (typeof stories  !== "undefined") ? stories.length  : 94;
       const ROUTE_DESC = {
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
-        courses:   en ? "10 in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding." : "10 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
+        courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
         resources: en ? "Free interview resources from EngineerPro — programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — video lập trình nền tảng, template CV Big Tech và playlist review CV.",
-        mentors:   en ? "19 mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…" : "19 mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",
-        stories:   en ? "94+ EngineerPro students landed offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…" : "94+ học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",
+        mentors:   en ? `${nMentors} mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…` : `${nMentors} mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…`,
+        stories:   en ? `${nStories}+ EngineerPro students landed offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…` : `${nStories}+ học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…`,
         podcast:   en ? "EngineerPro podcast on Substack & Spotify — tech career and interview tips from Big Tech mentors." : "Podcast EngineerPro trên Substack & Spotify — tips sự nghiệp & phỏng vấn từ mentor Big Tech.",
         partners:  en ? "EngineerPro partners — organisations sharing the mission of bringing Vietnamese engineers into Big Tech." : "Đối tác EngineerPro — các tổ chức cùng sứ mệnh đưa kỹ sư Việt vươn ra Big Tech.",
         faq:       en ? "Frequently asked questions about EngineerPro courses, mentors, schedule, and admissions." : "Câu hỏi thường gặp về khoá học, mentor, lịch học và thủ tục đăng ký tại EngineerPro.",

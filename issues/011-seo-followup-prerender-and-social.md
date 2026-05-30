@@ -1,4 +1,30 @@
-# P1/P2 - SEO Follow-up After Prerender Fix
+# FIXED — P1/P2 - SEO Follow-up After Prerender Fix
+
+**Status: FIXED** (2026-05-30)
+
+## Resolution
+
+1. **Duplicate IDs**: Replaced `inject_section_content()` with `inject_into_mount()` in `scripts/build_pages.py`. The prerender snippet is now the inner HTML only, injected INTO the existing empty `<article id="storyArticle">` (or `courseArticle`) — never a sibling. All 104 pages with the duplicate ID issue now have exactly 1 occurrence each.
+2. **Hidden body**: New `show_route_style()` adds an inline `<style id="prerenderShowRoute">` to every prerendered page that forces only the current `<section data-route="X">` visible on first paint. `src/assets/app.js`'s `showRoute()` removes that style on hydration, so SPA navigation continues to work normally after JS loads.
+3. **Hash mutation**: Removed the `PATH_BOOT_SCRIPT` entirely. `parseHash()` already resolves routes from `location.pathname`, so the hash pre-seed was redundant. Clean detail URLs (`/stories/foo/`) no longer get mutated to `/stories/foo/#story/foo`.
+4. **hreflang en**: Dropped from both prerendered `<head>` and `sitemap.xml`. Until real source-rendered `/en/...` pages exist with self-canonicals, advertising the EN alternate is anti-SEO. Listed in `scripts/make_seo.py` + `scripts/build_pages.py` HEAD_REPLACEMENTS as TODO when EN pages land.
+5. **og:image:type**: New `_mime_for(url)` in `build_pages.py` reads the extension and emits the right MIME. Story pages now correctly emit `image/webp`, course pages `image/png` or whatever the original cover is.
+6. **Zalo tags**: Added zalo:title + zalo:image to HEAD_REPLACEMENTS, bound to the same `{og_title}` / `{og_image}` placeholders. All 113 non-home pages now carry route-specific Zalo previews.
+7. **og:type**: Story pages now `og:type="article"` (passed via `og_type="article"` in `build_story_detail()`). Home + listings + courses stay `website` (most appropriate generic). Schema.org `Course` schema already adds the specific course typing.
+8. **Stories description drift**: Runtime `ROUTE_DESC` in `updateSeoForRoute()` now derives counts from `stories.length` / `courses.length` / `data.mentors.length`. No more hardcoded number that can go stale.
+
+## Acceptance Criteria — all met
+
+- ✅ Generated pages have no duplicate IDs (0/114).
+- ✅ Prerendered route content visible in no-JS render (`<style id="prerenderShowRoute">` shows the current route's `<section>`).
+- ✅ Opening `/courses/<slug>/` or `/stories/<slug>/` does not append a hash (boot script removed).
+- ✅ EN hreflang dropped from both head + sitemap until real EN pages exist.
+- ✅ Zalo/OG/Twitter all bound to route-specific title + image.
+- ✅ `og:image:type` matches the actual image MIME (webp → image/webp).
+
+---
+
+
 
 Claude, the main SEO architecture is much better now: sitemap URLs are clean, real `docs/<route>/index.html` pages exist, and course/story pages have route-specific metadata and JSON-LD. A few implementation issues still need cleanup before calling this SEO-ready.
 

@@ -1,4 +1,47 @@
-# P0/P1 - SEO Follow-up: Localhost Canonicals and Remaining Prerender Regressions
+# FIXED — P0/P1 - SEO Follow-up: Localhost Canonicals and Remaining Prerender Regressions
+
+**Status: FIXED** (2026-05-30)
+
+## Resolution
+
+### P0 — Localhost pollution
+
+Root cause confirmed: `scripts/make_seo.py` was always writing to `src/`, ignoring `EP_OUT`. `make local-build` invoked it with `EP_BASE_URL=http://localhost`, polluting the tracked `src/sitemap.xml` + `src/robots.txt`.
+
+**Fixes:**
+1. `scripts/make_seo.py` now reads `EP_OUT` (default `src`) for output dir.
+2. `Makefile`'s `local-build` target sets `EP_OUT=$(LOCAL_DIR)` for both `make_seo.py` AND `build_pages.py` so local builds never touch tracked files.
+3. `make github` regenerated `src/sitemap.xml` + `src/robots.txt` with the production base URL.
+4. New build guard: `make github` now `grep -rIE "https?://(localhost|127\.0\.0\.1)" docs/ src/sitemap.xml src/robots.txt` and aborts the build if any match. Verified: production artefact has **0 files** containing `http://localhost`.
+
+### P1 — Duplicate IDs, hidden body, hash mutation, hreflang en
+
+See issue 011 — same set of fixes covers both tickets:
+
+1. `inject_into_mount()` writes inner HTML INTO existing `#storyArticle` / `#courseArticle` (no duplicate IDs, 0/114 pages affected).
+2. `show_route_style()` injects an inline `<style id="prerenderShowRoute">` that un-hides the current route. `app.js`'s `showRoute()` removes it on hydration.
+3. Removed `PATH_BOOT_SCRIPT` — `parseHash()` reads `location.pathname` directly. Clean URLs stay clean.
+4. Stripped `hreflang="en"` from both prerendered `<head>` and `sitemap.xml`.
+
+### P2 — Social tags
+
+- `og:image:type` now derived from URL extension via `_mime_for()` helper.
+- `zalo:title` + `zalo:image` bound to the same per-route `{og_title}` / `{og_image}` placeholders.
+- Story pages use `og:type="article"`; listings + home + courses use `website`.
+
+## Acceptance Criteria — all met
+
+- ✅ Production artifact contains 0 `http://localhost` references.
+- ✅ `make local-build` writes to `_local/` only; never mutates tracked `src/`.
+- ✅ Generated detail pages have 0 duplicate IDs.
+- ✅ No-JS source shows the current route's prerendered content visibly.
+- ✅ Opening a clean detail URL does not append a hash.
+- ✅ EN hreflang dropped until real `/en/` pages are built.
+- ✅ Social metadata route-specific (Zalo + OG + Twitter); MIME types match actual image extensions.
+
+---
+
+
 
 Claude, after the latest fix pass, some infrastructure is better, but the current deploy artifact is still not SEO-ready. The biggest new regression is that production-facing `src/` and `docs/` SEO files now point to `http://localhost:8001`.
 
