@@ -67,10 +67,23 @@
 
 /* Hero already uses a fixed dark gradient — keep it bright but ensure it
    meets the body palette nicely. */
-:root[data-theme="dark"] .hero,
-:root[data-theme="dark"] .roadmap-hero,
+/* The hero / book-hero use `var(--navy)` in their gradients. In dark mode
+   that variable is swapped to a light grey for headings, which would turn
+   the hero background into light grey with white text on top — unreadable.
+   Force the original navy gradient regardless of theme. */
+:root[data-theme="dark"] .hero {
+  background:
+    radial-gradient(1200px 600px at 90% -10%, rgba(255, 122, 24, 0.18), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(24, 98, 255, 0.22), transparent 60%),
+    linear-gradient(180deg, #0b1d3a 0%, #102849 100%);
+  color: #fff;
+}
 :root[data-theme="dark"] .book-hero {
-  /* Keep the rich gradient as-is — looks great in both modes */
+  background:
+    radial-gradient(900px 500px at 90% 0%, rgba(255, 122, 24, 0.18), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(24, 98, 255, 0.22), transparent 60%),
+    linear-gradient(180deg, #0b1d3a 0%, #102849 100%);
+  color: #fff;
 }
 
 /* Nav background — make sure backdrop blur works in dark too */
