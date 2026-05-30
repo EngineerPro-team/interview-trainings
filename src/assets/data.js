@@ -105,8 +105,8 @@ window.SITE_DATA = {
     {
       name: "Chấn Thành (Thomas Quach)",
       photo: "assets/img/mentors/thomas-quach.jpg",
-      current:  { role: "Software Engineer",        company: "Đang cập nhật" },
-      previous: null,
+      current:  { role: "Software Engineer",        company: "Amazon (UK)" },
+      previous: { role: "Staff Engineer",           company: "OKX" },
       linkedin: "https://www.linkedin.com/in/thomas-quach-669818117/",
     },
     {
