@@ -50,6 +50,20 @@ SUBS = [
     # "Gossip" misrender of Vietnamese "tản mạn" (musings, notes)
     (re.compile(r"\bgossip\b"), "notes"),
     (re.compile(r"\bGossip\b"), "Notes"),
+    # "Bạn học viên" fallback name → "Our student" in EN context
+    (re.compile(r"\bBạn học viên\b"), "Our student"),
+    (re.compile(r"\bbạn học viên\b"), "our student"),
+    # "Tản mạn" / "tản mạn" (musings) — keep as "Reflections" in titles
+    (re.compile(r"\bTản mạn\b"), "Reflections"),
+    (re.compile(r"\btản mạn\b"), "reflections"),
+    # Common Vietnamese article-title fragments that crept into EN titles
+    (re.compile(r"\bnhững điều bạn cần chú ý\b", re.IGNORECASE), "things you should watch out for"),
+    (re.compile(r"\bKỹ Năng Cần Thiết Cho\b"), "Essential Skills for"),
+    (re.compile(r"\bTại Big Tech\b", re.IGNORECASE), "at Big Tech"),
+    (re.compile(r"\bDân IT và Chuyện Phỏng Vấn Ở\b"), "IT folks and the interview story at"),
+    (re.compile(r"\btừ Staff Engineer\b", re.IGNORECASE), "from a Staff Engineer"),
+    (re.compile(r"\btại Zendesk\b", re.IGNORECASE), "at Zendesk"),
+    (re.compile(r"\bbehavior trong pv bigtech\b", re.IGNORECASE), "behavior in Big Tech interviews"),
 ]
 
 # Marketing boilerplate appended to almost every Google Doc — strip it.
