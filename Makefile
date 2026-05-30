@@ -5,13 +5,14 @@
 #   make dev      -> generate docs + serve in one shot
 #   make clean    -> remove docs/
 
-SRC_DIR  := src
-DOCS_DIR := docs
-PORT     := 8001
+SRC_DIR   := src
+DOCS_DIR  := docs
+LOCAL_DIR := _local
+PORT      := 8001
 # Override with: make PYTHON=python3 crawl
 PYTHON   ?= python3.11
 
-.PHONY: github serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo prerender og masks help
+.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo prerender og masks help
 
 help:
 	@echo "EngineerPro rebuild — available targets:"
@@ -24,9 +25,10 @@ help:
 	@echo "  make crawl-story-images  Match + download covers (run after parse-stories)"
 	@echo "  make og              Re-generate share card    → src/assets/img/og-share.png"
 	@echo "  make masks           Convert raster logos      → src/assets/img/companies/*-mask.png"
-	@echo "  make github          Generate $(DOCS_DIR)/ from $(SRC_DIR)/ for GitHub Pages"
+	@echo "  make github          PROD build of $(DOCS_DIR)/ for GitHub Pages (uses EP_BASE_URL + EP_BASE_PATH)"
+	@echo "  make local-build     LOCAL build of $(DOCS_DIR)/ for serving from localhost root (no subpath)"
 	@echo "  make serve           Serve $(DOCS_DIR)/ at http://localhost:$(PORT)"
-	@echo "  make dev             Generate + serve"
+	@echo "  make dev             local-build + serve (the right command for local preview)"
 	@echo "  make clean           Remove $(DOCS_DIR)/"
 
 crawl: crawl-courses crawl-podcasts crawl-faqs crawl-resources
@@ -100,15 +102,27 @@ github: seo
 	@$(PYTHON) scripts/build_pages.py
 	@echo "✓ $(DOCS_DIR)/ ready — commit & push, then enable GitHub Pages on /docs."
 
-serve:
-	@if [ ! -d "$(DOCS_DIR)" ]; then \
-		echo "✗ $(DOCS_DIR)/ not found. Run 'make github' first."; exit 1; \
-	fi
-	@echo "→ Serving $(DOCS_DIR)/ at http://localhost:$(PORT)  (Ctrl+C to stop)"
-	@cd $(DOCS_DIR) && python3 -m http.server $(PORT)
+# Local build into $(LOCAL_DIR)/ with EP_BASE_PATH="" — for local preview ONLY.
+# Kept separate from $(DOCS_DIR)/ so the production deploy artefact never gets
+# clobbered. $(LOCAL_DIR)/ is in .gitignore.
+local-build:
+	@echo "→ Building $(LOCAL_DIR)/ for LOCAL serve (no subpath) ..."
+	@rm -rf $(LOCAL_DIR)
+	@mkdir -p $(LOCAL_DIR)
+	@cp -R $(SRC_DIR)/. $(LOCAL_DIR)/
+	@touch $(LOCAL_DIR)/.nojekyll
+	@EP_BASE_URL=http://localhost:$(PORT) EP_BASE_PATH= EP_OUT=$(LOCAL_DIR) $(PYTHON) scripts/build_pages.py
+	@echo "✓ $(LOCAL_DIR)/ ready for localhost (production docs/ untouched)."
 
-dev: github serve
+serve:
+	@if [ ! -d "$(LOCAL_DIR)" ]; then \
+		echo "✗ $(LOCAL_DIR)/ not found. Run 'make local-build' or 'make dev' first."; exit 1; \
+	fi
+	@echo "→ Serving $(LOCAL_DIR)/ at http://localhost:$(PORT)  (Ctrl+C to stop)"
+	@cd $(LOCAL_DIR) && python3 -m http.server $(PORT)
+
+dev: local-build serve
 
 clean:
-	@rm -rf $(DOCS_DIR)
-	@echo "✓ Removed $(DOCS_DIR)/"
+	@rm -rf $(DOCS_DIR) $(LOCAL_DIR)
+	@echo "✓ Removed $(DOCS_DIR)/ and $(LOCAL_DIR)/"

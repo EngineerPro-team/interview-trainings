@@ -43,7 +43,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
-DOCS = os.path.join(ROOT, "docs")
+# Output dir defaults to docs/ (production); override with EP_OUT=_local for local builds.
+DOCS = os.path.join(ROOT, os.environ.get("EP_OUT", "docs"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, SITE_NAME, OG_IMAGE  # noqa: E402
@@ -559,7 +560,8 @@ def main() -> int:
     write(os.path.join(DOCS, "404.html"), SPA_FALLBACK_404.format(base=SITE_BASE.rstrip("/")))
     pages += 1
 
-    print(f"[prerender] wrote {pages} HTML pages under docs/ (base={SITE_BASE})")
+    out_label = os.path.relpath(DOCS, ROOT)
+    print(f"[prerender] wrote {pages} HTML pages under {out_label}/ (base={SITE_BASE})")
     return 0
 
 

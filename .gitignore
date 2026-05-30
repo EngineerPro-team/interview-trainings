@@ -18,4 +18,6 @@ uploads/
 .cursor/
 
 # Build output is intentionally committed to publish via GitHub Pages,
-# so docs/ is NOT ignored.
+# so docs/ is NOT ignored. _local/ is the local-preview build target
+# (separate from docs/ so prod artefact is never clobbered by `make dev`).
+_local/
