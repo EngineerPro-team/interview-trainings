@@ -13,6 +13,17 @@
     return p || "";
   }
 
+  // If we got here via 404.html (e.g. user opened a non-prerendered URL),
+  // 404.html stashed the original path in sessionStorage. Restore it before
+  // the router runs so the SPA still ends up at the right route.
+  try {
+    const stash = sessionStorage.getItem("ep_redirect");
+    if (stash && stash !== location.pathname + location.search + location.hash) {
+      sessionStorage.removeItem("ep_redirect");
+      history.replaceState(null, "", stash);
+    }
+  } catch (e) { /* sessionStorage disabled */ }
+
   // ===================== i18n =====================
   // Lang priority: ?lang= query param → localStorage → navigator.language → 'vi'.
   // The query param is honoured so that hreflang alternate URLs ("?lang=en") are

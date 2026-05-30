@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>EngineerPro — Page not found</title>
+  <meta name="robots" content="noindex" />
+  <meta http-equiv="refresh" content="0;url=https://engineerpro-team.github.io/interview-trainings/" />
+  <script>
+    // GitHub Pages serves /404.html for any unknown URL. Stash the originally-
+    // requested path so the SPA can route there after we land on /.
+    (function () {
+      try {
+        var p = location.pathname + location.search + location.hash;
+        sessionStorage.setItem("ep_redirect", p);
+      } catch (e) {}
+      location.replace("https://engineerpro-team.github.io/interview-trainings/");
+    })();
+  </script>
+</head>
+<body>
+  <p>Page not found. <a href="https://engineerpro-team.github.io/interview-trainings/">Back to home</a>.</p>
+</body>
+</html>

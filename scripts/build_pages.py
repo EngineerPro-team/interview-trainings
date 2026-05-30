@@ -484,6 +484,32 @@ ROUTE_DESCRIPTIONS_VI = {
 }
 
 
+SPA_FALLBACK_404 = """<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>EngineerPro — Page not found</title>
+  <meta name="robots" content="noindex" />
+  <meta http-equiv="refresh" content="0;url={base}/" />
+  <script>
+    // GitHub Pages serves /404.html for any unknown URL. Stash the originally-
+    // requested path so the SPA can route there after we land on /.
+    (function () {{
+      try {{
+        var p = location.pathname + location.search + location.hash;
+        sessionStorage.setItem("ep_redirect", p);
+      }} catch (e) {{}}
+      location.replace("{base}/");
+    }})();
+  </script>
+</head>
+<body>
+  <p>Page not found. <a href="{base}/">Back to home</a>.</p>
+</body>
+</html>
+"""
+
+
 def main() -> int:
     with open(os.path.join(SRC, "index.html"), "r", encoding="utf-8") as f:
         template = f.read()
@@ -529,7 +555,11 @@ def main() -> int:
         write(os.path.join(DOCS, "stories", s["slug"], "index.html"), html_out)
         pages += 1
 
-    print(f"[prerender] wrote {pages} HTML pages under docs/ (base={BASE_URL})")
+    # 4. SPA fallback for any URL not prerendered (typos, future slugs, etc.)
+    write(os.path.join(DOCS, "404.html"), SPA_FALLBACK_404.format(base=SITE_BASE.rstrip("/")))
+    pages += 1
+
+    print(f"[prerender] wrote {pages} HTML pages under docs/ (base={SITE_BASE})")
     return 0
 
 
