@@ -1,0 +1,21 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local data drops not meant for the repo (large XLSX / MD source sheets)
+uploads/
+
+# Cursor / local-agent state
+.cursor/
+
+# Build output is intentionally committed to publish via GitHub Pages,
+# so docs/ is NOT ignored.

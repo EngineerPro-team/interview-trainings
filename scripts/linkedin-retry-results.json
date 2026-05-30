@@ -1,0 +1,59 @@
+{
+  "tungtran309": {
+    "status": "blocked"
+  },
+  "hoangdquang": {
+    "status": "blocked"
+  },
+  "vu-thi-thien-anh": {
+    "status": "blocked"
+  },
+  "nguyen-anh-viet": {
+    "status": "blocked"
+  },
+  "kylenguyen141": {
+    "status": "blocked"
+  },
+  "tranhieu23": {
+    "status": "blocked"
+  },
+  "ntlam94": {
+    "status": "blocked"
+  },
+  "thomas-quach-669818117": {
+    "status": "blocked"
+  },
+  "lam0895": {
+    "status": "ok",
+    "name": "Lam Pham",
+    "company": "NVIDIA",
+    "description": "Experienced Software Engineer with a demonstrated history of working in the internet… · Experience: NVIDIA · Education: The University of Aizu · Location: Hanoi Capital Region · 500+ connections on Li",
+    "photo_url": "https://media.licdn.com/dms/image/v2/D5603AQG8AVriSdCX3A/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1682343630198?e=2147483647&v=beta&t=Qkn1rGF13m1hc_fwl8Wja-Gbko8fm4-c4-VUiGIxc64",
+    "photo_saved": true,
+    "local_photo": "assets/img/mentors/lam-pham.jpg"
+  },
+  "loi-nguyen-thang": {
+    "status": "ok",
+    "name": "Loi Nguyen",
+    "company": "GovTech Singapore",
+    "description": "Experience: GovTech Singapore · Education: Hanoi University of Science and Technology · Location: Singapore · 500+ connections on LinkedIn. View Loi Nguyen’s profile on LinkedIn, a professional commun",
+    "photo_url": "https://static.licdn.com/aero-v1/sc/h/1c5u578iilxfi4m4dvc4q810q",
+    "photo_saved": false,
+    "local_photo": null
+  },
+  "manhdx": {
+    "status": "blocked"
+  },
+  "huytq56": {
+    "status": "ok",
+    "name": "Huy Tran",
+    "company": "Meta",
+    "description": "Motivated Software Engineer with a strong interest in Backend Software Development and… · Experience: Meta · Education: Hanoi University of Science and Technology · Location: Singapore · 500+ connecti",
+    "photo_url": "https://static.licdn.com/aero-v1/sc/h/1c5u578iilxfi4m4dvc4q810q",
+    "photo_saved": false,
+    "local_photo": null
+  },
+  "vuducnhi": {
+    "status": "blocked"
+  }
+}

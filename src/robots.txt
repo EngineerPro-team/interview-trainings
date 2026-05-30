@@ -1,0 +1,4 @@
+# EngineerPro static site
+User-agent: *
+Allow: /
+Sitemap: https://engineerpro-academy.github.io/sitemap.xml
