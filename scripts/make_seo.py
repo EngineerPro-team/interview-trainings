@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from site_config import BASE_URL, TOP_ROUTES  # noqa: E402
+from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES  # noqa: E402
 
 ROUTE_PRIORITY = {
     "courses":   (0.9, "weekly"),
@@ -47,20 +47,20 @@ def main() -> int:
     urls: list[tuple[str, str, float, str]] = []
 
     # Home
-    urls.append((f"{BASE_URL}/", today, 1.0, "weekly"))
+    urls.append((f"{SITE_BASE}/", today, 1.0, "weekly"))
 
     # Top-level routes
     for slug, _vi, _en in TOP_ROUTES:
         prio, freq = ROUTE_PRIORITY.get(slug, (0.6, "monthly"))
-        urls.append((f"{BASE_URL}/{slug}/", today, prio, freq))
+        urls.append((f"{SITE_BASE}/{slug}/", today, prio, freq))
 
     # Course detail pages
     for s in load_slugs("courses-data.js", "COURSES"):
-        urls.append((f"{BASE_URL}/courses/{s}/", today, 0.7, "monthly"))
+        urls.append((f"{SITE_BASE}/courses/{s}/", today, 0.7, "monthly"))
 
     # Story detail pages
     for s in load_slugs("stories-data.js", "STORIES"):
-        urls.append((f"{BASE_URL}/stories/{s}/", today, 0.6, "monthly"))
+        urls.append((f"{SITE_BASE}/stories/{s}/", today, 0.6, "monthly"))
 
     # Build XML
     sm = [
@@ -89,12 +89,12 @@ def main() -> int:
         "# EngineerPro static site\n"
         "User-agent: *\n"
         "Allow: /\n"
-        f"Sitemap: {BASE_URL}/sitemap.xml\n"
+        f"Sitemap: {SITE_BASE}/sitemap.xml\n"
     )
     with open(os.path.join(SRC, "robots.txt"), "w", encoding="utf-8") as f:
         f.write(robots)
 
-    print(f"[seo] wrote sitemap.xml with {len(urls)} clean URLs + robots.txt (base={BASE_URL})")
+    print(f"[seo] wrote sitemap.xml with {len(urls)} clean URLs + robots.txt (base={SITE_BASE})")
     return 0
 
 

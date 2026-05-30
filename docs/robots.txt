@@ -1,4 +1,4 @@
 # EngineerPro static site
 User-agent: *
 Allow: /
-Sitemap: https://engineerpro-academy.github.io/sitemap.xml
+Sitemap: https://engineerpro-team.github.io/interview-trainings/sitemap.xml

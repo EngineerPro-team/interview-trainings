@@ -46,7 +46,7 @@ SRC = os.path.join(ROOT, "src")
 DOCS = os.path.join(ROOT, "docs")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from site_config import BASE_URL, TOP_ROUTES, SITE_NAME, OG_IMAGE  # noqa: E402
+from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, SITE_NAME, OG_IMAGE  # noqa: E402
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -184,10 +184,39 @@ HEAD_REPLACEMENTS = [
 ]
 
 
+PLACEHOLDER_ORIGIN = "https://engineerpro-academy.github.io"
+
+
 def fix_asset_paths(template: str) -> str:
-    """Convert relative `assets/...` URLs to root-relative `/assets/...` so the
-    same template works at depth `/`, `/courses/`, and `/courses/foo/`."""
-    out = re.sub(r'(src|href)="assets/', r'\1="/assets/', template)
+    """Patch the master template for the current deploy target:
+      - Rewrite the placeholder origin (used in the source for OG/JSON-LD) to
+        the real `SITE_BASE` (origin + subpath).
+      - Convert relative `assets/...` URLs to absolute `{BASE_PATH}/assets/...`
+        so subfolder prerendered pages still find them.
+      - Rewrite internal `<a href="/courses/...">` to include the subpath.
+      - Inject `window.EP_BASE_PATH` so app.js can construct subpath URLs at
+        runtime.
+    Works whether `BASE_PATH` is empty (root deploy) or non-empty (project
+    Pages, e.g. `/interview-trainings`).
+    """
+    out = template
+    # 1. Rewrite placeholder origin to the real deploy origin+subpath.
+    out = out.replace(PLACEHOLDER_ORIGIN, SITE_BASE)
+    # 2. Asset paths
+    out = re.sub(r'(src|href)="assets/', rf'\1="{BASE_PATH}/assets/', out)
+    # 3. Internal route links
+    if BASE_PATH:
+        out = re.sub(
+            r'href="/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)/"',
+            rf'href="{BASE_PATH}/\1/"',
+            out,
+        )
+    # 4. Embed BASE_PATH as a global before app.js loads
+    base_path_inject = f'<script>window.EP_BASE_PATH = "{BASE_PATH}";</script>\n    '
+    out = out.replace(
+        f'<script src="{BASE_PATH}/assets/i18n.js">',
+        base_path_inject + f'<script src="{BASE_PATH}/assets/i18n.js">',
+    )
     return out
 
 
@@ -235,23 +264,25 @@ def patch_jsonld(template: str, extra_nodes: list[dict]) -> str:
 
 # Prepend the bootstrap script that turns /courses/foo/ → #course/foo BEFORE
 # app.js runs, so the SPA renders the right route immediately.
-PATH_BOOT_SCRIPT = """
-    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->
-    <script>
-      (function () {
-        try {
-          var p = location.pathname.replace(/\\/index\\.html$/, "").replace(/\\/+$/, "");
-          if (p) {
-            var m;
-            if ((m = p.match(/^\\/courses\\/([^/]+)$/))) location.hash = "#course/" + m[1];
-            else if ((m = p.match(/^\\/stories\\/([^/]+)$/))) location.hash = "#story/" + m[1];
-            else if ((m = p.match(/^\\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))
-              location.hash = "#" + m[1];
-          }
-        } catch (e) {}
-      })();
-    </script>
-"""
+PATH_BOOT_SCRIPT = (
+    "\n    <!-- Prerendered route bootstrap: translate path to hash before app.js runs -->\n"
+    "    <script>\n"
+    "      (function () {\n"
+    "        try {\n"
+    "          var basePath = \"" + BASE_PATH + "\";\n"
+    "          var p = location.pathname.replace(/\\/index\\.html$/, \"\").replace(/\\/+$/, \"\");\n"
+    "          if (basePath && p.indexOf(basePath) === 0) p = p.slice(basePath.length);\n"
+    "          if (p) {\n"
+    "            var m;\n"
+    "            if ((m = p.match(/^\\/courses\\/([^/]+)$/))) location.hash = \"#course/\" + m[1];\n"
+    "            else if ((m = p.match(/^\\/stories\\/([^/]+)$/))) location.hash = \"#story/\" + m[1];\n"
+    "            else if ((m = p.match(/^\\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)$/)))\n"
+    "              location.hash = \"#\" + m[1];\n"
+    "          }\n"
+    "        } catch (e) {}\n"
+    "      })();\n"
+    "    </script>\n"
+)
 
 
 def inject_boot_script(template: str) -> str:
@@ -290,10 +321,10 @@ SHOW_ROUTE_STYLE_TMPL = """
 def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
                     description: str, snippet_html: str = "") -> str:
     title = f"{title_vi} · {SITE_NAME} — Luyện phỏng vấn Big Tech"
-    canonical = f"{BASE_URL}/{slug}/"
+    canonical = f"{SITE_BASE}/{slug}/"
     out = patch_head(template, title=title, description=description,
                      canonical=canonical,
-                     og_image=BASE_URL + OG_IMAGE,
+                     og_image=SITE_BASE + OG_IMAGE,
                      og_title=f"{title_vi} · {SITE_NAME}")
     # ItemList schema for listing pages
     extra = [{
@@ -302,7 +333,7 @@ def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
         "url": canonical,
         "name": f"{title_vi} · {SITE_NAME}",
         "description": description,
-        "isPartOf": {"@id": f"{BASE_URL}/#website"},
+        "isPartOf": {"@id": f"{SITE_BASE}/#website"},
         "inLanguage": "vi",
     }]
     out = patch_jsonld(out, extra)
@@ -318,9 +349,9 @@ def build_home(template: str) -> str:
         "100% mentors đến từ Big Tech — Google, Amazon, TikTok, Shopee, Spotify, "
         "Uber. Lộ trình rõ ràng để chinh phục offer Big Tech."
     )
-    canonical = f"{BASE_URL}/"
+    canonical = f"{SITE_BASE}/"
     return patch_head(template, title=title, description=description,
-                      canonical=canonical, og_image=BASE_URL + OG_IMAGE)
+                      canonical=canonical, og_image=SITE_BASE + OG_IMAGE)
 
 
 def build_course_detail(template: str, c: dict, en: dict) -> str:
@@ -331,15 +362,14 @@ def build_course_detail(template: str, c: dict, en: dict) -> str:
 
     title = f"{title_vi} · {SITE_NAME} — Big Tech Interview Prep"
     description = truncate(blurb_vi, 160)
-    canonical = f"{BASE_URL}/courses/{c['slug']}/"
-    cover = c.get("cover") or (BASE_URL + OG_IMAGE)
+    canonical = f"{SITE_BASE}/courses/{c['slug']}/"
+    cover = c.get("cover") or (SITE_BASE + OG_IMAGE)
     if cover.startswith("//"):
         cover = "https:" + cover
 
     out = patch_head(template, title=title, description=description,
                      canonical=canonical, og_image=cover, og_title=title_vi)
 
-    # Course schema
     extra = [{
         "@type": "Course",
         "@id": canonical + "#course",
@@ -347,27 +377,25 @@ def build_course_detail(template: str, c: dict, en: dict) -> str:
         "alternateName": title_en,
         "description": blurb_vi,
         "url": canonical,
-        "provider": {"@id": f"{BASE_URL}/#org"},
+        "provider": {"@id": f"{SITE_BASE}/#org"},
         "inLanguage": "vi",
         "image": cover,
     }, {
         "@type": "BreadcrumbList",
         "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "Home", "item": BASE_URL + "/"},
-            {"@type": "ListItem", "position": 2, "name": "Courses", "item": f"{BASE_URL}/courses/"},
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_BASE + "/"},
+            {"@type": "ListItem", "position": 2, "name": "Courses", "item": f"{SITE_BASE}/courses/"},
             {"@type": "ListItem", "position": 3, "name": title_vi, "item": canonical},
         ],
     }]
     out = patch_jsonld(out, extra)
 
-    # Inject pre-rendered article header into the course-detail route so crawlers
-    # see the title/lead/cover before JS runs.
     snippet = (
         f'<article class="article" id="courseArticle">'
         f'  <header class="article__head">'
         f'    <h1>{text(title_vi)}</h1>'
         f'    <p class="article__lede">{text(blurb_vi)}</p>'
-        f'    <p class="muted"><a href="/courses/" data-href="#courses">← All courses</a></p>'
+        f'    <p class="muted"><a href="{attr(BASE_PATH)}/courses/" data-href="#courses">← All courses</a></p>'
         f'  </header>'
         f'  <img class="article__cover" src="{attr(cover)}" alt="{attr(title_vi)}" loading="lazy" />'
         f'</article>'
@@ -381,13 +409,13 @@ def build_story_detail(template: str, s: dict) -> str:
     title_vi = s.get("originalTitle") or s.get("title") or ""
     title_en = s.get("originalTitleEn") or s.get("titleEn") or title_vi
     lead_vi = re.sub(r"<[^>]+>", " ", s.get("lead", "")).strip()
-    cover = s.get("cover") or (BASE_URL + OG_IMAGE)
+    cover = s.get("cover") or (SITE_BASE + OG_IMAGE)
     if cover.startswith("assets/"):
-        cover = f"{BASE_URL}/{cover}"
+        cover = f"{SITE_BASE}/{cover}"
 
     title = f"{title_vi} · {SITE_NAME}"
     description = truncate(lead_vi, 160) or f"Success story tại EngineerPro: {title_vi}"
-    canonical = f"{BASE_URL}/stories/{s['slug']}/"
+    canonical = f"{SITE_BASE}/stories/{s['slug']}/"
 
     out = patch_head(template, title=title, description=description,
                      canonical=canonical, og_image=cover, og_title=title_vi)
@@ -402,15 +430,15 @@ def build_story_detail(template: str, s: dict) -> str:
         "image": cover,
         "author": (
             {"@type": "Person", "name": s["name"]}
-            if s.get("name") else {"@id": f"{BASE_URL}/#org"}
+            if s.get("name") else {"@id": f"{SITE_BASE}/#org"}
         ),
-        "publisher": {"@id": f"{BASE_URL}/#org"},
+        "publisher": {"@id": f"{SITE_BASE}/#org"},
         "inLanguage": "vi",
     }, {
         "@type": "BreadcrumbList",
         "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "Home", "item": BASE_URL + "/"},
-            {"@type": "ListItem", "position": 2, "name": "Success Stories", "item": f"{BASE_URL}/stories/"},
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_BASE + "/"},
+            {"@type": "ListItem", "position": 2, "name": "Success Stories", "item": f"{SITE_BASE}/stories/"},
             {"@type": "ListItem", "position": 3, "name": title_vi, "item": canonical},
         ],
     }]
@@ -433,7 +461,7 @@ def build_story_detail(template: str, s: dict) -> str:
         f'  </header>'
         f'  <img class="story-detail__cover" src="{attr(cover)}" alt="{attr(title_vi)}" loading="lazy" />'
         f'  {lede}'
-        f'  <p class="muted"><a href="/stories/" data-href="#stories">← All stories</a></p>'
+        f'  <p class="muted"><a href="{attr(BASE_PATH)}/stories/" data-href="#stories">← All stories</a></p>'
         f'</article>'
     )
     out = inject_section_content(out, "story", snippet)

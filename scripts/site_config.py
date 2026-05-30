@@ -1,15 +1,32 @@
 """Single source of truth for site-wide build config.
 
-Override the deploy URL once before launch:
+Override at deploy time:
 
+    # Root deploy (custom domain or user/org pages):
     EP_BASE_URL=https://engineerpro.com make github
 
-All build scripts (make_seo.py, build_pages.py) read BASE_URL from here.
+    # GitHub Pages project subpath (default for repo-name.github.io/repo/):
+    EP_BASE_URL=https://engineerpro-team.github.io \
+    EP_BASE_PATH=/interview-trainings \
+    make github
+
+All build scripts (make_seo.py, build_pages.py) read these from here.
 """
 import os
 
-# Trailing slash is *not* included — scripts append paths explicitly.
-BASE_URL: str = os.environ.get("EP_BASE_URL", "https://engineerpro-academy.github.io").rstrip("/")
+# Origin only — no trailing slash. e.g. "https://engineerpro-team.github.io"
+BASE_URL: str = os.environ.get("EP_BASE_URL", "https://engineerpro-team.github.io").rstrip("/")
+
+# Subpath prefix (with leading slash, no trailing slash) — empty string for root
+# deploys, "/interview-trainings" for project Pages, etc.
+_raw_path = os.environ.get("EP_BASE_PATH", "/interview-trainings").strip()
+if _raw_path and not _raw_path.startswith("/"):
+    _raw_path = "/" + _raw_path
+BASE_PATH: str = _raw_path.rstrip("/")
+
+# Full canonical URL prefix (origin + subpath, no trailing slash) — what every
+# loc/canonical/og:url uses.
+SITE_BASE: str = BASE_URL + BASE_PATH
 
 SITE_NAME: str = "EngineerPro"
 SITE_TAGLINE_VI: str = "Chinh phục Big Tech cùng mentor thực chiến"

@@ -1,6 +1,18 @@
 (function () {
   "use strict";
 
+  // ===================== BASE PATH =====================
+  // GitHub Pages serves project repos at /<repo>/. build_pages.py injects
+  // window.EP_BASE_PATH; everything else defaults to "" (root deploy).
+  const BASE_PATH = (typeof window !== "undefined" && window.EP_BASE_PATH) || "";
+
+  function stripBasePath(p) {
+    if (!BASE_PATH) return p || "";
+    if (p === BASE_PATH) return "/";
+    if (p && p.indexOf(BASE_PATH + "/") === 0) return p.slice(BASE_PATH.length);
+    return p || "";
+  }
+
   // ===================== i18n =====================
   // Lang priority: ?lang= query param → localStorage → navigator.language → 'vi'.
   // The query param is honoured so that hreflang alternate URLs ("?lang=en") are
@@ -161,8 +173,7 @@
   // serve prerendered URLs cleanly while keeping the legacy hash router alive
   // for backwards-compatible links.
   function parseHash() {
-    const path = (location.pathname || "/").replace(/\/index\.html$/, "");
-    // /courses/<slug>/
+    let path = stripBasePath((location.pathname || "/").replace(/\/index\.html$/, ""));
     let m;
     if ((m = path.match(/^\/courses\/([^/]+)\/?$/))) return { route: "course", slug: m[1] };
     if ((m = path.match(/^\/stories\/([^/]+)\/?$/))) return { route: "story", slug: m[1] };
@@ -179,13 +190,15 @@
     return { route: "home", slug: null };
   }
 
-  // Build the canonical /path/ for a given {route, slug}. Used by click
-  // interception to update URL via history.pushState (no hash).
+  // Build the canonical /path/ for a given {route, slug}, prefixed by the
+  // deploy subpath when running under a project-Pages URL.
   function pathFor(route, slug) {
-    if (route === "home" || !route) return "/";
-    if (route === "course" && slug) return `/courses/${slug}/`;
-    if (route === "story"  && slug) return `/stories/${slug}/`;
-    return `/${route}/`;
+    let p;
+    if (route === "home" || !route) p = "/";
+    else if (route === "course" && slug) p = `/courses/${slug}/`;
+    else if (route === "story"  && slug) p = `/stories/${slug}/`;
+    else p = `/${route}/`;
+    return BASE_PATH ? BASE_PATH + (p === "/" ? "/" : p) : p;
   }
 
   function showRoute({ route, slug }) {
@@ -580,7 +593,7 @@
       const card = el("article", { class: "card card--course" }, [
         el(
           "a",
-          { class: "card--course__media", href: `/courses/${c.slug}/`, "data-href": `#course/${c.slug}` },
+          { class: "card--course__media", href: `${BASE_PATH}/courses/${c.slug}/`, "data-href": `#course/${c.slug}` },
           cover
         ),
         el("div", { class: "card--course__body" }, [
@@ -588,13 +601,13 @@
           el(
             "h3",
             {},
-            el("a", { href: `/courses/${c.slug}/`, "data-href": `#course/${c.slug}`, class: "card--course__title" }, cardTitle)
+            el("a", { href: `${BASE_PATH}/courses/${c.slug}/`, "data-href": `#course/${c.slug}`, class: "card--course__title" }, cardTitle)
           ),
           el("p", {}, cardBlurb),
           tags.length ? tagRow : null,
           el(
             "a",
-            { class: "card__link", href: `/courses/${c.slug}/`, "data-href": `#course/${c.slug}` },
+            { class: "card__link", href: `${BASE_PATH}/courses/${c.slug}/`, "data-href": `#course/${c.slug}` },
             t("courses.card.viewMore")
           ),
         ]),
@@ -1368,7 +1381,7 @@
         "a",
         {
           class: "story-row",
-          href: `/stories/${s.slug}/`,
+          href: `${BASE_PATH}/stories/${s.slug}/`,
           "data-href": `#story/${s.slug}`,
           title: dispTitle,
         },
