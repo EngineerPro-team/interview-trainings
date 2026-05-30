@@ -136,6 +136,13 @@ window.SITE_DATA = {
       previous: null,
       linkedin: "https://www.linkedin.com/in/duc-than-a15045122/",
     },
+    {
+      name: "Đông Trương",
+      photo: "assets/img/mentors/dong-truong.jpg",
+      current:  { role: "Software Engineer",        company: "Đang cập nhật" },
+      previous: null,
+      linkedin: "https://www.linkedin.com/in/dong-truong-56297a145/",
+    },
   ],
 
   contact: {

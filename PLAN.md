@@ -22,7 +22,7 @@ A one-page site with a sticky top nav. Clicking a tab swaps the visible section 
 |---|---|---|
 | Trang chủ | `#home` | Hero, value props, quick links |
 | Khoá học | `#courses` | 10 courses (15 crawled from `/blogs/khoa-hoc` pages 1-4, 5 excluded in `scripts/crawl_courses.py`) |
-| Giảng viên | `#mentors` | 18 mentors (LinkedIn-linked) |
+| Giảng viên | `#mentors` | 19 mentors (LinkedIn-linked) |
 | Podcast | `#podcast` | Episodes from `engineerprovn.substack.com/podcast/archive` |
 | Hình thức học | `#format` | Zoom live + Discord support |
 | Liên hệ | `#contact` | Placeholder — info TBD |

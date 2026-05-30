@@ -83,7 +83,7 @@ window.I18N = {
     // ============== MENTORS ==============
     "mentors.head":  "Giảng viên",
     "mentors.intro.html":
-      '<span id="mentorsCount">18</span> mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS… Bấm vào nút LinkedIn để xem profile.',
+      '<span id="mentorsCount">19</span> mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS… Bấm vào nút LinkedIn để xem profile.',
     "mentors.cta.linkedin": "LinkedIn",
     "mentors.cta.disabled": "LinkedIn — cập nhật sau",
 
@@ -275,7 +275,7 @@ window.I18N = {
 
     "mentors.head":  "Mentors",
     "mentors.intro.html":
-      '<span id="mentorsCount">18</span> mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS… Click LinkedIn to see their profile.',
+      '<span id="mentorsCount">19</span> mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS… Click LinkedIn to see their profile.',
     "mentors.cta.linkedin": "LinkedIn",
     "mentors.cta.disabled": "LinkedIn — coming soon",
 
