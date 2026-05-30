@@ -1,12 +1,12 @@
 # FIXED — P0/P1 Follow-up Review After Latest Fixes
 
-**Status: FIXED** (2026-05-30) — except mentor placeholder list (still awaiting user verification)
+**Status: FIXED** (2026-05-30) — except remaining mentor labels that still need public verification
 
 ## Resolution
 
 - **P0 docs drift**: ran `make github` after every source change. `make github` now depends on `seo` AND runs `scripts/build_pages.py` to regenerate every prerendered page. `diff -qr src docs` now shows the expected drift (`Only in docs: .nojekyll`, `Only in docs: book/`, `Only in docs: courses/`, etc. — those are the prerendered subfolder pages by design). The two files that originally diverged (`app.js`, `stories-data.js`, `index.html`) are now in sync, and the new `sitemap.xml` / `robots.txt` are present.
 
-- **P1 mentor placeholders**: still 4 mentor records ship `Big Tech` / `Đang cập nhật` in `src/assets/data.js` (Việt, Chấn Thành, Lợi Nguyễn, Mạnh) plus Chương has `linkedin: null`. Retried `scripts/retry_linkedin.py` with new IP → still 100% HTTP 999 / 404, so we can't backfill from LinkedIn programmatically. **This needs user input** — see issue 006 for the names and detailed next step. Marked there as OPEN.
+- **P1 mentor placeholders**: `Việt` and `Mạnh` intentionally keep a generic `Big Tech` label for privacy; do not backfill their specific employer. Remaining public-data gaps are Chấn Thành, Lợi Nguyễn, plus Chương's missing LinkedIn. Retried `scripts/retry_linkedin.py` with new IP → still 100% HTTP 999 / 404, so we can't backfill from LinkedIn programmatically. See issue 006 for the current next step.
 
 - **P1 README / PLAN inventory stale**:
   - `README.md`: `8 mentors from Big Tech` → `17 mentors from Big Tech`.
@@ -56,14 +56,14 @@ Reviewers or users opening the deployed/GitHub Pages version can still see stale
 `src/assets/data.js` still contains:
 
 - `Chuong` has `linkedin: null` at `src/assets/data.js:55-58`.
-- `Viet` has company `Big Tech` at `src/assets/data.js:61-64`.
+- `Viet` has company `Big Tech` at `src/assets/data.js:61-64` — intentional privacy label.
 - `Chan Thanh (Thomas Quach)` has company `Dang cap nhat` at `src/assets/data.js:98-101`.
 - `Loi Nguyen` has company `Dang cap nhat` at `src/assets/data.js:110-113`.
-- `Manh` has company `Big Tech` at `src/assets/data.js:116-119`.
+- `Manh` has company `Big Tech` at `src/assets/data.js:116-119` — intentional privacy label.
 
 ### Suggested Fix
 
-Replace these with approved public labels, hide unverifiable cards, or mark them intentionally private so the mentor grid does not show placeholder companies.
+Replace the remaining `Dang cap nhat` labels with approved public labels, hide unverifiable cards, or mark them intentionally private. Do not replace the intentional `Big Tech` labels for Viet/Manh with specific employer names.
 
 ## P1 - README/PLAN content inventory is stale
 

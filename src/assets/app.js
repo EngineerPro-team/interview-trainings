@@ -765,20 +765,25 @@
         el("span", { class: "mentor__company" }, company),
       ]);
 
-      const children = [
-        avatar,
-        el("h3", {}, m.name),
-        current,
-      ];
-
+      // Wrap the role lines in a single .mentor__body cell so the card's
+      // 4-row grid (avatar / name / body 1fr / cta) keeps the LinkedIn CTA
+      // pinned to the same y across all cards in a row.
+      const bodyChildren = [current];
       if (m.previous) {
-        children.push(
+        bodyChildren.push(
           el("div", { class: "mentor__line mentor__line--ex" }, [
             el("span", { class: "mentor__ex" }, "ex-"),
             el("span", {}, `${m.previous.role} @ ${m.previous.company}`),
           ])
         );
       }
+      const body = el("div", { class: "mentor__body" }, bodyChildren);
+
+      const children = [
+        avatar,
+        el("h3", {}, m.name),
+        body,
+      ];
 
       if (m.linkedin) {
         children.push(

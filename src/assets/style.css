@@ -1693,17 +1693,31 @@ p {
 
 /* mentor card */
 .card--mentor {
+  /* Grid layout with explicit rows: avatar / name / body (fills remaining) / cta.
+     This guarantees the LinkedIn CTA sits at the same y in every card of the
+     same row, no matter how many lines the role / ex-line take. */
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  justify-items: center;
   text-align: center;
-  align-items: center;
   padding: 1.75rem 1.25rem 1.5rem;
   gap: 0.45rem;
-  /* Reserve a minimum height so cards in the same row don't collapse to the
-     shortest one; the LinkedIn CTA is then bottom-pinned via margin-top:auto. */
-  min-height: 290px;
+  min-height: 300px;
+}
+/* Wrap the 1-2 role lines into a single body cell that fills the 1fr row. */
+.card--mentor .mentor__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  /* Sit at the top of the 1fr cell so spacing above the CTA is consistent. */
+  align-self: start;
 }
 .avatar {
-  width: 76px;
-  height: 76px;
+  box-sizing: border-box;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -1713,6 +1727,7 @@ p {
   color: #fff;
   margin-bottom: 0.4rem;
   box-shadow: inset 0 -8px 16px rgba(0, 0, 0, 0.15);
+  border: 2px solid transparent;
 }
 .avatar--photo {
   object-fit: cover;
@@ -1766,10 +1781,9 @@ p {
 }
 
 .mentor__cta {
-  /* margin-top:auto pushes the CTA to the bottom of the flex card so the
-     LinkedIn button is bottom-aligned across cards regardless of whether
-     a mentor has an "ex-" line or not. */
-  margin-top: auto;
+  /* The card uses CSS Grid with `grid-template-rows: auto auto 1fr auto` —
+     the CTA sits in the last `auto` row, which is anchored to the bottom
+     because the 1fr row above absorbs all leftover space. */
   align-self: center;
   display: inline-flex;
   align-items: center;
@@ -1803,7 +1817,6 @@ p {
   font-family: "Inter", sans-serif;
 }
 .mentor__cta--disabled {
-  margin-top: auto;
   align-self: center;
   background: rgba(11, 29, 58, 0.07);
   color: var(--muted) !important;
