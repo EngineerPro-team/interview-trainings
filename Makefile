@@ -12,7 +12,7 @@ PORT      := 8001
 # Override with: make PYTHON=python3 crawl
 PYTHON   ?= python3.11
 
-.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo prerender og masks help
+.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks help
 
 help:
 	@echo "EngineerPro rebuild — available targets:"
@@ -84,6 +84,10 @@ seo:
 	@echo "→ Generating sitemap.xml + robots.txt ..."
 	@$(PYTHON) scripts/make_seo.py
 
+stats:
+	@echo "→ Auditing stat references across docs + code ..."
+	@$(PYTHON) scripts/check_stats.py
+
 prerender:
 	@echo "→ Prerendering route HTML pages under docs/ ..."
 	@$(PYTHON) scripts/build_pages.py
@@ -92,7 +96,7 @@ masks:
 	@echo "→ Converting raster company logos to silhouette masks ..."
 	@$(PYTHON) scripts/mask_logos.py
 
-github: seo
+github: stats seo
 	@echo "→ Generating $(DOCS_DIR)/ from $(SRC_DIR)/ ..."
 	@rm -rf $(DOCS_DIR)
 	@mkdir -p $(DOCS_DIR)
