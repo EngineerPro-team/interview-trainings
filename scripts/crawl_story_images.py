@@ -259,11 +259,19 @@ def main() -> int:
     matched = 0
     generated = 0
     kept_doc = 0
+    kept_manual = 0
     for s in stories:
         slug = s["slug"]
         out = IMG_DIR / f"{slug}.webp"
 
-        # Highest-priority cover comes from the linked Google Doc (set by
+        # Highest priority: an explicit manualEdits lock on `cover` means
+        # someone replaced the cover by hand (e.g. regenerated for IP safety
+        # or to drop a copyrighted building photo). Never touch.
+        if "cover" in (s.get("manualEdits") or []):
+            kept_manual += 1
+            continue
+
+        # Next priority: cover came from the linked Google Doc (set by
         # crawl_story_bodies.py). If we already have a doc cover, leave it.
         if s.get("coverFrom") == "googledoc" and s.get("cover"):
             kept_doc += 1
@@ -295,6 +303,7 @@ def main() -> int:
         generated += 1
 
     print(f"  kept {kept_doc} doc covers untouched")
+    print(f"  kept {kept_manual} manual covers untouched (manualEdits lock)")
 
     update_stories_file(stories)
     print()

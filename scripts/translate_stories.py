@@ -154,6 +154,11 @@ def main() -> int:
         if s.get("originalHtmlEn") and s.get("originalTitleEn"):
             continue  # already done; safe to re-run
 
+        # manualEdits lock: skip stories whose EN body was hand-curated.
+        locks = s.get("manualEdits") or []
+        if "originalHtmlEn" in locks:
+            continue
+
         slug = s.get("slug", "?")
         try:
             title_vi = (s.get("originalTitle") or "").strip()

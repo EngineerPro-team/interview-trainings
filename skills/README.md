@@ -14,6 +14,7 @@ the task with minimal back-and-forth.
 | [deploy-and-preview](deploy-and-preview/SKILL.md) | "Push lên", "preview local", deploy/build questions |
 | [content-pipeline](content-pipeline/SKILL.md) | Refresh stories / courses / podcast / FAQ |
 | [translate-content](translate-content/SKILL.md) | Translate / re-translate VI → EN, fix MT artifacts |
+| [manual-edits](manual-edits/SKILL.md) | Hand-curated story data — how the `manualEdits` lock keeps it safe across re-crawls |
 
 These are READMEs, not magic. They follow the Cursor SKILL.md format
 (YAML frontmatter + concise body) so they can also be loaded as agent
