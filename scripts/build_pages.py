@@ -365,16 +365,24 @@ def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
                      canonical=canonical,
                      og_image=SITE_BASE + OG_IMAGE,
                      og_title=f"{title_vi} · {SITE_NAME}")
-    # ItemList schema for listing pages
-    extra = [{
-        "@type": "WebPage",
-        "@id": canonical,
-        "url": canonical,
-        "name": f"{title_vi} · {SITE_NAME}",
-        "description": description,
-        "isPartOf": {"@id": f"{SITE_BASE}/#website"},
-        "inLanguage": "vi",
-    }]
+    extra = [
+        {
+            "@type": "WebPage",
+            "@id": canonical,
+            "url": canonical,
+            "name": f"{title_vi} · {SITE_NAME}",
+            "description": description,
+            "isPartOf": {"@id": f"{SITE_BASE}/#website"},
+            "inLanguage": "vi",
+        },
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_BASE + "/"},
+                {"@type": "ListItem", "position": 2, "name": title_vi, "item": canonical},
+            ],
+        },
+    ]
     out = patch_jsonld(out, extra)
     out = show_route_style(out, slug)
     out = inject_boot_script(out)
@@ -390,6 +398,36 @@ def build_home(template: str) -> str:
     canonical = f"{SITE_BASE}/"
     out = patch_head(template, title=title, description=description,
                      canonical=canonical, og_image=SITE_BASE + OG_IMAGE)
+
+    # Tell Google the 9 top-level pages so it can pick sitelinks faster.
+    nav_items = [
+        {
+            "@type": "SiteNavigationElement",
+            "@id": f"{SITE_BASE}/{slug}/#nav",
+            "name": title_vi,
+            "alternateName": title_en,
+            "url": f"{SITE_BASE}/{slug}/",
+        }
+        for slug, title_vi, title_en in TOP_ROUTES
+    ]
+    # Plus an ItemList that ranks them (Google prefers explicit ordering).
+    item_list = {
+        "@type": "ItemList",
+        "@id": f"{SITE_BASE}/#mainnav",
+        "name": f"{SITE_NAME} — Main navigation",
+        "itemListOrder": "https://schema.org/ItemListOrderAscending",
+        "numberOfItems": len(TOP_ROUTES),
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": idx,
+                "name": title_vi,
+                "url": f"{SITE_BASE}/{slug}/",
+            }
+            for idx, (slug, title_vi, _) in enumerate(TOP_ROUTES, start=1)
+        ],
+    }
+    out = patch_jsonld(out, nav_items + [item_list])
     out = show_route_style(out, "home")
     return out
 
