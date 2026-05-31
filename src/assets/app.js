@@ -1117,8 +1117,6 @@
 
     const intro = document.getElementById("roadmapIntro");
     if (intro) intro.textContent = (en && r.introEn) ? r.introEn : r.intro;
-    const src = document.getElementById("roadmapSource");
-    if (src) src.href = r.sourceUrl;
 
     const tl = document.getElementById("roadmapTimeline");
     if (tl) {

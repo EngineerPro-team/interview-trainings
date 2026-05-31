@@ -109,7 +109,6 @@ window.I18N = {
     "roadmap.eyebrow": "📍 Lộ trình ôn thi · Big Tech",
     "roadmap.title.html":
       'Từ <span class="grad">fresher</span> đến <span class="grad">Big Tech offer</span><br />trong 3 giai đoạn rõ ràng.',
-    "roadmap.source":  "Đọc bản gốc trên Substack ↗",
     "roadmap.extras.title": "Song song với lộ trình chính",
     "roadmap.benefits.head": "Khi là học viên EngineerPro, bạn nhận được gì?",
     "roadmap.cta1":   "Xem khoá học áp dụng →",
@@ -346,7 +345,6 @@ window.I18N = {
     "roadmap.eyebrow": "📍 Interview roadmap · Big Tech",
     "roadmap.title.html":
       'From <span class="grad">fresher</span> to <span class="grad">Big Tech offer</span><br />in 3 clear stages.',
-    "roadmap.source":  "Read the original on Substack ↗",
     "roadmap.extras.title": "Alongside the main path",
     "roadmap.benefits.head": "What you get as an EngineerPro student",
     "roadmap.cta1":   "See applicable courses →",
