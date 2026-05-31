@@ -216,6 +216,22 @@ HEAD_REPLACEMENTS = [
 ]
 
 
+def absolutise(url: str) -> str:
+    """Make an asset URL absolute so social-network scrapers (Facebook
+    Messenger, Twitter, LinkedIn, ...) can fetch it. Zalo is permissive
+    and will resolve relative URLs against og:url; Facebook/Twitter
+    won't, and silently drop the preview image."""
+    if not url:
+        return url
+    if url.startswith(("http://", "https://")):
+        return url
+    if url.startswith("//"):
+        return "https:" + url
+    if url.startswith("/"):
+        return BASE_URL + url
+    return f"{SITE_BASE}/{url.lstrip('./')}"
+
+
 def _mime_for(url: str) -> str:
     """Best-effort MIME from URL extension; falls back to image/png."""
     u = (url or "").lower().split("?")[0].split("#")[0]
@@ -441,9 +457,7 @@ def build_course_detail(template: str, c: dict, en: dict) -> str:
     title = f"{title_vi} · {SITE_NAME} — Big Tech Interview Prep"
     description = truncate(blurb_vi, 160)
     canonical = f"{SITE_BASE}/courses/{c['slug']}/"
-    cover = c.get("cover") or (SITE_BASE + OG_IMAGE)
-    if cover.startswith("//"):
-        cover = "https:" + cover
+    cover = absolutise(c.get("cover") or (SITE_BASE + OG_IMAGE))
 
     out = patch_head(template, title=title, description=description,
                      canonical=canonical, og_image=cover, og_title=title_vi)
@@ -488,9 +502,7 @@ def build_story_detail(template: str, s: dict) -> str:
     title_vi = s.get("originalTitle") or s.get("title") or ""
     title_en = s.get("originalTitleEn") or s.get("titleEn") or title_vi
     lead_vi = re.sub(r"<[^>]+>", " ", s.get("lead", "")).strip()
-    cover = s.get("cover") or (SITE_BASE + OG_IMAGE)
-    if cover.startswith("assets/"):
-        cover = f"{SITE_BASE}/{cover}"
+    cover = absolutise(s.get("cover") or (SITE_BASE + OG_IMAGE))
 
     title = f"{title_vi} · {SITE_NAME}"
     description = truncate(lead_vi, 160) or f"Success story tại EngineerPro: {title_vi}"
