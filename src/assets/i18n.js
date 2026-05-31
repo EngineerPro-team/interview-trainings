@@ -26,7 +26,7 @@ window.I18N = {
     "hero.title.html":
       'Chinh phục <span class="grad">Big Tech</span><br />cùng mentor thực chiến.',
     "hero.sub.html":
-      "100% giảng viên đến từ Google, Amazon, TikTok, Shopee, Uber, Spotify… Lộ trình rõ ràng từ fresher đến senior. Học live trên Zoom trong <strong>lớp nhỏ 15–20 học viên</strong>, hỗ trợ 24/7 trên Discord.",
+      "100% giảng viên đến từ Google, Amazon, TikTok, Shopee, Uber, Spotify… Lộ trình rõ ràng từ fresher đến senior. Học live trên Zoom trong <strong>lớp nhỏ 15–20 học viên</strong>, hỗ trợ 24/7 trên Discord. Học viên xuất sắc còn được mentor <strong>refer trực tiếp vào Big Tech</strong> (Google, Meta, Amazon, Nvidia…).",
     "hero.cta1":      "Xem khoá học",
     "hero.cta2":      "Gặp giảng viên →",
 
@@ -224,7 +224,7 @@ window.I18N = {
     "hero.title.html":
       'Conquer <span class="grad">Big Tech</span><br />with battle-tested mentors.',
     "hero.sub.html":
-      "100% mentors from Google, Amazon, TikTok, Shopee, Uber, Spotify… A clear path from fresher to senior. Live Zoom sessions in <strong>small classes of 15–20 students</strong>, with 24/7 Discord support.",
+      "100% mentors from Google, Amazon, TikTok, Shopee, Uber, Spotify… A clear path from fresher to senior. Live Zoom sessions in <strong>small classes of 15–20 students</strong>, with 24/7 Discord support. Top students get <strong>direct mentor referrals into Big Tech</strong> (Google, Meta, Amazon, Nvidia…).",
     "hero.cta1":      "Browse courses",
     "hero.cta2":      "Meet the mentors →",
 
