@@ -25,11 +25,9 @@ ROOT = Path(__file__).resolve().parent.parent
 #   4. Author's local cursor uploads (legacy default)
 _CLI = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else None
 _ENV = Path(os.environ["EP_STORIES_MD"]).expanduser() if os.environ.get("EP_STORIES_MD") else None
-_REPO = ROOT / "uploads" / "edit-0.md"
-_AUTHOR = Path(
-    "/Users/lamp/.cursor/projects/Users-lamp-Desktop-individual-projects-interview-trainings/uploads/edit-0.md"
-)
-SHEET_MD = next((p for p in (_CLI, _ENV, _REPO, _AUTHOR) if p and p.exists()), _REPO)
+_REPO = ROOT / "uploads" / "edit-0.md"  # gitignored; drop the sheet export here
+# Final fallback only matters on the original author's machine; safe to leave empty here.
+SHEET_MD = next((p for p in (_CLI, _ENV, _REPO) if p and p.exists()), _REPO)
 OUT = ROOT / "src" / "assets" / "stories-data.js"
 MAX_OUTPUT = 100
 
