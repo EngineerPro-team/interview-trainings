@@ -309,7 +309,7 @@ def fix_asset_paths(template: str) -> str:
     # 3. Internal route links
     if BASE_PATH:
         out = re.sub(
-            r'href="/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)/"',
+            r'href="/(courses|book|resources|mentors|stories|podcast|partners|faq|terms|contact)/"',
             rf'href="{BASE_PATH}/\1/"',
             out,
         )

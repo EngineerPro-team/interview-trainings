@@ -209,7 +209,7 @@
   //  (#home-roadmap and #home-format are anchor scrolls into the home page)
   const TOP_ROUTES = [
     "home", "courses", "book", "resources",
-    "mentors", "stories", "podcast", "partners", "faq", "contact",
+    "mentors", "stories", "podcast", "partners", "faq", "terms", "contact",
   ];
 
   // Route resolution: prefer pathname (real URL like /courses/foo/) if it matches
@@ -221,7 +221,7 @@
     let m;
     if ((m = path.match(/^\/courses\/([^/]+)\/?$/))) return { route: "course", slug: m[1] };
     if ((m = path.match(/^\/stories\/([^/]+)\/?$/))) return { route: "story", slug: m[1] };
-    if ((m = path.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|contact)\/?$/))) {
+    if ((m = path.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
       return { route: m[1], slug: null };
     }
     // Hash fallback (legacy or anchor-only navigation)
