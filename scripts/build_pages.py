@@ -186,6 +186,26 @@ HEAD_REPLACEMENTS = [
         ),
         '<meta property="og:image:type" content="{og_image_type}" />',
     ),
+    # Actual pixel dimensions of the per-page image (FB/Twitter render
+    # better when these match; mismatched values cause ugly cropping).
+    (
+        re.compile(
+            r'<meta\s+property="og:image:width"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="og:image:width" content="{og_image_w}" />',
+    ),
+    (
+        re.compile(
+            r'<meta\s+property="og:image:height"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="og:image:height" content="{og_image_h}" />',
+    ),
+    (
+        re.compile(
+            r'<meta\s+property="og:image:alt"\s+content="[^"]*"\s*/?>',
+        ),
+        '<meta property="og:image:alt" content="{og_image_alt}" />',
+    ),
     (
         re.compile(
             r'<meta\s+name="twitter:image"\s+content="[^"]*"\s*/?>',
@@ -214,6 +234,30 @@ HEAD_REPLACEMENTS = [
         '<meta property="og:type" content="{og_type}" />',
     ),
 ]
+
+
+def image_dims(absolute_url: str) -> tuple[int, int]:
+    """Read pixel dimensions of an image whose absolute URL maps to a
+    file under docs/ (or src/). Falls back to (1200, 630) if missing —
+    that's the FB-recommended default for the share card."""
+    if not absolute_url:
+        return 1200, 630
+    rel = absolute_url
+    for prefix in (SITE_BASE, BASE_URL):
+        if prefix and rel.startswith(prefix):
+            rel = rel[len(prefix):]
+            break
+    rel = rel.lstrip("/")
+    for root in (DOCS, SRC):
+        candidate = os.path.join(root, rel)
+        if os.path.isfile(candidate):
+            try:
+                from PIL import Image
+                with Image.open(candidate) as im:
+                    return im.size
+            except Exception:
+                return 1200, 630
+    return 1200, 630
 
 
 def absolutise(url: str) -> str:
@@ -280,14 +324,19 @@ def fix_asset_paths(template: str) -> str:
 
 def patch_head(template: str, *, title: str, description: str, canonical: str,
                og_image: str, og_title: str | None = None,
-               og_type: str = "website") -> str:
+               og_type: str = "website",
+               og_image_alt: str | None = None) -> str:
     og_title = og_title or title
+    w, h = image_dims(og_image)
     ctx = {
         "title": attr(title),
         "description": attr(description),
         "canonical": attr(canonical),
         "og_image": attr(og_image),
         "og_image_type": attr(_mime_for(og_image)),
+        "og_image_w": str(w),
+        "og_image_h": str(h),
+        "og_image_alt": attr(og_image_alt or og_title),
         "og_title": attr(og_title),
         "og_type": attr(og_type),
     }
