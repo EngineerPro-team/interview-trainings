@@ -48,5 +48,6 @@ TOP_ROUTES = [
     ("podcast",   "Podcast",           "Podcast"),
     ("partners",  "Đối tác",           "Partners"),
     ("faq",       "Câu hỏi thường gặp", "FAQ"),
+    ("terms",     "Điều khoản dịch vụ", "Terms of Service"),
     ("contact",   "Liên hệ",           "Contact"),
 ]

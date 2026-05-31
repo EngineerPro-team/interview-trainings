@@ -3790,6 +3790,60 @@ a.faq-cta:hover { transform: translateY(-1px); }
   }
 }
 
+/* ===================== TERMS OF SERVICE ===================== */
+.terms-article {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 2.5rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  line-height: 1.65;
+  color: var(--text);
+}
+.terms-article h3 {
+  font-size: 1.18rem;
+  margin: 1.75rem 0 0.6rem;
+  color: var(--navy);
+  border-left: 3px solid var(--accent);
+  padding-left: 0.6rem;
+}
+.terms-article h3:first-child {
+  margin-top: 0;
+}
+.terms-article h4 {
+  font-size: 1rem;
+  margin: 1.1rem 0 0.4rem;
+  color: var(--text);
+}
+.terms-article p { margin: 0 0 0.7rem; }
+.terms-article ul,
+.terms-article ol {
+  margin: 0.2rem 0 0.9rem;
+  padding-left: 1.4rem;
+}
+.terms-article li { margin: 0.25rem 0; }
+.terms-article strong { color: var(--navy); }
+.terms-callout {
+  margin-top: 1.5rem !important;
+  padding: 0.9rem 1.1rem;
+  background: rgba(255, 122, 24, 0.08);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+:root[data-theme="dark"] .terms-article h3,
+:root[data-theme="dark"] .terms-article strong {
+  color: #fff;
+}
+:root[data-theme="dark"] .terms-callout {
+  background: rgba(255, 122, 24, 0.14);
+}
+.faq-foot {
+  text-align: center;
+  margin-top: 2rem;
+}
+
 /* ===================== ROUTES ===================== */
 .route {
   animation: fadeIn 0.32s ease both;

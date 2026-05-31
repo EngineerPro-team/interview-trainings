@@ -168,6 +168,11 @@ window.I18N = {
     "faq.expand":    "Mở tất cả",
     "faq.collapse":  "Thu gọn",
     "faq.empty":     "Không tìm thấy câu hỏi nào khớp.",
+    "faq.terms.cta": "Xem điều khoản dịch vụ →",
+
+    // ============== TERMS OF SERVICE ==============
+    "terms.head":  "Điều khoản dịch vụ",
+    "terms.intro": "Cam kết & chính sách của EngineerPro với học viên — vui lòng đọc kỹ trước khi đăng ký khoá học.",
 
     // ============== CONTACT ==============
     "contact.head":  "Liên hệ",
@@ -199,6 +204,7 @@ window.I18N = {
     "footer.link.stories":   "Success Stories",
     "footer.link.podcast":   "Podcast",
     "footer.link.faq":       "FAQ",
+    "footer.link.terms":     "Điều khoản dịch vụ",
     "footer.link.contact":   "Liên hệ",
     "footer.link.messenger": "Messenger",
     "footer.link.allPartners": "Tất cả đối tác",
@@ -353,6 +359,52 @@ window.I18N = {
     "faq.expand":    "Expand all",
     "faq.collapse":  "Collapse all",
     "faq.empty":     "No questions match.",
+    "faq.terms.cta": "Read our terms of service →",
+
+    "terms.head":  "Terms of Service",
+    "terms.intro": "EngineerPro's commitments & policies for our students — please read carefully before enrolling.",
+    "terms.body.html":
+      '<h3>1. Course delivery commitment</h3>' +
+      '<p>Courses you enroll in with <strong>EngineerPro</strong> will be delivered in full and as advertised. We are responsible for the quality and pace of every course we publish.</p>' +
+      '<h3>2. Ownership of learning materials</h3>' +
+      '<p>All learning materials, including but not limited to recorded videos and documents, are the <strong>intellectual property of EngineerPro</strong>. EngineerPro reserves the right to revoke or stop providing these materials at any time. Sharing, copying, or distributing materials outside the classroom in any form is <strong>strictly prohibited</strong>. Materials (including recordings) are only provided to support students who miss a session.</p>' +
+      '<h3>3. Use of learning materials</h3>' +
+      '<p>Students commit to using EngineerPro materials <strong>for study purposes only</strong>. Misuse — including copying, sharing outside the classroom, or repurposing without permission — is considered a breach. In that case, EngineerPro reserves the right to revoke access and refuse further services without refund.</p>' +
+      '<h3>4. Community services</h3>' +
+      '<p>EngineerPro community services — <strong>CV review, job-search support, material sharing, 1:1 consulting, Alumni access</strong> — are <strong>free of charge</strong> and are not part of the course fee. EngineerPro may pause or stop these services if they no longer fit community needs, and reserves the right to refuse service in case of conflict of interest.</p>' +
+      '<h3>5. Course freeze / deferral policy</h3>' +
+      '<p>EngineerPro <strong>does not generally support course freezing</strong>. In special cases, the team may review and approve a freeze. The final decision rests with EngineerPro and may be declined if deemed unreasonable.</p>' +
+      '<h3>6. Alumni & Internal Tech Talk policy</h3>' +
+      '<p>EngineerPro Alumni and Internal Tech Talk are platforms where mentors and students support each other and grow careers after the course. All Alumni members have the right and the duty to help build the community. EngineerPro reserves the right to refuse participation for <strong>unconstructive behavior or conflict of interest</strong>.</p>' +
+      '<h3>7. Refunds & deposit / tuition transfer</h3>' +
+      '<h4>a. Refund policy</h4>' +
+      '<p>We deliver quality and always do our best to meet expectations. We recognize unexpected situations happen, so please read the policy below carefully.</p>' +
+      '<p><strong>No refund under any circumstance</strong> (except when the course is cancelled by EngineerPro) — students cannot request a refund of tuition or deposit. This applies to all courses.</p>' +
+      '<h4>b. Transferring deposit / tuition to another course</h4>' +
+      '<p>Students may transfer paid deposit/tuition to a different course under the following conditions:</p>' +
+      '<ul>' +
+      '<li>Request must be made <strong>at least 5 days before the start date</strong> of the enrolled course.</li>' +
+      '<li>Up to <strong>2 transfer requests</strong> per student.</li>' +
+      '<li>Transfers depend on seat availability and curriculum at the time of request.</li>' +
+      '<li>If the new course is <strong>more expensive</strong>, the student pays the difference. If <strong>cheaper</strong>, the difference is not refunded.</li>' +
+      '<li>Any transfer fee (if applicable) must be paid before the transfer is finalized.</li>' +
+      '</ul>' +
+      '<h4>c. When transfer is NOT allowed</h4>' +
+      '<ul>' +
+      '<li>Student unilaterally cancels or requests transfer <strong>after the course has started</strong>.</li>' +
+      '<li>Student does not attend due to personal reasons without prior notice.</li>' +
+      '<li>Student violates EngineerPro policies / terms of service.</li>' +
+      '<li>Student misses sessions without valid reason.</li>' +
+      '</ul>' +
+      '<h4>d. Transfer request process</h4>' +
+      '<ol>' +
+      '<li>Submit request via <strong>email or fanpage</strong> at least <strong>5 days before the start date</strong>.</li>' +
+      '<li>Include a specific reason and supporting information.</li>' +
+      '<li>EngineerPro responds within <strong>2 days</strong> with the decision.</li>' +
+      '</ol>' +
+      '<h4>e. Final decision</h4>' +
+      '<p>EngineerPro reserves the right to the final decision on refunds and transfers, case by case.</p>' +
+      '<p class="terms-callout"><strong>Important:</strong> Refund and deferral requests are reviewed case-by-case under the policy above.</p>',
 
     "contact.head":  "Contact",
     "contact.intro": "Reach out to us for any questions or path consultation.",
@@ -381,6 +433,7 @@ window.I18N = {
     "footer.link.stories":   "Success Stories",
     "footer.link.podcast":   "Podcast",
     "footer.link.faq":       "FAQ",
+    "footer.link.terms":     "Terms of Service",
     "footer.link.contact":   "Contact",
     "footer.link.messenger": "Messenger",
     "footer.link.allPartners": "All partners",

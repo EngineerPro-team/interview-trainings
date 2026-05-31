@@ -404,6 +404,21 @@ def main() -> int:
 
     results.extend(load_extra_courses())
 
+    # Normalise legacy brand naming — the upstream blog uses the long form
+    # "EngineerPro / EngineerPro Academy" in many course bodies. We only
+    # operate under "EngineerPro" now.
+    def _strip_academy(s: str) -> str:
+        s = re.sub(r'EngineerPro\s*/\s*EngineerPro Academy', 'EngineerPro', s)
+        s = re.sub(r'EngineerPro và EngineerPro Academy', 'EngineerPro', s)
+        return s.replace(' tại EngineerPro Academy', ' tại EngineerPro') \
+                .replace(' at EngineerPro Academy', ' at EngineerPro') \
+                .replace('EngineerPro Academy', 'EngineerPro')
+
+    for c in results:
+        for k in ("title", "blurb", "html", "htmlEn"):
+            if isinstance(c.get(k), str):
+                c[k] = _strip_academy(c[k])
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(results, ensure_ascii=False, indent=2)
     OUT.write_text(

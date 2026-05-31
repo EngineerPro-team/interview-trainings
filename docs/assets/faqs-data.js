@@ -25,7 +25,7 @@ window.FAQS = [
   {
     "question": "EngineerPro có hỗ trợ học viên tìm việc tại Big tech và các công ti vừa và nhỏ trong và ngoài nước không?",
     "html": "Có, EngineerPro cam kết đi với học viên tới cuối hành trình Offer với các buổi Internal Talk training cho học viên. Các bạn học viên có thể nhắn tin fanpage để nhận được sự giúp đỡ tìm Job.",
-    "plain": "Có, EngineerPro/EngineerPro Academy cam kết đi với học viên tới cuối hành trình Offer với các buổi Internal Talk training cho học viên. Các bạn học viên có thể nhắn tin fanpage để nhận được sự giúp đỡ tìm Job.",
+    "plain": "Có, EngineerPro cam kết đi với học viên tới cuối hành trình Offer với các buổi Internal Talk training cho học viên. Các bạn học viên có thể nhắn tin fanpage để nhận được sự giúp đỡ tìm Job.",
     "questionEn": "Does EngineerPro help students find jobs at Big Tech or smaller companies?",
     "htmlEn": "<p>Yes. EngineerPro commits to walking with students all the way to the offer — including internal talk training sessions. Message our fanpage for job-search support.</p>"
   },
@@ -39,7 +39,7 @@ window.FAQS = [
   {
     "question": "Các khoá học của EngineerPro dạy bằng tiếng Việt hay tiếng Anh?",
     "html": "<p>Các khoá học của EngineerPro đều dạy bằng tiếng Việt</p>",
-    "plain": "Các khoá học của EngineerPro và EngineerPro Academy đều dạy bằng tiếng Việt",
+    "plain": "Các khoá học của EngineerPro đều dạy bằng tiếng Việt",
     "questionEn": "Are EngineerPro courses taught in Vietnamese or English?",
     "htmlEn": "<p>All EngineerPro courses are taught in Vietnamese.</p>"
   }
