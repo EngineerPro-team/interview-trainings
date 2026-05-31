@@ -351,6 +351,26 @@ def extract_article(html: str, fallback_title: str, fallback_cover: str) -> tupl
 
 
 # ===================================================================
+#  Extra hand-curated courses (not present on engineerprogurus.com)
+# ===================================================================
+EXTRA_COURSES_FILE = Path(__file__).resolve().parent / "data" / "extra_courses.json"
+
+
+def load_extra_courses() -> list[dict]:
+    """Read hand-curated course entries (e.g. the rotating Crash Course) and
+    merge them into the crawl output so they survive every re-crawl."""
+    if not EXTRA_COURSES_FILE.exists():
+        return []
+    try:
+        extras = json.loads(EXTRA_COURSES_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"  ! failed to load {EXTRA_COURSES_FILE}: {e}")
+        return []
+    print(f"  + merging {len(extras)} hand-curated course(s) from {EXTRA_COURSES_FILE.name}")
+    return extras
+
+
+# ===================================================================
 #  Main
 # ===================================================================
 def main() -> int:
@@ -381,6 +401,8 @@ def main() -> int:
             }
         )
         time.sleep(0.2)
+
+    results.extend(load_extra_courses())
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(results, ensure_ascii=False, indent=2)
