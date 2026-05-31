@@ -546,6 +546,8 @@
     { tag: "Golang",                    patterns: ["golang"], where: "title" },
     { tag: "Java",                      patterns: ["java"], where: "title" },
     { tag: "Big Tech",                  patterns: ["big tech"] },
+    { tag: "Crash Course",              patterns: ["crash course", "crash-course", "pet project", "build kafka", "build redis", "build mini database", "from scratch"] },
+    { tag: "Build CV",                  patterns: ["build cv", "viết cv", "review cv", "làm cv", "cv writing", "cv mạnh"] },
     { tag: "Mentor Talk",               patterns: ["mini series", "tech tea", "sharing tips"] },
     { tag: "Career",                    patterns: ["career", "sự nghiệp", "bứt phá"] },
   ];
