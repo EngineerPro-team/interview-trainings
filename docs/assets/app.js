@@ -949,6 +949,33 @@
   }
 
   // ===================== FAQ =====================
+  // FAQ enrichment: spot YouTube URLs inside the html and append a responsive
+  // 16:9 iframe right after the matching <a>, so readers can watch the linked
+  // video inline without leaving the page. Idempotent — skip if an embed for
+  // the same video id is already present.
+  function embedYouTubeLinks(html) {
+    if (!html) return html;
+    const VID_RE = /(?:youtube\.com\/(?:watch\?(?:[^"']*?[?&])?v=|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
+    return html.replace(
+      /<a\s+([^>]*?)href="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi,
+      (full, pre, href, post, inner) => {
+        VID_RE.lastIndex = 0;
+        const m = VID_RE.exec(href);
+        if (!m) return full;
+        const vid = m[1];
+        // already embedded?
+        if (html.includes(`youtube.com/embed/${vid}`)) return full;
+        const embed =
+          `<div class="embed-16x9" style="margin:0.5rem 0 0.75rem;">` +
+          `<iframe src="https://www.youtube.com/embed/${vid}" ` +
+          `title="YouTube video" frameborder="0" allowfullscreen ` +
+          `allow="accelerometer; encrypted-media; picture-in-picture"></iframe>` +
+          `</div>`;
+        return full + embed;
+      }
+    );
+  }
+
   function renderFAQ() {
     const wrap = document.getElementById("faqList");
     if (!wrap) return;
@@ -959,6 +986,7 @@
     faqs.forEach((f, i) => {
       const q    = currentLang === "en" ? (f.questionEn || f.question) : f.question;
       const html = currentLang === "en" ? (f.htmlEn     || f.html)     : f.html;
+      const enriched = embedYouTubeLinks(sanitizeHtml(html));
       const item = el(
         "details",
         {
@@ -975,7 +1003,7 @@
               el("span", { class: "faq-item__chevron", "aria-hidden": "true" }, "›"),
             ]
           ),
-          el("div", { class: "faq-item__a", html: html }),
+          el("div", { class: "faq-item__a", html: enriched }),
         ]
       );
       wrap.appendChild(item);
