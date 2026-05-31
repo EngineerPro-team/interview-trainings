@@ -1207,7 +1207,12 @@
       return;
     }
 
-    const cleanName = (s.name || "").trim() || (s.companies?.[0] ? `EP · ${s.companies[0]}` : "EngineerPro");
+    // Anonymous stories must never leak the student's real name. The data
+    // layer already neutralises s.name to "Học viên EngineerPro" but we
+    // localise it here so EN visitors see English copy too.
+    const cleanName = s.anonymous
+      ? (currentLang === "en" ? "EngineerPro student" : "Học viên EngineerPro")
+      : ((s.name || "").trim() || (s.companies?.[0] ? `EP · ${s.companies[0]}` : "EngineerPro"));
     const nm = cleanName.replace(/^(anh|chị|bạn|em|cô)\s+/i, "");
     const [c1, c2] = colorFor(cleanName);
     const cos = (s.companies || []).map((c) => `<span class="story-card__co">${c}</span>`).join("");
@@ -1486,7 +1491,9 @@
     }
 
     function makeCard(s) {
-      const cleanName = (s.name || "").trim() || (s.companies?.[0] ? `EP · ${s.companies[0]}` : "EngineerPro");
+      const cleanName = s.anonymous
+        ? (currentLang === "en" ? "EngineerPro student" : "Học viên EngineerPro")
+        : ((s.name || "").trim() || (s.companies?.[0] ? `EP · ${s.companies[0]}` : "EngineerPro"));
       // Prefer the real article title from the Google Doc; only fall back to
       // the AI-generated title if we never crawled the original.
       const dispTitle = currentLang === "en"
