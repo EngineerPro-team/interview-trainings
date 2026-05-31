@@ -52,4 +52,9 @@ window.COURSES_EN = {
     blurb:
       "9 topics covering Networking, OS, Git, code review, DB + ORM + DI, caching, system design, monitoring & alerts, testing (unit → e2e → stress), web security, CI/CD + IaC, async patterns and microservices — plus a custom-built project.",
   },
+  "crash-course-build-world-class-pet-project": {
+    title: "Crash Course — Build World-class Pet Projects",
+    blurb:
+      "Crash-course series where you build Big-Tech-grade pet projects from scratch (Mini Database, Kafka, Redis, …). Topics rotate per cohort and are led directly by Big Tech mentors (Google etc.). Message our Fanpage for the next cohort's topic + schedule.",
+  },
 };

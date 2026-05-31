@@ -513,7 +513,7 @@ def build_story_detail(template: str, s: dict) -> str:
 # ---------- per-route descriptions for top routes ---------------------------
 
 ROUTE_DESCRIPTIONS_VI = {
-    "courses":   "10 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
+    "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "book":      "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
     "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — video lập trình nền tảng, template CV Big Tech, playlist review CV.",
     "mentors":   "17 mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",

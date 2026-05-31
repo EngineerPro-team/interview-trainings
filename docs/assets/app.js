@@ -13,6 +13,19 @@
     return p || "";
   }
 
+  // Rewrite every relative `src="assets/..."` (or "src='assets/...'") inside a
+  // string of HTML to use asset(...). Needed when we inject crawled HTML
+  // bodies that embed images via relative paths — without rewriting, the
+  // browser resolves them against the page URL (so /courses/foo/assets/...
+  // returns 404) AND BASE_PATH wouldn't be honoured on project Pages.
+  function rewriteAssetUrls(html) {
+    if (!html || typeof html !== "string") return html;
+    return html.replace(
+      /(\b(?:src|href)=)(["'])(assets\/[^"']+)(\2)/gi,
+      (_full, attr, q, path, _q2) => attr + q + asset(path) + q
+    );
+  }
+
   // Resolve any asset path so it works at both root (/) and project-Pages
   // subpath (/interview-trainings/). Pass through absolute URLs, root-relative
   // paths, and data: URIs unchanged.
@@ -696,7 +709,7 @@
       </header>
       ${cover}
       ${langNote}
-      <div class="article__body">${sanitizeHtml(body)}</div>
+      <div class="article__body">${buttonifyContactLinks(rewriteAssetUrls(sanitizeHtml(body)))}</div>
       <div class="article__cta">
         <a class="btn btn--primary" href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">
           ${escapeText(t("course.cta"))}
@@ -1023,7 +1036,7 @@
     faqs.forEach((f, i) => {
       const q    = currentLang === "en" ? (f.questionEn || f.question) : f.question;
       const html = currentLang === "en" ? (f.htmlEn     || f.html)     : f.html;
-      const enriched = embedYouTubeLinks(buttonifyContactLinks(sanitizeHtml(html)));
+      const enriched = embedYouTubeLinks(buttonifyContactLinks(rewriteAssetUrls(sanitizeHtml(html))));
       const item = el(
         "details",
         {
@@ -1225,7 +1238,7 @@
     }
 
     // Strip a duplicate leading <h1>/<h2> if it just repeats the page title.
-    dispBody = sanitizeHtml(stripDuplicateHeading(dispBody, dispTitle));
+    dispBody = rewriteAssetUrls(sanitizeHtml(stripDuplicateHeading(dispBody, dispTitle)));
 
     const cover = s.cover
       ? `<img class="story-detail__cover" src="${escapeAttr(asset(s.cover))}" alt="${escapeAttr(dispTitle || cleanName)}" />`

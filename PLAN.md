@@ -21,7 +21,7 @@ A one-page site with a sticky top nav. Clicking a tab swaps the visible section 
 | Tab | Hash | Content source |
 |---|---|---|
 | Trang chủ | `#home` | Hero, value props, quick links |
-| Khoá học | `#courses` | 10 courses (15 crawled from `/blogs/khoa-hoc` pages 1-4, 5 excluded in `scripts/crawl_courses.py`) |
+| Khoá học | `#courses` | 11 courses (15 crawled from `/blogs/khoa-hoc` pages 1-4, 5 excluded in `scripts/crawl_courses.py`) |
 | Giảng viên | `#mentors` | 19 mentors (LinkedIn-linked) |
 | Podcast | `#podcast` | Episodes from `engineerprovn.substack.com/podcast/archive` |
 | Hình thức học | `#format` | Zoom live + Discord support |
@@ -102,7 +102,7 @@ Placeholder section with “Thông tin liên hệ sẽ được cập nhật”.
 - **Layout**: 1200px max-width container, CSS Grid for card sections, sticky nav with backdrop blur.
 - **Components**:
   - Hero with gradient + CTA buttons.
-  - Stat strip (dynamic from data: 19 mentors, 10 courses, 12 podcasts, 94 stories).
+  - Stat strip (dynamic from data: 19 mentors, 11 courses, 12 podcasts, 94 stories).
   - Card grid (3 columns ≥ 1024px, 2 columns ≥ 640px, 1 column mobile).
   - Mentor avatar cards with initial-based color blocks (no external images needed).
   - Footer with social placeholders.

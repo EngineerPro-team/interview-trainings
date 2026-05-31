@@ -15,7 +15,7 @@ See [`PLAN.md`](./PLAN.md) for the full design + content inventory.
 | Tab | Description |
 |---|---|
 | Trang chủ | Hero + 3-pillar values |
-| Khoá học | 10 courses crawled from blog pages (5 internally-excluded slugs in `scripts/crawl_courses.py`) |
+| Khoá học | 11 courses crawled from blog pages (5 internally-excluded slugs in `scripts/crawl_courses.py`) |
 | Giảng viên | 19 mentors from Big Tech |
 | Podcast | Latest episodes from Substack |
 | Hình thức học | Zoom live + Discord community |
