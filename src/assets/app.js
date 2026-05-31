@@ -110,7 +110,8 @@
   // Allows iframes only for known embed hosts (YouTube, Vimeo, Google Drive,
   // Facebook page plugin).
   const IFRAME_HOST_ALLOWLIST = [
-    "www.youtube.com", "youtube.com", "youtube-nocookie.com",
+    "www.youtube.com", "youtube.com",
+    "www.youtube-nocookie.com", "youtube-nocookie.com",
     "player.vimeo.com",
     "drive.google.com", "docs.google.com",
     "www.facebook.com",
@@ -965,10 +966,16 @@
         const vid = m[1];
         // already embedded?
         if (html.includes(`youtube.com/embed/${vid}`)) return full;
+        // Use youtube-nocookie + lite cosmetic params (cleaner player,
+        // no "Watch on YouTube" overlay, less crowded thumbnail).
+        // loading="lazy" defers off-screen FAQ videos until scrolled to.
+        const src =
+          `https://www.youtube-nocookie.com/embed/${vid}` +
+          `?rel=0&modestbranding=1&playsinline=1`;
         const embed =
           `<div class="embed-16x9" style="margin:0.5rem 0 0.75rem;">` +
-          `<iframe src="https://www.youtube.com/embed/${vid}" ` +
-          `title="YouTube video" frameborder="0" allowfullscreen ` +
+          `<iframe src="${src}" ` +
+          `title="YouTube video" loading="lazy" frameborder="0" allowfullscreen ` +
           `allow="accelerometer; encrypted-media; picture-in-picture"></iframe>` +
           `</div>`;
         return full + embed;
