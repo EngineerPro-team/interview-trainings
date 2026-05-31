@@ -3263,6 +3263,20 @@ p {
   color: var(--orange);
   word-break: break-word;
 }
+
+/* Inline CTA buttons inside FAQ answers (FB / Messenger / Zalo links
+   auto-promoted by buttonifyContactLinks() in app.js). */
+.faq-item__a a.faq-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #fff !important;
+  margin: 0.4rem 0.4rem 0.6rem 0;
+  word-break: normal;
+}
+.faq-cta--fb   { background: linear-gradient(135deg, #1877f2 0%, #0d62d6 100%) !important; }
+.faq-cta--msg  { background: linear-gradient(135deg, #00b2ff 0%, #006aff 100%) !important; }
+.faq-cta--zalo { background: linear-gradient(135deg, #1a8cff 0%, #0068ff 100%) !important; }
 .faq-item__a strong {
   color: var(--navy);
 }

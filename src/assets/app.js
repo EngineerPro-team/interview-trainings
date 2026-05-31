@@ -950,6 +950,35 @@
   }
 
   // ===================== FAQ =====================
+  // Promote bare Facebook / Messenger / Zalo URLs inside FAQ answers to
+  // styled CTA buttons. Detects by hostname; ignores already-styled links
+  // (anything with a class= attribute).
+  function buttonifyContactLinks(html) {
+    if (!html) return html;
+    const HOSTS = {
+      facebook: { label: { vi: "Mở Fanpage trên Facebook →", en: "Open the Fanpage on Facebook →" }, cls: "btn btn--primary faq-cta faq-cta--fb" },
+      "m.me":   { label: { vi: "Chat trên Messenger →",       en: "Chat on Messenger →" },          cls: "btn btn--primary faq-cta faq-cta--msg" },
+      "messenger.com": { label: { vi: "Chat trên Messenger →", en: "Chat on Messenger →" },         cls: "btn btn--primary faq-cta faq-cta--msg" },
+      "zalo.me": { label: { vi: "Mở Zalo →",                  en: "Open Zalo →" },                  cls: "btn btn--primary faq-cta faq-cta--zalo" },
+    };
+    const lang = (typeof currentLang !== "undefined" && currentLang === "en") ? "en" : "vi";
+    return html.replace(
+      /<a\s+([^>]*?)href="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi,
+      (full, pre, href, post, _inner) => {
+        // skip already-styled links (anything with class=)
+        if (/\bclass=/.test(pre + post)) return full;
+        let host;
+        try { host = new URL(href, location.href).host.replace(/^www\./, ""); }
+        catch (_) { return full; }
+        const cfg = Object.entries(HOSTS).find(([h]) => host === h || host.endsWith("." + h) || host === "www." + h);
+        if (!cfg) return full;
+        const [, { label, cls }] = cfg;
+        const text = label[lang] || label.vi;
+        return `<a class="${cls}" href="${href}" target="_blank" rel="noopener">${text}</a>`;
+      }
+    );
+  }
+
   // FAQ enrichment: spot YouTube URLs inside the html and append a responsive
   // 16:9 iframe right after the matching <a>, so readers can watch the linked
   // video inline without leaving the page. Idempotent — skip if an embed for
@@ -993,7 +1022,7 @@
     faqs.forEach((f, i) => {
       const q    = currentLang === "en" ? (f.questionEn || f.question) : f.question;
       const html = currentLang === "en" ? (f.htmlEn     || f.html)     : f.html;
-      const enriched = embedYouTubeLinks(sanitizeHtml(html));
+      const enriched = embedYouTubeLinks(buttonifyContactLinks(sanitizeHtml(html)));
       const item = el(
         "details",
         {
