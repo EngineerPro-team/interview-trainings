@@ -949,7 +949,7 @@
           el("div", { class: "book-group__items" }, items.map((c) =>
             el("a", {
               class: "book-chapter",
-              href: `${book.urlEn}#chapter-${c.n}`,
+              href: `${book.urlEn}#${c.anchor || `chapter-${c.n}`}`,
               target: "_blank",
               rel: "noopener",
               title: `Chapter ${c.n} — ${c.title}`,
