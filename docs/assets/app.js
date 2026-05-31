@@ -216,6 +216,13 @@
   // one of our routes, then fall back to hash (#course/foo). This lets the SPA
   // serve prerendered URLs cleanly while keeping the legacy hash router alive
   // for backwards-compatible links.
+  // Clean path shortcuts that resolve to a section anchor on the home page
+  // (e.g. /roadmap → / + scroll to #home-roadmap).
+  const HOME_ANCHORS = {
+    "roadmap": "home-roadmap",
+    "format":  "home-format",
+  };
+
   function parseHash() {
     let path = stripBasePath((location.pathname || "/").replace(/\/index\.html$/, ""));
     let m;
@@ -224,6 +231,9 @@
     if ((m = path.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
       return { route: m[1], slug: null };
     }
+    if ((m = path.match(/^\/(roadmap|format)\/?$/))) {
+      return { route: "home", slug: null, scrollTo: HOME_ANCHORS[m[1]] };
+    }
     // Hash fallback (legacy or anchor-only navigation)
     const raw = (location.hash || "").replace(/^#/, "").trim();
     if (!raw) return { route: "home", slug: null };
@@ -231,6 +241,7 @@
     if (head === "course" && rest.length) return { route: "course", slug: rest.join("/") };
     if (head === "story" && rest.length) return { route: "story", slug: rest.join("/") };
     if (TOP_ROUTES.includes(head)) return { route: head, slug: null };
+    if (HOME_ANCHORS[head]) return { route: "home", slug: null, scrollTo: HOME_ANCHORS[head] };
     return { route: "home", slug: null };
   }
 
@@ -245,7 +256,7 @@
     return BASE_PATH ? BASE_PATH + (p === "/" ? "/" : p) : p;
   }
 
-  function showRoute({ route, slug }) {
+  function showRoute({ route, slug, scrollTo }) {
     // Remove the prerender-time style that forces one route visible — once
     // JS hydrates we let `.route[hidden]` CSS do the work as usual.
     const preStyle = document.getElementById("prerenderShowRoute");
@@ -269,7 +280,17 @@
     if (route === "story") {
       renderStoryDetail(slug);
     }
-    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    if (scrollTo) {
+      // Deep links like /roadmap or /format land on the home page and need
+      // to scroll past the hero to the requested section. Wait a frame so
+      // the route swap + i18n hydration finishes before measuring.
+      requestAnimationFrame(() => {
+        const el = document.getElementById(scrollTo);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    }
   }
 
   // SEO: keep <title>, <meta name="description">, <link rel="canonical">,

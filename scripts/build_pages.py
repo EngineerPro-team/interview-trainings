@@ -696,7 +696,30 @@ def main() -> int:
         write(os.path.join(DOCS, "stories", s["slug"], "index.html"), html_out)
         pages += 1
 
-    # 4. SPA fallback for any URL not prerendered (typos, future slugs, etc.)
+    # 4. Home anchor shortcuts: /roadmap and /format land on the home page
+    # and the SPA scrolls past the hero to the requested section via
+    # parseHash() -> scrollTo. We prerender them as copies of home (so the
+    # URL serves 200, never 404) with their own canonical so Google can
+    # surface the deep link as a distinct landing page. No-JS visitors still
+    # see the full home page; just the smooth-scroll is lost.
+    home_html = build_home(template)
+    for slug, _anchor_id in [("roadmap", "home-roadmap"), ("format", "home-format")]:
+        page = home_html
+        anchor_url = f"{SITE_BASE}/{slug}/"
+        page = re.sub(
+            r'<link rel="canonical" href="[^"]*"',
+            f'<link rel="canonical" href="{anchor_url}"',
+            page, count=1,
+        )
+        page = re.sub(
+            r'<meta property="og:url" content="[^"]*"',
+            f'<meta property="og:url" content="{anchor_url}"',
+            page, count=1,
+        )
+        write(os.path.join(DOCS, slug, "index.html"), page)
+        pages += 1
+
+    # 5. SPA fallback for any URL not prerendered (typos, future slugs, etc.)
     write(os.path.join(DOCS, "404.html"), SPA_FALLBACK_404.format(base=SITE_BASE.rstrip("/")))
     pages += 1
 
