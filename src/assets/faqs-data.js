@@ -23,11 +23,11 @@ window.FAQS = [
     "htmlEn": "<p><strong>Backend</strong> is the role with the most openings at Big Tech.</p><p><strong>More info:</strong> <a href=\"https://www.youtube.com/watch?v=DCEGLAWoTUs&amp;t=3s\" rel=\"noopener\" target=\"_blank\">https://www.youtube.com/watch?v=DCEGLAWoTUs&amp;t=3s</a></p>"
   },
   {
-    "question": "EngineerPro/EngineerPro Academy có hỗ trợ học viên tìm việc tại Big tech và các công ti vừa và nhỏ trong và ngoài nước không?",
-    "html": "Có, EngineerPro/EngineerPro Academy cam kết đi với học viên tới cuối hành trình Offer với các buổi Internal Talk training cho học viên. Các bạn học viên có thể nhắn tin fanpage để nhận được sự giúp đỡ tìm Job.",
+    "question": "EngineerPro có hỗ trợ học viên tìm việc tại Big tech và các công ti vừa và nhỏ trong và ngoài nước không?",
+    "html": "Có, EngineerPro cam kết đi với học viên tới cuối hành trình Offer với các buổi Internal Talk training cho học viên. Các bạn học viên có thể nhắn tin fanpage để nhận được sự giúp đỡ tìm Job.",
     "plain": "Có, EngineerPro/EngineerPro Academy cam kết đi với học viên tới cuối hành trình Offer với các buổi Internal Talk training cho học viên. Các bạn học viên có thể nhắn tin fanpage để nhận được sự giúp đỡ tìm Job.",
-    "questionEn": "Does EngineerPro / EngineerPro Academy help students find jobs at Big Tech or smaller companies?",
-    "htmlEn": "<p>Yes. EngineerPro / EngineerPro Academy commits to walking with students all the way to the offer — including internal talk training sessions. Message our fanpage for job-search support.</p>"
+    "questionEn": "Does EngineerPro help students find jobs at Big Tech or smaller companies?",
+    "htmlEn": "<p>Yes. EngineerPro commits to walking with students all the way to the offer — including internal talk training sessions. Message our fanpage for job-search support.</p>"
   },
   {
     "question": "Học gì để thi vào Big tech?",
@@ -37,10 +37,10 @@ window.FAQS = [
     "htmlEn": "<p>Big Tech interviews almost always cover Algorithms and Computer Science Fundamentals.</p><p>Depending on the company, juniors may have a System Design round (mid-level and above will 100% have it).</p><p>EngineerPro offers interview-prep training for Algorithms, System Design, and CS Fundamentals — DM the page for details: <a href=\"https://www.facebook.com/EngineerPro.Official\" rel=\"noopener\" target=\"_blank\">https://www.facebook.com/EngineerPro.Official</a></p>"
   },
   {
-    "question": "Các khoá học của EngineerPro và EngineerPro Academy dạy bằng tiếng Việt hay tiếng Anh?",
-    "html": "<p>Các khoá học của EngineerPro và EngineerPro Academy đều dạy bằng tiếng Việt</p>",
+    "question": "Các khoá học của EngineerPro dạy bằng tiếng Việt hay tiếng Anh?",
+    "html": "<p>Các khoá học của EngineerPro đều dạy bằng tiếng Việt</p>",
     "plain": "Các khoá học của EngineerPro và EngineerPro Academy đều dạy bằng tiếng Việt",
-    "questionEn": "Are EngineerPro / EngineerPro Academy courses taught in Vietnamese or English?",
-    "htmlEn": "<p>All EngineerPro / EngineerPro Academy courses are taught in Vietnamese.</p>"
+    "questionEn": "Are EngineerPro courses taught in Vietnamese or English?",
+    "htmlEn": "<p>All EngineerPro courses are taught in Vietnamese.</p>"
   }
 ];
