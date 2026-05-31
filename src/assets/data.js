@@ -378,10 +378,12 @@ window.SITE_DATA = {
       items: [
         "Backend Java with Spring — củng cố tư duy lập trình thực tế",
         "Backend Golang — mở rộng cơ hội nghề nghiệp",
+        "Crash Course — Build World-class Pet Projects — biến CV mỏng thành CV có pet project đủ sâu để recruiter Big Tech (Google, Meta, Amazon, TikTok…) phải dừng lại đọc kỹ.",
       ],
       itemsEn: [
         "Backend Java with Spring — strengthen real-world coding thinking",
         "Backend Golang — broaden career opportunities",
+        "Crash Course — Build World-class Pet Projects — turn a thin CV into one with a pet project deep enough that Big Tech recruiters (Google, Meta, Amazon, TikTok…) actually stop and read it carefully.",
       ],
     },
     benefits: [
