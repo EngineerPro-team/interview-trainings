@@ -129,7 +129,7 @@ def main() -> int:
     chips = [
         ("2K+", "Học viên"),
         ("500+", "Offers"),
-        ("17", "Mentor Big Tech"),
+        ("19", "Mentor Big Tech"),
         ("10", "Khoá học"),
         ("3+ năm", "Từ 04·2023"),
     ]
