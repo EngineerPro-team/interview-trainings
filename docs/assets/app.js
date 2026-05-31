@@ -1545,7 +1545,6 @@
                 ])
               : null,
             el("h3", { class: "story-row__title" }, dispTitle || cleanName),
-            el("p", { class: "story-row__byline" }, cleanName),
             snippet ? el("p", { class: "story-row__snippet" }, snippet) : null,
             el("span", { class: "story-row__cta" }, t("stories.card.cta")),
           ]),
