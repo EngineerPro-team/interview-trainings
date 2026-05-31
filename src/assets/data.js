@@ -139,7 +139,7 @@ window.SITE_DATA = {
     {
       name: "Đông Trương",
       photo: "assets/img/mentors/dong-truong.jpg",
-      current:  { role: "Software Engineer",        company: "Đang cập nhật" },
+      current:  { role: "Software Engineer",        company: "TikTok" },
       previous: null,
       linkedin: "https://www.linkedin.com/in/dong-truong-56297a145/",
     },
