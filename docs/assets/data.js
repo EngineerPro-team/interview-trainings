@@ -386,14 +386,12 @@ window.SITE_DATA = {
     },
     benefits: [
       "Dẫn dắt trực tiếp bởi mentor từ Google, Meta, TikTok, Amazon, Citadel, Grab…",
-      "Mock interview thật + hỗ trợ referral đến các công ty trong & ngoài nước",
       "Cộng đồng học viên chất lượng, học nghiêm túc — làm thật, chia sẻ tài nguyên",
       "Tự tin phỏng vấn tại Big Tech — từ DSA, System Design đến giao tiếp",
       "Hình thức học online linh động — phù hợp người đi làm hoặc đang học đại học",
     ],
     benefitsEn: [
       "Taught directly by mentors from Google, Meta, TikTok, Amazon, Citadel, Grab…",
-      "Real mock interviews + referral support to companies in Vietnam & abroad",
       "A serious, high-quality learner community — real work, shared resources",
       "Confidently interview at Big Tech — from DSA and System Design to communication",
       "Flexible online format — suitable for working professionals or university students",
