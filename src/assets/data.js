@@ -56,6 +56,7 @@ window.SITE_DATA = {
     },
     {
       name: "Chương",
+      photo: "assets/img/mentors/chuong-le.jpg",
       current:  { role: "Senior Software Engineer",  company: "Google (USA)" },
       previous: null,
       linkedin: "https://www.linkedin.com/in/le-chuong-50b91766/",
