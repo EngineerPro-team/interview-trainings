@@ -163,7 +163,7 @@ window.I18N = {
     // ============== FAQ ==============
     "faq.head":      "Câu hỏi thường gặp",
     "faq.intro.html":
-      '<span id="faqCount">8</span> câu hỏi phổ biến nhất — bấm vào từng câu để xem trả lời. Có thể search nhanh ở khung bên dưới.',
+      '<span id="faqCount">6</span> câu hỏi phổ biến nhất — bấm vào từng câu để xem trả lời. Có thể search nhanh ở khung bên dưới.',
     "faq.searchPh":  "Tìm trong FAQ… (vd: tiếng Anh, backend, lộ trình)",
     "faq.expand":    "Mở tất cả",
     "faq.collapse":  "Thu gọn",
@@ -348,7 +348,7 @@ window.I18N = {
 
     "faq.head":      "FAQ",
     "faq.intro.html":
-      '<span id="faqCount">8</span> most common questions — click each to expand. Quick search in the box below.',
+      '<span id="faqCount">6</span> most common questions — click each to expand. Quick search in the box below.',
     "faq.searchPh":  "Search FAQ… (e.g. English, backend, roadmap)",
     "faq.expand":    "Expand all",
     "faq.collapse":  "Collapse all",
