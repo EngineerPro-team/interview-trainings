@@ -86,6 +86,57 @@
   color: #fff;
 }
 
+/* All other "brand-navy on white-ish text" surfaces need the same treatment:
+   --navy is swapped to a light grey in dark mode (so headings on white cards
+   become legible), but these surfaces depend on a real dark background to
+   contrast against their hardcoded white text. Force the brand navy in dark
+   mode via per-selector overrides. */
+:root[data-theme="dark"] .book-final__inner {
+  background: linear-gradient(135deg, #0b1d3a 0%, #102849 100%);
+  color: #fff;
+}
+:root[data-theme="dark"] .book-final__inner h2,
+:root[data-theme="dark"] .book-final__inner p {
+  color: #fff;
+}
+:root[data-theme="dark"] .book-final__inner p {
+  color: rgba(255, 255, 255, 0.82);
+}
+:root[data-theme="dark"] .footer {
+  background: linear-gradient(180deg, #0b1d3a 0%, #0a1424 100%);
+  color: #fff;
+}
+/* Small navy-on-white-text badges scattered across the site */
+:root[data-theme="dark"] .book-chapter__n,
+:root[data-theme="dark"] .pager__btn.is-active,
+:root[data-theme="dark"] .cv-card__icon,
+:root[data-theme="dark"] .nav__links a.is-active,
+:root[data-theme="dark"] .tag-chip.is-active,
+:root[data-theme="dark"] .card--podcast .play {
+  background: #0b1d3a;
+  color: #fff;
+}
+/* Card cover placeholders (e.g. course/story without a real cover) */
+:root[data-theme="dark"] .card--course__media,
+:root[data-theme="dark"] .story-row__cover {
+  background: #0b1d3a;
+  color: #fff;
+}
+/* Dark ghost button — keep it dark in both themes for contrast on hero/book */
+:root[data-theme="dark"] .btn--ghost-dark {
+  background: #0b1d3a;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+:root[data-theme="dark"] .btn--ghost-dark:hover {
+  background: #102849;
+  color: var(--orange-2);
+}
+:root[data-theme="dark"] .btn-mini:hover {
+  background: #102849;
+  color: #fff;
+}
+
 /* Nav background — make sure backdrop blur works in dark too */
 :root[data-theme="dark"] .nav {
   background: rgba(10, 20, 36, 0.85);
