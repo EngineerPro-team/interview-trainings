@@ -956,10 +956,11 @@
   function buttonifyContactLinks(html) {
     if (!html) return html;
     const HOSTS = {
-      facebook: { label: { vi: "Mở Fanpage trên Facebook →", en: "Open the Fanpage on Facebook →" }, cls: "btn btn--primary faq-cta faq-cta--fb" },
-      "m.me":   { label: { vi: "Chat trên Messenger →",       en: "Chat on Messenger →" },          cls: "btn btn--primary faq-cta faq-cta--msg" },
-      "messenger.com": { label: { vi: "Chat trên Messenger →", en: "Chat on Messenger →" },         cls: "btn btn--primary faq-cta faq-cta--msg" },
-      "zalo.me": { label: { vi: "Mở Zalo →",                  en: "Open Zalo →" },                  cls: "btn btn--primary faq-cta faq-cta--zalo" },
+      "facebook.com":  { label: { vi: "Mở Fanpage trên Facebook →", en: "Open the Fanpage on Facebook →" }, cls: "btn btn--primary faq-cta faq-cta--fb" },
+      "fb.com":        { label: { vi: "Mở Fanpage trên Facebook →", en: "Open the Fanpage on Facebook →" }, cls: "btn btn--primary faq-cta faq-cta--fb" },
+      "m.me":          { label: { vi: "Chat trên Messenger →",      en: "Chat on Messenger →" },           cls: "btn btn--primary faq-cta faq-cta--msg" },
+      "messenger.com": { label: { vi: "Chat trên Messenger →",      en: "Chat on Messenger →" },           cls: "btn btn--primary faq-cta faq-cta--msg" },
+      "zalo.me":       { label: { vi: "Mở Zalo →",                  en: "Open Zalo →" },                   cls: "btn btn--primary faq-cta faq-cta--zalo" },
     };
     const lang = (typeof currentLang !== "undefined" && currentLang === "en") ? "en" : "vi";
     return html.replace(
