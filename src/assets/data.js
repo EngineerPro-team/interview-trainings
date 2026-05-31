@@ -58,7 +58,7 @@ window.SITE_DATA = {
       name: "Chương",
       current:  { role: "Senior Software Engineer",  company: "Google (USA)" },
       previous: null,
-      linkedin: null, // chưa có LinkedIn — update sau
+      linkedin: "https://www.linkedin.com/in/le-chuong-50b91766/",
     },
     {
       name: "Việt",
