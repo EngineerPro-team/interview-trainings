@@ -108,6 +108,10 @@ github: stats seo
 	@touch $(DOCS_DIR)/.nojekyll
 	@echo "→ Prerendering route pages ..."
 	@$(PYTHON) scripts/build_pages.py
+	@echo "→ Writing CNAME from EP_BASE_URL ..."
+	@$(PYTHON) -c "import os,re; from scripts.site_config import BASE_URL; \
+		host = re.sub(r'^https?://', '', BASE_URL).strip('/'); \
+		open(os.path.join('$(DOCS_DIR)', 'CNAME'), 'w').write(host + chr(10)) if 'github.io' not in host else None"
 	@echo "→ Guarding against localhost URLs in production artifact ..."
 	@if grep -rIE "https?://(localhost|127\.0\.0\.1)" $(DOCS_DIR) $(SRC_DIR)/sitemap.xml $(SRC_DIR)/robots.txt 2>/dev/null; then \
 		echo "✗ Production artifact contains localhost URLs above. Fix EP_BASE_URL / EP_BASE_PATH before deploying."; \

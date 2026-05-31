@@ -14,12 +14,13 @@ All build scripts (make_seo.py, build_pages.py) read these from here.
 """
 import os
 
-# Origin only — no trailing slash. e.g. "https://engineerpro-team.github.io"
-BASE_URL: str = os.environ.get("EP_BASE_URL", "https://engineerpro-team.github.io").rstrip("/")
+# Origin only — no trailing slash. e.g. "https://engineerprogurus.com"
+BASE_URL: str = os.environ.get("EP_BASE_URL", "https://engineerprogurus.com").rstrip("/")
 
 # Subpath prefix (with leading slash, no trailing slash) — empty string for root
-# deploys, "/interview-trainings" for project Pages, etc.
-_raw_path = os.environ.get("EP_BASE_PATH", "/interview-trainings").strip()
+# / custom-domain deploys, "/interview-trainings" for the bare github.io
+# project Pages URL.
+_raw_path = os.environ.get("EP_BASE_PATH", "").strip()
 if _raw_path and not _raw_path.startswith("/"):
     _raw_path = "/" + _raw_path
 BASE_PATH: str = _raw_path.rstrip("/")
