@@ -662,6 +662,34 @@ SPA_FALLBACK_404 = """<!doctype html>
 """
 
 
+# Standalone HTML for a legacy → new-URL redirect. GH Pages can't issue real
+# HTTP 301s, so we approximate as closely as a static host can:
+#   1. <link rel="canonical"> tells search engines the new URL is authoritative
+#      → they will eventually de-index the legacy path and transfer ranking.
+#   2. <meta name="robots" content="noindex"> on the legacy URL itself so it
+#      doesn't compete with the canonical in SERP.
+#   3. <meta http-equiv="refresh" content="0;…"> for visitors with JS disabled.
+#   4. location.replace() for visitors with JS — instant, no extra history entry
+#      (clicking Back doesn't bounce them back to the legacy URL).
+#   5. Visible fallback <a> for accessibility / screen-reader users.
+LEGACY_REDIRECT_HTML = """<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Redirecting → {target_path} · EngineerPro</title>
+  <meta name="robots" content="noindex,follow" />
+  <link rel="canonical" href="{target_url}" />
+  <meta http-equiv="refresh" content="0;url={target_url}" />
+  <script>location.replace({target_url!r});</script>
+</head>
+<body>
+  <p>This page has moved. If you are not redirected automatically,
+     <a href="{target_url}">click here to continue to {target_path}</a>.</p>
+</body>
+</html>
+"""
+
+
 def main() -> int:
     with open(os.path.join(SRC, "index.html"), "r", encoding="utf-8") as f:
         template = f.read()
@@ -730,7 +758,33 @@ def main() -> int:
         write(os.path.join(DOCS, slug, "index.html"), page)
         pages += 1
 
-    # 5. SPA fallback for any URL not prerendered (typos, future slugs, etc.)
+    # 5. Legacy URL redirects. The old Shopify site used Vietnamese-slug paths
+    # under /pages/ and /blogs/ which we want to keep linkable from external
+    # backlinks (Substack, FB posts, etc.). For each entry below we emit a
+    # standalone HTML file that does an immediate client-side redirect to the
+    # new path, with rel="canonical" so Google transfers ranking to the new URL
+    # over time (GH Pages can't issue real HTTP 301s).
+    legacy_redirects = {
+        "/pages/dieu-khoan-dich-vu":  "/terms/",
+        # Add more legacy paths here as we discover them:
+        # "/blogs/faqs":              "/faq/",
+        # "/pages/lien-he":           "/contact/",
+    }
+    for old_path, new_path in legacy_redirects.items():
+        rel_dir = old_path.strip("/")
+        target_url = f"{SITE_BASE}{new_path}"
+        write(
+            os.path.join(DOCS, rel_dir, "index.html"),
+            LEGACY_REDIRECT_HTML.format(
+                target_url=target_url,
+                target_path=new_path,
+                site_base=SITE_BASE,
+            ),
+        )
+        pages += 1
+    print(f"[prerender] wrote {len(legacy_redirects)} legacy redirect page(s)")
+
+    # 6. SPA fallback for any URL not prerendered (typos, future slugs, etc.)
     write(os.path.join(DOCS, "404.html"), SPA_FALLBACK_404.format(base=SITE_BASE.rstrip("/")))
     pages += 1
 
