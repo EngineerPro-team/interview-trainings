@@ -422,14 +422,24 @@ def show_route_style(template: str, route: str) -> str:
 
 # ---------- per-route builders ----------------------------------------------
 
+# Per-route OG image override. Routes not listed here fall back to the generic
+# site-wide OG_IMAGE so social shares of any unmapped route still get a usable
+# preview card. Paths are relative to site root (will be absolutised).
+ROUTE_OG_IMAGES = {
+    "mock": "/assets/img/mock-interview-cover.jpg",
+}
+
+
 def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
                     description: str, snippet_html: str = "") -> str:
     title = f"{title_vi} · {SITE_NAME} — Luyện phỏng vấn Big Tech"
     canonical = f"{SITE_BASE}/{slug}/"
+    og_image = SITE_BASE + ROUTE_OG_IMAGES.get(slug, OG_IMAGE)
     out = patch_head(template, title=title, description=description,
                      canonical=canonical,
-                     og_image=SITE_BASE + OG_IMAGE,
-                     og_title=f"{title_vi} · {SITE_NAME}")
+                     og_image=og_image,
+                     og_title=f"{title_vi} · {SITE_NAME}",
+                     og_image_alt=f"{title_vi} — {SITE_NAME}")
     extra = [
         {
             "@type": "WebPage",
