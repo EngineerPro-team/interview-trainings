@@ -505,10 +505,12 @@
 /* Btn ghost on dark hero needs better border */
 :root[data-theme="dark"] .btn--ghost {
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 :root[data-theme="dark"] .btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.8);
 }
 :root[data-theme="dark"] .btn--ghost-dark {
   background: var(--paper);
@@ -942,21 +944,24 @@ p {
   border-color: rgba(11, 29, 58, 0.5);
 }
 /* On dark-bg sections (hero gradient, book hero/final, footer) the ghost
-   button still needs to be white-on-transparent for contrast. */
+   button still needs to be white-on-translucent for contrast. We give it
+   a slight bg tint + a strong border so it reads as clickable, not as
+   plain text with a hairline outline. */
 .hero .btn--ghost,
 .book-hero .btn--ghost,
 .book-final__inner .btn--ghost,
 .footer .btn--ghost {
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 .hero .btn--ghost:hover,
 .book-hero .btn--ghost:hover,
 .book-final__inner .btn--ghost:hover,
 .footer .btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.8);
 }
 
 /* hero art: floating company chips */
