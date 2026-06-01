@@ -1147,9 +1147,19 @@
               s.modules.map((m) => {
                 const mTitle = (en && m.titleEn) ? m.titleEn : m.title;
                 const mBlurb = (en && m.blurbEn) ? m.blurbEn : m.blurb;
+                // If the module is delivered by a real course, turn the title
+                // into a link to /courses/<slug>/ so visitors can jump straight
+                // into the course detail.
+                const titleNode = m.courseSlug
+                  ? el("a", {
+                      class: "module__title-link",
+                      href: pathFor("course", m.courseSlug),
+                      "aria-label": (en ? "Open course: " : "Mở khoá: ") + mTitle,
+                    }, [el("span", {}, mTitle), el("span", { class: "module__title-arrow" }, " →")])
+                  : mTitle;
                 return el("article", { class: "module" }, [
                   el("header", { class: "module__head" }, [
-                    el("h3", {}, mTitle),
+                    el("h3", {}, titleNode),
                     mBlurb ? el("p", { class: "module__blurb" }, mBlurb) : null,
                   ]),
                   el(
@@ -1177,8 +1187,25 @@
       const exTitleEl = document.getElementById("roadmapExtrasTitle");
       if (exTitleEl) exTitleEl.textContent = (en && r.extras.titleEn) ? r.extras.titleEn : r.extras.title;
       extras.innerHTML = "";
-      const items = (en && r.extras.itemsEn) ? r.extras.itemsEn : r.extras.items;
-      items.forEach((t) => extras.appendChild(el("li", {}, t)));
+      // Items can be either a plain string (legacy) or an object
+      // { courseSlug, linkLabel, text, textEn } where the linkLabel becomes
+      // a hyperlink to /courses/<slug>/ and `text` is the trailing copy.
+      const items = r.extras.items || [];
+      items.forEach((it) => {
+        if (typeof it === "string") {
+          extras.appendChild(el("li", {}, it));
+          return;
+        }
+        const trailing = (en && it.textEn) ? it.textEn : (it.text || "");
+        const linkText = it.linkLabel || it.courseSlug || "";
+        const link = it.courseSlug
+          ? el("a", {
+              class: "roadmap-extras__link",
+              href: pathFor("course", it.courseSlug),
+            }, linkText)
+          : el("strong", {}, linkText);
+        extras.appendChild(el("li", {}, [link, trailing]));
+      });
     }
 
     const ben = document.getElementById("roadmapBenefits");

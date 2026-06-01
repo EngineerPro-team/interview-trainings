@@ -234,6 +234,7 @@ window.SITE_DATA = {
           {
             title: "DSA 1 — Cơ bản",
             titleEn: "DSA 1 — Basics",
+            courseSlug: "khoa-hoc-dsa",
             blurb: "22 chủ đề nền tảng từ Array đến Prime Number",
             blurbEn: "22 foundational topics from Array to Prime Number",
             topics: [
@@ -248,6 +249,7 @@ window.SITE_DATA = {
           {
             title: "DSA 2 — Nâng cao tư duy",
             titleEn: "DSA 2 — Advanced thinking",
+            courseSlug: "khoa-hoc-dsa",
             blurb: "Giải quyết bài toán phức tạp",
             blurbEn: "Solving complex problems",
             topics: [
@@ -264,6 +266,7 @@ window.SITE_DATA = {
           {
             title: "DSA 3 — Chuyên sâu",
             titleEn: "DSA 3 — Deep dive",
+            courseSlug: "khoa-hoc-dsa",
             blurb: "Vượt qua mọi thử thách phỏng vấn thực tế",
             blurbEn: "Conquer any real interview challenge",
             topics: [
@@ -276,6 +279,7 @@ window.SITE_DATA = {
           {
             title: "Computer Science Fundamentals",
             titleEn: "Computer Science Fundamentals",
+            courseSlug: "computer-science-fundamental-interview",
             blurb: "Nắm chắc các trụ cột CS để pass round CS Interview",
             blurbEn: "Master the CS pillars to pass the CS Interview round",
             topics: [
@@ -304,6 +308,7 @@ window.SITE_DATA = {
           {
             title: "System Design Interview — Level 1",
             titleEn: "System Design Interview — Level 1",
+            courseSlug: "khoa-hoc-system-design-interview-big-tech",
             blurb: "Distributed system 101, các bài design cơ bản",
             blurbEn: "Distributed systems 101, foundational design problems",
             topics: [
@@ -324,6 +329,7 @@ window.SITE_DATA = {
           {
             title: "System Design Interview — Level 2",
             titleEn: "System Design Interview — Level 2",
+            courseSlug: "system-design-interview-level-2",
             blurb: "Trade-off chuyên sâu + bài design Big Tech",
             blurbEn: "Deep trade-offs + Big Tech design problems",
             topics: [
@@ -355,6 +361,7 @@ window.SITE_DATA = {
           {
             title: "Behavioral Interview",
             titleEn: "Behavioral Interview",
+            courseSlug: "behaviour-interview-course",
             blurb: "9 buổi với 9 topic — STAR framework + Leadership Principles",
             blurbEn: "9 sessions with 9 topics — STAR framework + Leadership Principles",
             topics: [
@@ -376,14 +383,18 @@ window.SITE_DATA = {
       title: "Song song với lộ trình chính",
       titleEn: "Alongside the main path",
       items: [
-        "Backend Java with Spring — củng cố tư duy lập trình thực tế",
-        "Backend Golang — mở rộng cơ hội nghề nghiệp",
-        "Crash Course — Build World-class Pet Projects — biến CV mỏng thành CV có pet project đủ sâu để recruiter Big Tech (Google, Meta, Amazon, TikTok…) phải dừng lại đọc kỹ.",
-      ],
-      itemsEn: [
-        "Backend Java with Spring — strengthen real-world coding thinking",
-        "Backend Golang — broaden career opportunities",
-        "Crash Course — Build World-class Pet Projects — turn a thin CV into one with a pet project deep enough that Big Tech recruiters (Google, Meta, Amazon, TikTok…) actually stop and read it carefully.",
+        { courseSlug: "khoa-hoc-backend-java",
+          linkLabel: "Backend Java with Spring",
+          text: " — củng cố tư duy lập trình thực tế",
+          textEn: " — strengthen real-world coding thinking" },
+        { courseSlug: "khoa-hoc-backend-golang",
+          linkLabel: "Backend Golang",
+          text: " — mở rộng cơ hội nghề nghiệp",
+          textEn: " — broaden career opportunities" },
+        { courseSlug: "crash-course-build-world-class-pet-project",
+          linkLabel: "Crash Course — Build World-class Pet Projects",
+          text: " — biến CV mỏng thành CV có pet project đủ sâu để recruiter Big Tech (Google, Meta, Amazon, TikTok…) phải dừng lại đọc kỹ.",
+          textEn: " — turn a thin CV into one with a pet project deep enough that Big Tech recruiters (Google, Meta, Amazon, TikTok…) actually stop and read it carefully." },
       ],
     },
     benefits: [
