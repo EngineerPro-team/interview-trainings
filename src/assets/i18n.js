@@ -279,7 +279,10 @@ window.I18N = {
     "mock.bigtech.list": "Google · Meta · TikTok · Amazon · Microsoft · Nvidia · WorldQuant · Axon · Apple · Citadel",
     "mock.bigtech.note": "Interviewer từ team EngineerPro đã đi qua các vòng phỏng vấn thật tại các công ty này — mock đúng format, đúng signal, đúng level.",
     "mock.cta.primary":  "💬 Inbox fanpage để đặt lịch mock 1-1 →",
-    "mock.cta.zalo":     "Đặt qua Zalo 0352 911 223 →",
+    "mock.cta.zalo":     "Hoặc đặt qua Zalo 0352 911 223 →",
+    "mock.book.title":   "📅 Cách đặt lịch mock 1-1",
+    "mock.book.body.html":
+      "Để đặt lịch buổi mock, các bạn vui lòng <strong>nhắn qua fanpage EngineerPro</strong>. Team sẽ phản hồi trong vòng 24h để confirm <strong>topic, level, ngôn ngữ (VI / EN) và thời gian</strong> phù hợp.",
     "footer.link.messenger": "Messenger",
     "footer.link.allPartners": "Tất cả đối tác",
     "footer.fanpage.head":   "Fanpage",
@@ -544,5 +547,8 @@ window.I18N = {
     "mock.bigtech.note": "EngineerPro interviewers have actually gone through the interview loops at these companies — mock with the right format, the right signals, the right level.",
     "mock.cta.primary":  "💬 Message our Fanpage to book a 1-1 mock →",
     "mock.cta.zalo":     "Or book via Zalo 0352 911 223 →",
+    "mock.book.title":   "📅 How to book your 1-1 mock",
+    "mock.book.body.html":
+      "To book a mock session, please <strong>message the EngineerPro Fanpage</strong>. The team will reply within 24 hours to confirm <strong>topic, level, language (VI / EN) and a time slot</strong> that works for you.",
   },
 };

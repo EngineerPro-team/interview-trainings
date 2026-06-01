@@ -4063,6 +4063,54 @@ a.faq-cta:hover { transform: translateY(-1px); }
   margin: 1rem auto 0;
 }
 
+/* Booking block — the moment of conversion. Lives at the bottom of the mock
+   page, explains the booking flow, and centres the primary CTA. */
+.mock-book {
+  text-align: center;
+  max-width: 760px;
+  margin: 2.5rem auto 0;
+  padding: 2rem 1.5rem 2.25rem;
+  background: linear-gradient(180deg, rgba(255, 122, 24, 0.07), rgba(11, 29, 58, 0.03));
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  border-radius: 18px;
+}
+.mock-book h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.2rem;
+  color: var(--navy);
+}
+.mock-book p {
+  margin: 0 auto 1.25rem;
+  max-width: 60ch;
+  line-height: 1.6;
+  color: var(--text);
+}
+.mock-book__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+:root[data-theme="dark"] .mock-book {
+  background: linear-gradient(180deg, rgba(255, 122, 24, 0.1), rgba(255, 255, 255, 0.02));
+  border-color: rgba(255, 122, 24, 0.45);
+}
+:root[data-theme="dark"] .mock-book h3 { color: #fff; }
+
+/* Oversized primary button — used for the single conversion moment on
+   the mock booking block. Don't overuse elsewhere or the visual weight
+   becomes meaningless. */
+.btn.btn--xl {
+  padding: 0.95rem 1.6rem;
+  font-size: 1.02rem;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(255, 122, 24, 0.28);
+}
+.btn.btn--xl:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(255, 122, 24, 0.36);
+}
+
 /* ===================== ROUTES ===================== */
 .route {
   animation: fadeIn 0.32s ease both;
