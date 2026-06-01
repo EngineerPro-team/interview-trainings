@@ -1147,20 +1147,20 @@
               s.modules.map((m) => {
                 const mTitle = (en && m.titleEn) ? m.titleEn : m.title;
                 const mBlurb = (en && m.blurbEn) ? m.blurbEn : m.blurb;
-                // If the module is delivered by a real course, turn the title
-                // into a link to /courses/<slug>/ so visitors can jump straight
-                // into the course detail.
-                const titleNode = m.courseSlug
+                // Inject an explicit "Bấm vào đây để xem chi tiết khoá học"
+                // mini-button when the module has a real course backing it,
+                // so visitors don't have to guess that the title is clickable.
+                const ctaNode = m.courseSlug
                   ? el("a", {
-                      class: "module__title-link",
+                      class: "module__cta",
                       href: pathFor("course", m.courseSlug),
-                      "aria-label": (en ? "Open course: " : "Mở khoá: ") + mTitle,
-                    }, [el("span", {}, mTitle), el("span", { class: "module__title-arrow" }, " →")])
-                  : mTitle;
+                    }, t("roadmap.module.cta"))
+                  : null;
                 return el("article", { class: "module" }, [
                   el("header", { class: "module__head" }, [
-                    el("h3", {}, titleNode),
+                    el("h3", {}, mTitle),
                     mBlurb ? el("p", { class: "module__blurb" }, mBlurb) : null,
+                    ctaNode,
                   ]),
                   el(
                     "div",
@@ -1198,13 +1198,16 @@
         }
         const trailing = (en && it.textEn) ? it.textEn : (it.text || "");
         const linkText = it.linkLabel || it.courseSlug || "";
-        const link = it.courseSlug
+        const nameNode = el("strong", { class: "roadmap-extras__name" }, linkText);
+        const ctaNode = it.courseSlug
           ? el("a", {
-              class: "roadmap-extras__link",
+              class: "module__cta",
               href: pathFor("course", it.courseSlug),
-            }, linkText)
-          : el("strong", {}, linkText);
-        extras.appendChild(el("li", {}, [link, trailing]));
+            }, t("roadmap.module.cta"))
+          : null;
+        const li = el("li", {}, [nameNode, trailing]);
+        if (ctaNode) li.appendChild(ctaNode);
+        extras.appendChild(li);
       });
     }
 

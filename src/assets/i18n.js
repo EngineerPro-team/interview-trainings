@@ -110,6 +110,7 @@ window.I18N = {
     "roadmap.title.html":
       'Từ <span class="grad">fresher</span> đến <span class="grad">Big Tech offer</span><br />trong 3 giai đoạn rõ ràng.',
     "roadmap.extras.title": "Song song với lộ trình chính",
+    "roadmap.module.cta": "Bấm vào đây để xem chi tiết khoá học →",
     "roadmap.benefits.head": "Khi là học viên EngineerPro, bạn nhận được gì?",
     "roadmap.cta1":   "Xem khoá học áp dụng →",
     "roadmap.cta2":   "💬 Bấm vào đây để nhắn fanpage tư vấn lộ trình →",
@@ -346,6 +347,7 @@ window.I18N = {
     "roadmap.title.html":
       'From <span class="grad">fresher</span> to <span class="grad">Big Tech offer</span><br />in 3 clear stages.',
     "roadmap.extras.title": "Alongside the main path",
+    "roadmap.module.cta": "Click here to view course details →",
     "roadmap.benefits.head": "What you get as an EngineerPro student",
     "roadmap.cta1":   "See applicable courses →",
     "roadmap.cta2":   "💬 Click here to message our Fanpage for a personalised plan →",
