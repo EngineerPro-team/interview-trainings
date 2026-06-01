@@ -112,7 +112,7 @@ window.I18N = {
     "roadmap.extras.title": "Song song với lộ trình chính",
     "roadmap.benefits.head": "Khi là học viên EngineerPro, bạn nhận được gì?",
     "roadmap.cta1":   "Xem khoá học áp dụng →",
-    "roadmap.cta2":   "Nhắn fanpage tư vấn lộ trình cá nhân",
+    "roadmap.cta2":   "💬 Bấm vào đây để nhắn fanpage tư vấn lộ trình →",
 
     // ============== BOOK ==============
     "book.eyebrow":   "📚 Sách miễn phí cho cộng đồng · 2026",
@@ -348,7 +348,7 @@ window.I18N = {
     "roadmap.extras.title": "Alongside the main path",
     "roadmap.benefits.head": "What you get as an EngineerPro student",
     "roadmap.cta1":   "See applicable courses →",
-    "roadmap.cta2":   "Message Fanpage for a personalised plan",
+    "roadmap.cta2":   "💬 Click here to message our Fanpage for a personalised plan →",
 
     "book.eyebrow":   "📚 Free for the community · 2026",
     "book.read.en":   "Read in English →",

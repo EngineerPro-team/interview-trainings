@@ -2649,6 +2649,31 @@ p {
   color: #fff;
 }
 
+/* Accent variant of the ghost button — uses the brand orange for the border
+   so a secondary CTA reads as visually "paired" with the orange primary CTA
+   next to it, instead of fading into the background. */
+.btn.btn--ghost.btn--ghost-accent {
+  color: var(--orange-2);
+  background: rgba(255, 122, 24, 0.06);
+  border-color: rgba(255, 122, 24, 0.55);
+  font-weight: 600;
+}
+.btn.btn--ghost.btn--ghost-accent:hover {
+  color: #fff;
+  background: var(--orange-2);
+  border-color: var(--orange-2);
+}
+:root[data-theme="dark"] .btn.btn--ghost.btn--ghost-accent {
+  color: #ffb169;
+  background: rgba(255, 122, 24, 0.1);
+  border-color: rgba(255, 122, 24, 0.75);
+}
+:root[data-theme="dark"] .btn.btn--ghost.btn--ghost-accent:hover {
+  color: #fff;
+  background: var(--orange-2);
+  border-color: var(--orange-2);
+}
+
 /* Video grid (Programming Foundation) */
 .video-grid {
   display: grid;
