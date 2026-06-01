@@ -291,6 +291,22 @@
     } else {
       window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
     }
+
+    // SPA route changes go through pushState, so GA's auto page_view (which
+    // fires once on initial document load) won't see them. Manually emit a
+    // page_view event with the new path so Analytics → Pages report stays
+    // accurate. We send `page_location` so GA picks up the absolute URL +
+    // any query/hash; `page_title` reflects the route-specific document.title
+    // that updateSeoForRoute() just wrote.
+    try {
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "page_view", {
+          page_location: location.href,
+          page_path:     location.pathname + location.search,
+          page_title:    document.title,
+        });
+      }
+    } catch (_) { /* analytics is non-critical, never block routing on it */ }
   }
 
   // SEO: keep <title>, <meta name="description">, <link rel="canonical">,

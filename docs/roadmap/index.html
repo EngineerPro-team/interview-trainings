@@ -257,6 +257,17 @@
 
     <meta name="theme-color" content="#0b1d3a" />
 
+    <!-- Google Analytics 4 (gtag.js) — fires an automatic page_view on first
+         paint. The SPA also fires a manual gtag('event','page_view',...) on
+         every showRoute() so client-side path navigations are tracked too. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-621HPFWYBP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-621HPFWYBP', { send_page_view: true });
+    </script>
+
     <!-- Early theme bootstrap: applies dark/light before first paint to avoid FOUC.
          Priority: saved choice → OS preference → light default. -->
     <script>
