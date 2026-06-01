@@ -222,12 +222,24 @@
     "roadmap": "home-roadmap",
     "format":  "home-format",
   };
+  // Deep-link sub-sections of the Resources tab: clicking
+  // /resources/golang-tour lands on /resources/ and scrolls straight to
+  // that resource block.
+  const RESOURCES_ANCHORS = {
+    "foundation":  "resFoundation",
+    "golang-tour": "resGolangTour",
+    "cv-kit":      "resCV",
+    "cv":          "resCV",         // back-compat alias
+  };
 
   function parseHash() {
     let path = stripBasePath((location.pathname || "/").replace(/\/index\.html$/, ""));
     let m;
     if ((m = path.match(/^\/courses\/([^/]+)\/?$/))) return { route: "course", slug: m[1] };
     if ((m = path.match(/^\/stories\/([^/]+)\/?$/))) return { route: "story", slug: m[1] };
+    if ((m = path.match(/^\/resources\/([\w-]+)\/?$/)) && RESOURCES_ANCHORS[m[1]]) {
+      return { route: "resources", slug: null, scrollTo: RESOURCES_ANCHORS[m[1]] };
+    }
     if ((m = path.match(/^\/(courses|book|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
       return { route: m[1], slug: null };
     }
@@ -1633,6 +1645,52 @@
       if (grid) {
         grid.innerHTML = "";
         f.videos.forEach((v, i) => {
+          const card = el(
+            "a",
+            {
+              class: "video-card",
+              href: v.url,
+              target: "_blank",
+              rel: "noopener",
+              title: v.title,
+            },
+            [
+              el("div", { class: "video-card__thumb" }, [
+                el("img", { src: asset(v.thumbnail), alt: v.title, loading: "lazy" }),
+                v.duration ? el("span", { class: "video-card__dur" }, v.duration) : null,
+                el("span", { class: "video-card__play" }, "▶"),
+              ]),
+              el("div", { class: "video-card__meta" }, [
+                el("span", { class: "video-card__idx" }, `#${String(i + 1).padStart(2, "0")}`),
+                el("h4", {}, v.title),
+              ]),
+            ]
+          );
+          grid.appendChild(card);
+        });
+      }
+    }
+
+    // Golang Tour — 3 free videos with a senior Shopee SWE
+    const gt = resources.golangTour;
+    if (gt) {
+      const gtEn = enMap.golangTour || {};
+      const videoWord = en
+        ? (gtEn.videoCountLabel || "videos")
+        : (viLabels.golangTour?.videoCountLabel || "video");
+      const t = document.getElementById("resGolangTourTitle");
+      if (t) t.textContent = `${gt.title} — ${gt.videos.length} ${videoWord}`;
+      const s = document.getElementById("resGolangTourSub");
+      if (s) s.textContent = (en && gtEn.subtitle) ? gtEn.subtitle : gt.subtitle;
+      const d = document.getElementById("resGolangTourDesc");
+      if (d) d.textContent = (en && gtEn.description) ? gtEn.description : gt.description;
+      const c = document.getElementById("resGolangTourCta");
+      if (c) c.href = gt.url;
+
+      const grid = document.getElementById("resGolangTourGrid");
+      if (grid) {
+        grid.innerHTML = "";
+        gt.videos.forEach((v, i) => {
           const card = el(
             "a",
             {

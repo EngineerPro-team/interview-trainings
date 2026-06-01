@@ -758,6 +758,46 @@ def main() -> int:
         write(os.path.join(DOCS, slug, "index.html"), page)
         pages += 1
 
+    # Deep-link sub-sections of /resources/. Same shape as the home anchor
+    # aliases above: prerender a clone of /resources/index.html under each
+    # sub-slug so the URL serves 200; the SPA's parseHash() + showRoute()
+    # handle the scroll to the matching block on hydration.
+    resources_html = build_top_route(
+        template, "resources", "Interview Resources", "Interview Resources",
+        ROUTE_DESCRIPTIONS_VI["resources"],
+    )
+    RESOURCES_ALIASES = {
+        "foundation":  ("Programming Foundation · ", "16 video nền tảng lập trình free (C++ / Java / Golang / Python) từ EngineerPro."),
+        "golang-tour": ("Golang Tour · ",            "3 video free học Golang cơ bản cùng Senior SWE tại Shopee Singapore."),
+        "cv-kit":      ("Viết CV chuẩn Big Tech · ", "Bộ tài liệu viết CV chuẩn Big Tech — CV mẫu đã pass Google, template LaTeX, playlist review CV."),
+    }
+    for slug, (title_prefix, desc) in RESOURCES_ALIASES.items():
+        page = resources_html
+        anchor_url = f"{SITE_BASE}/resources/{slug}/"
+        title = f"{title_prefix}Interview Resources · {SITE_NAME}"
+        page = re.sub(
+            r'<title>[^<]*</title>',
+            f'<title>{attr(title)}</title>',
+            page, count=1,
+        )
+        page = re.sub(
+            r'<link rel="canonical" href="[^"]*"',
+            f'<link rel="canonical" href="{anchor_url}"',
+            page, count=1,
+        )
+        page = re.sub(
+            r'<meta property="og:url" content="[^"]*"',
+            f'<meta property="og:url" content="{anchor_url}"',
+            page, count=1,
+        )
+        page = re.sub(
+            r'<meta name="description" content="[^"]*"',
+            f'<meta name="description" content="{attr(desc)}"',
+            page, count=1,
+        )
+        write(os.path.join(DOCS, "resources", slug, "index.html"), page)
+        pages += 1
+
     # 5. Legacy URL redirects. The old Shopify site used Vietnamese-slug paths
     # under /pages/ and /blogs/ which we want to keep linkable from external
     # backlinks (Substack, FB posts, etc.). For each entry below we emit a

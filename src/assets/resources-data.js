@@ -122,6 +122,36 @@ window.RESOURCES = {
       }
     ]
   },
+  "golangTour": {
+    "playlistId": "PLy5vBFMmXuxejlQ2iZNKnLyTuKQvLcEQH",
+    "title": "Golang Tour",
+    "subtitle": "3 video free — học Golang cơ bản cùng Senior SWE tại Shopee Singapore",
+    "description": "Series 3 video EngineerPro thực hiện cùng Senior Software Engineer tại Shopee Singapore — đi từ cú pháp cơ bản đến concurrency, goroutines, channels. Phù hợp người chuẩn bị apply backend Golang tại Big Tech / Shopee / Grab / TikTok.",
+    "url": "https://www.youtube.com/playlist?list=PLy5vBFMmXuxejlQ2iZNKnLyTuKQvLcEQH",
+    "videos": [
+      {
+        "videoId": "vzIhF4zkOnA",
+        "title": "Learning Basic Golang with a Senior Software Engineer at Shopee Singapore [1/3]",
+        "duration": "1:23:39",
+        "thumbnail": "https://i.ytimg.com/vi/vzIhF4zkOnA/hqdefault.jpg",
+        "url": "https://www.youtube.com/watch?v=vzIhF4zkOnA&list=PLy5vBFMmXuxejlQ2iZNKnLyTuKQvLcEQH"
+      },
+      {
+        "videoId": "tkc_amg3IDk",
+        "title": "Học Golang cơ bản cùng Senior Software Engineer tại Shopee Singapore [2/3]",
+        "duration": "1:18:59",
+        "thumbnail": "https://i.ytimg.com/vi/tkc_amg3IDk/hqdefault.jpg",
+        "url": "https://www.youtube.com/watch?v=tkc_amg3IDk&list=PLy5vBFMmXuxejlQ2iZNKnLyTuKQvLcEQH"
+      },
+      {
+        "videoId": "srcuEXLeQS4",
+        "title": "Học Golang cơ bản cùng Senior Software Engineer tại Shopee Singapore [3/3]",
+        "duration": "1:18:28",
+        "thumbnail": "https://i.ytimg.com/vi/srcuEXLeQS4/hqdefault.jpg",
+        "url": "https://www.youtube.com/watch?v=srcuEXLeQS4&list=PLy5vBFMmXuxejlQ2iZNKnLyTuKQvLcEQH"
+      }
+    ]
+  },
   "cv": {
     "intro": "4 nguồn tham khảo để bạn viết CV chuẩn Big Tech — CV mẫu đã pass Google, template LaTeX, video review CV thật, và tool generate CV nhanh.",
     "sample": {
