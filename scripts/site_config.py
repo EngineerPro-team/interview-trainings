@@ -42,6 +42,7 @@ OG_IMAGE: str = "/assets/img/og-share.png"
 TOP_ROUTES = [
     ("courses",   "Khoá học",          "Courses"),
     ("book",      "Coding Book",       "Coding Book"),
+    ("mock",      "Mock Interview 1-1", "Mock Interview 1-1"),
     ("resources", "Interview Resources", "Interview Resources"),
     ("mentors",   "Giảng viên",        "Mentors"),
     ("stories",   "Success Stories",   "Success Stories"),

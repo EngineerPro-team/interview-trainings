@@ -208,7 +208,7 @@
   //  #home, #courses, #book, #resources, #mentors, #stories, #podcast, #partners, #faq, #contact
   //  (#home-roadmap and #home-format are anchor scrolls into the home page)
   const TOP_ROUTES = [
-    "home", "courses", "book", "resources",
+    "home", "courses", "book", "mock", "resources",
     "mentors", "stories", "podcast", "partners", "faq", "terms", "contact",
   ];
 
@@ -228,7 +228,7 @@
     let m;
     if ((m = path.match(/^\/courses\/([^/]+)\/?$/))) return { route: "course", slug: m[1] };
     if ((m = path.match(/^\/stories\/([^/]+)\/?$/))) return { route: "story", slug: m[1] };
-    if ((m = path.match(/^\/(courses|book|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
+    if ((m = path.match(/^\/(courses|book|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
       return { route: m[1], slug: null };
     }
     if ((m = path.match(/^\/(roadmap|format)\/?$/))) {

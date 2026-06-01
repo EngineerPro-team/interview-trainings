@@ -309,7 +309,7 @@ def fix_asset_paths(template: str) -> str:
     # 3. Internal route links
     if BASE_PATH:
         out = re.sub(
-            r'href="/(courses|book|resources|mentors|stories|podcast|partners|faq|terms|contact)/"',
+            r'href="/(courses|book|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/"',
             rf'href="{BASE_PATH}/\1/"',
             out,
         )
@@ -614,6 +614,7 @@ def build_story_detail(template: str, s: dict) -> str:
 ROUTE_DESCRIPTIONS_VI = {
     "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "book":      "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
+    "mock":      "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
     "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — video lập trình nền tảng, template CV Big Tech, playlist review CV.",
     "mentors":   "17 mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",
     "stories":   "94+ học viên EngineerPro đã nhận offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",

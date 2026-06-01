@@ -26,6 +26,14 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/book/" />
   </url>
   <url>
+    <loc>https://engineerprogurus.com/mock/</loc>
+    <lastmod>2026-06-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/mock/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/mock/" />
+  </url>
+  <url>
     <loc>https://engineerprogurus.com/resources/</loc>
     <lastmod>2026-06-01</lastmod>
     <changefreq>monthly</changefreq>
