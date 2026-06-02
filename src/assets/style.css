@@ -2016,6 +2016,10 @@ p {
   font-weight: 600;
   color: var(--orange);
 }
+.card__icon--email {
+  background: linear-gradient(135deg, var(--orange), #e65c00);
+  color: #fff;
+}
 .card__icon--fb {
   background: linear-gradient(135deg, #1877f2, #0a5cd6);
   color: #fff;

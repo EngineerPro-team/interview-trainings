@@ -222,6 +222,7 @@ window.I18N = {
     // ============== CONTACT ==============
     "contact.head":  "Liên hệ",
     "contact.intro": "Hãy liên hệ với chúng tôi để được giải đáp thắc mắc và tư vấn lộ trình.",
+    "contact.cta.email":     "Gửi email →",
     "contact.cta.messenger": "Chat ngay →",
     "contact.cta.facebook":  "Theo dõi Fanpage →",
     "contact.cta.zalo":      "Mở Zalo →",
@@ -490,6 +491,7 @@ window.I18N = {
 
     "contact.head":  "Contact",
     "contact.intro": "Reach out to us for any questions or path consultation.",
+    "contact.cta.email":     "Send email →",
     "contact.cta.messenger": "Chat now →",
     "contact.cta.facebook":  "Follow our Fanpage →",
     "contact.cta.zalo":      "Open Zalo →",

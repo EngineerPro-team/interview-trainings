@@ -632,7 +632,7 @@ ROUTE_DESCRIPTIONS_VI = {
     "partners":  "Đối tác EngineerPro — các tổ chức cùng sứ mệnh đưa kỹ sư Việt vươn ra Big Tech.",
     "faq":       "Câu hỏi thường gặp về khoá học, mentor, lịch học và thủ tục đăng ký tại EngineerPro.",
     "terms":     "Điều khoản dịch vụ EngineerPro — cam kết chất lượng, quyền sở hữu tài liệu, chính sách hoàn tiền và chuyển cọc.",
-    "contact":   "Liên hệ EngineerPro qua Messenger, Facebook, Zalo, Spotify, YouTube, Substack, Viblo.",
+    "contact":   "Liên hệ EngineerPro qua email, Messenger, Facebook, Zalo, Spotify, YouTube, Substack, Viblo.",
 }
 
 
