@@ -226,11 +226,13 @@
   // /resources/golang-tour lands on /resources/ and scrolls straight to
   // that resource block.
   const RESOURCES_ANCHORS = {
-    "hr-screen":   "resHrScreen",
-    "foundation":  "resFoundation",
-    "golang-tour": "resGolangTour",
-    "cv-kit":      "resCV",
-    "cv":          "resCV",         // back-compat alias
+    "hr-screen":     "resHrScreen",
+    "pip-big-tech":  "resPipBigTech",
+    "pip":           "resPipBigTech", // back-compat alias
+    "foundation":    "resFoundation",
+    "golang-tour":   "resGolangTour",
+    "cv-kit":        "resCV",
+    "cv":            "resCV",         // back-compat alias
   };
 
   function parseHash() {
@@ -299,7 +301,14 @@
       // the route swap + i18n hydration finishes before measuring.
       requestAnimationFrame(() => {
         const el = document.getElementById(scrollTo);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (!el) return;
+        const panel = el.classList.contains("resource-panel")
+          ? el
+          : el.closest("details.resource-panel");
+        if (panel && !panel.open) panel.open = true;
+        if (el.matches("details.faq-item") && !el.open) el.open = true;
+        if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     } else {
       window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
@@ -1135,6 +1144,151 @@
     });
   }
 
+  function syncResourceExpandLabels() {
+    const expand = t("resources.expandOne");
+    const collapse = t("resources.collapseOne");
+    document.querySelectorAll("details.faq-item .faq-item__action").forEach((label) => {
+      const item = label.closest("details");
+      if (item) label.textContent = item.open ? collapse : expand;
+    });
+  }
+
+  function initResourcesPanels() {
+    const list = document.getElementById("resourcesPanels");
+    if (!list) return;
+
+    const search = document.getElementById("resourcesSearch");
+    const empty = document.getElementById("resourcesEmpty");
+
+    const apply = () => {
+      const q = (search?.value || "").trim().toLowerCase();
+      let visible = 0;
+      list.querySelectorAll(":scope > details.resource-panel").forEach((it) => {
+        const show = !q || it.textContent.toLowerCase().includes(q);
+        it.hidden = !show;
+        if (show) {
+          visible++;
+          if (q) it.open = true;
+        }
+      });
+      if (empty) empty.hidden = visible !== 0;
+      if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+    };
+    if (search) search.addEventListener("input", apply);
+
+    list.querySelectorAll(":scope > details.resource-panel").forEach((it) => {
+      it.addEventListener("toggle", syncResourceExpandLabels);
+    });
+    syncResourceExpandLabels();
+
+    document.getElementById("resourcesExpandAll")?.addEventListener("click", () => {
+      list.querySelectorAll(":scope > details.resource-panel:not([hidden])").forEach((it) => {
+        it.open = true;
+      });
+      document.querySelectorAll("#hrChecklist .faq-item, #pipChecklist .faq-item").forEach((it) => {
+        it.open = true;
+      });
+      syncResourceExpandLabels();
+    });
+    document.getElementById("resourcesCollapseAll")?.addEventListener("click", () => {
+      list.querySelectorAll(":scope > details.resource-panel").forEach((it) => {
+        it.open = false;
+      });
+      document.querySelectorAll("#hrChecklist .faq-item, #pipChecklist .faq-item").forEach((it) => {
+        it.open = false;
+      });
+      syncResourceExpandLabels();
+    });
+  }
+
+  function initHrChecklist() {
+    const list = document.getElementById("hrChecklist");
+    if (!list) return;
+
+    const search = document.getElementById("hrSearch");
+    const empty = document.getElementById("hrEmpty");
+
+    const apply = () => {
+      const q = (search?.value || "").trim().toLowerCase();
+      let visible = 0;
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        const show = !q || it.textContent.toLowerCase().includes(q);
+        it.hidden = !show;
+        if (show) {
+          visible++;
+          if (q) it.open = true;
+        }
+      });
+      if (empty) empty.hidden = visible !== 0;
+      if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+    };
+    if (search) search.addEventListener("input", apply);
+
+    list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+      it.addEventListener("toggle", syncResourceExpandLabels);
+    });
+    syncResourceExpandLabels();
+
+    document.getElementById("hrExpandAll")?.addEventListener("click", () => {
+      const hrPanel = document.getElementById("resHrScreen");
+      if (hrPanel && !hrPanel.open) hrPanel.open = true;
+      list.querySelectorAll(":scope > .faq-item:not([hidden])").forEach((it) => {
+        it.open = true;
+      });
+      syncResourceExpandLabels();
+    });
+    document.getElementById("hrCollapseAll")?.addEventListener("click", () => {
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        it.open = false;
+      });
+      syncResourceExpandLabels();
+    });
+  }
+
+  function initPipChecklist() {
+    const list = document.getElementById("pipChecklist");
+    if (!list) return;
+
+    const search = document.getElementById("pipSearch");
+    const empty = document.getElementById("pipEmpty");
+
+    const apply = () => {
+      const q = (search?.value || "").trim().toLowerCase();
+      let visible = 0;
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        const show = !q || it.textContent.toLowerCase().includes(q);
+        it.hidden = !show;
+        if (show) {
+          visible++;
+          if (q) it.open = true;
+        }
+      });
+      if (empty) empty.hidden = visible !== 0;
+      if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+    };
+    if (search) search.addEventListener("input", apply);
+
+    list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+      it.addEventListener("toggle", syncResourceExpandLabels);
+    });
+    syncResourceExpandLabels();
+
+    document.getElementById("pipExpandAll")?.addEventListener("click", () => {
+      const pipPanel = document.getElementById("resPipBigTech");
+      if (pipPanel && !pipPanel.open) pipPanel.open = true;
+      list.querySelectorAll(":scope > .faq-item:not([hidden])").forEach((it) => {
+        it.open = true;
+      });
+      syncResourceExpandLabels();
+    });
+    document.getElementById("pipCollapseAll")?.addEventListener("click", () => {
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        it.open = false;
+      });
+      syncResourceExpandLabels();
+    });
+  }
+
   // ===================== ROADMAP =====================
   function renderRoadmap() {
     const r = data.roadmap;
@@ -1929,6 +2083,7 @@
     if (typeof renderStories === "function") renderStories();
     // Translate any data-i18n elements created by renderers
     applyI18n();
+    if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
     // Re-render current detail page if applicable
     const h = parseHash();
     if (h.route === "course") renderCourseDetail(h.slug);
@@ -1997,6 +2152,9 @@
   renderPodcasts();
   renderBook();
   renderFAQ();
+  initResourcesPanels();
+  initHrChecklist();
+  initPipChecklist();
   renderRoadmap();
   renderPartners();
   renderResources();

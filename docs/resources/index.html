@@ -1036,190 +1036,44 @@
           <div class="section__head">
             <h2><span data-i18n="resources.head">Interview Resources</span> <span class="badge" data-i18n="resources.badge">FREE</span></h2>
             <p data-i18n="resources.intro">
-              Bộ tài nguyên miễn phí team EngineerPro share cho cộng đồng — checklist HR
-              phone screen, video nền tảng lập trình, template CV chuẩn Big Tech, và playlist
-              review CV thực tế.
+              Bộ tài nguyên miễn phí — bấm từng nhóm (CV, HR checklist, PIP Big Tech, Golang, Programming Foundation)
+              để xem chi tiết.
             </p>
           </div>
 
-          <!-- 0) HR / recruiter phone screen checklist -->
-          <article class="resource-block resource-block--hr" id="resHrScreen">
-            <header class="resource-block__head">
-              <div>
-                <span class="resource-block__kicker" data-i18n="resources.hr.kicker">✅ CHECKLIST · HR PHONE SCREEN</span>
-                <h3 data-i18n="resources.hr.head">HR / Recruiter call — đừng fail vì phần “dễ”</h3>
-                <p class="muted" data-i18n="resources.hr.sub">
-                  Vòng gọi 20–30 phút trước technical — thường bị đánh giá chủ quan nếu chưa chuẩn bị.
-                </p>
-              </div>
-            </header>
-            <p class="resource-block__desc" data-i18n="resources.hr.intro">
-              Nhiều bạn rớt sớm không phải vì coding, mà vì HR/recruiter hỏi self-intro, behaviour,
-              project depth và motivation — và cảm thấy bạn chưa “own” công việc mình làm hoặc chưa
-              thật sự muốn vào công ty. Tick từng mục trước khi nhấc máy.
-            </p>
+          <div class="faq-controls resources-panels__controls">
+            <input
+              id="resourcesSearch"
+              class="faq-search"
+              type="search"
+              autocomplete="off"
+              placeholder="Tìm trong Resources… (vd: CV, STAR, Golang)"
+              data-i18n-attr="placeholder|resources.searchPh"
+            />
+            <button id="resourcesExpandAll" class="btn-mini" type="button" data-i18n="resources.expand">Mở tất cả</button>
+            <button id="resourcesCollapseAll" class="btn-mini" type="button" data-i18n="resources.collapse">Thu gọn</button>
+          </div>
 
-            <ul class="hr-checklist" role="list">
-              <li class="hr-checklist__item">
-                <span class="hr-checklist__mark" aria-hidden="true"></span>
-                <div>
-                  <h4 data-i18n="resources.hr.item1.title">1 · Tell me about yourself</h4>
-                  <p class="hr-checklist__why muted" data-i18n="resources.hr.item1.why">
-                    Mở đầu ~90 giây – 2 phút — HR quyết định có muốn đẩy bạn sang vòng sau không.
-                  </p>
-                  <ul class="hr-checklist__tips">
-                    <li data-i18n="resources.hr.item1.t1">Present → Past → Future: role hiện tại, 1–2 highlight có số liệu, vì sao apply vị trí/công ty này.</li>
-                    <li data-i18n="resources.hr.item1.t2">Không đọc CV từng dòng; kết bằng hook “That’s why I’m excited about …”.</li>
-                    <li data-i18n="resources.hr.item1.t3">Luyện nói to, rõ — tránh monologue quá 3 phút.</li>
-                  </ul>
-                </div>
-              </li>
-              <li class="hr-checklist__item">
-                <span class="hr-checklist__mark" aria-hidden="true"></span>
-                <div>
-                  <h4 data-i18n="resources.hr.item2.title">2 · Behavioural / situational (STAR)</h4>
-                  <p class="hr-checklist__why muted" data-i18n="resources.hr.item2.why">
-                    HR hay hỏi conflict, failure, leadership, deadline — để xem bạn phản ứng thế nào khi làm việc thật.
-                  </p>
-                  <ul class="hr-checklist__tips">
-                    <li data-i18n="resources.hr.item2.t1">Chuẩn bị đủ story behavioural: conflict, mistake, influence without authority, tight deadline, disagreement.</li>
-                    <li data-i18n="resources.hr.item2.t2">STAR gọn: Situation → Task → Action (chi tiết <strong>I</strong> làm gì) → Result (metric nếu có).</li>
-                    <li data-i18n="resources.hr.item2.t3">Tránh “we did…” suốt — recruiter cần signal cá nhân, không phải team generic.</li>
-                  </ul>
-                </div>
-              </li>
-              <li class="hr-checklist__item">
-                <span class="hr-checklist__mark" aria-hidden="true"></span>
-                <div>
-                  <h4 data-i18n="resources.hr.item3.title">3 · Past projects — chứng minh bạn nắm việc mình làm</h4>
-                  <p class="hr-checklist__why muted" data-i18n="resources.hr.item3.why">
-                    HR/recruiter thường drill 1–2 project trên CV để xem có “resume inflation” không.
-                  </p>
-                  <ul class="hr-checklist__tips">
-                    <li data-i18n="resources.hr.item3.t1">Chọn 2 project gần nhất: problem, scope của bạn, trade-offs, outcome, stack — nói được không cần slide.</li>
-                    <li data-i18n="resources.hr.item3.t2">Walk-through flow / architecture ở mức high-level; sẵn sàng giải thích 1 quyết định kỹ thuật bạn chịu trách nhiệm.</li>
-                    <li data-i18n="resources.hr.item3.t3">Project team → nói rõ phần việc của bạn; đừng claim credit cả team.</li>
-                  </ul>
-                </div>
-              </li>
-              <li class="hr-checklist__item">
-                <span class="hr-checklist__mark" aria-hidden="true"></span>
-                <div>
-                  <h4 data-i18n="resources.hr.item4.title">4 · Motivation — why company / why role</h4>
-                  <p class="hr-checklist__why muted" data-i18n="resources.hr.item4.why">
-                    Thiếu motivation cụ thể = red flag “ứng tượng trúng đâu hay đấy”.
-                  </p>
-                  <ul class="hr-checklist__tips">
-                    <li data-i18n="resources.hr.item4.t1">Research 3 điểm cụ thể: sản phẩm, culture/values, scope level role — không chỉ “công ty lớn”.</li>
-                    <li data-i18n="resources.hr.item4.t2">Nối motivation với mục tiêu nghề nghiệp 2–3 năm của bạn.</li>
-                    <li data-i18n="resources.hr.item4.t3">Không diss công ty cũ; compensation chỉ là một phần của câu trả lời.</li>
-                  </ul>
-                </div>
-              </li>
-              <li class="hr-checklist__item">
-                <span class="hr-checklist__mark" aria-hidden="true"></span>
-                <div>
-                  <h4 data-i18n="resources.hr.item5.title">5 · Logistics &amp; chuyên nghiệp</h4>
-                  <p class="hr-checklist__why muted" data-i18n="resources.hr.item5.why">
-                    Vòng HR cũng screen fit thực tế — timeline, package, next steps.
-                  </p>
-                  <ul class="hr-checklist__tips">
-                    <li data-i18n="resources.hr.item5.t1">Biết notice period, salary range mong muốn (hoặc “open depending on package”), work authorization nếu apply abroad.</li>
-                    <li data-i18n="resources.hr.item5.t2">Chuẩn bị 2–3 câu hỏi ngược: process, team structure, timeline các vòng sau.</li>
-                    <li data-i18n="resources.hr.item5.t3">Test mic/line; chỗ yên tĩnh; CV + JD mở sẵn trước mặt.</li>
-                  </ul>
-                </div>
-              </li>
-              <li class="hr-checklist__item">
-                <span class="hr-checklist__mark" aria-hidden="true"></span>
-                <div>
-                  <h4 data-i18n="resources.hr.item6.title">6 · Sau cuộc gọi</h4>
-                  <p class="hr-checklist__why muted" data-i18n="resources.hr.item6.why">
-                    Iteration nhỏ giúp vòng sau mạnh hơn — kể cả khi bạn pass HR screen.
-                  </p>
-                  <ul class="hr-checklist__tips">
-                    <li data-i18n="resources.hr.item6.t1">Ghi lại câu hỏi HR đã hỏi → refine story / pitch cho lần sau.</li>
-                    <li data-i18n="resources.hr.item6.t2">Thank-you note ngắn trong 24h (optional nhưng tăng impression).</li>
-                  </ul>
-                </div>
-              </li>
-            </ul>
+          <p class="faq-empty" id="resourcesEmpty" hidden data-i18n="resources.empty">
+            Không tìm thấy nhóm tài nguyên nào khớp.
+          </p>
 
-            <aside class="hr-checklist__promo">
-              <div class="hr-checklist__promo-copy">
-                <span class="hr-checklist__promo-badge" data-i18n="resources.hr.promo.badge">Khóa học gợi ý</span>
-                <h4 data-i18n="resources.hr.promo.head">Behaviour Interview Course — luyện đúng phần HR hay hỏi</h4>
-                <p data-i18n="resources.hr.promo.text">
-                  12 buổi live: self-intro, behavioural phổ biến, leadership principles &amp; STAR bằng tiếng Anh —
-                  format nhiều Big Tech dùng từ recruiter screen đến onsite behavioural.
-                </p>
-              </div>
-              <div class="hr-checklist__promo-actions">
-                <a
-                  href="/courses/behaviour-interview-course/"
-                  class="btn btn--primary"
-                  data-i18n="resources.hr.promo.cta"
-                >Xem khóa Behaviour Interview →</a>
-                <a
-                  href="https://m.me/EngineerPro.Official"
-                  class="btn btn--ghost btn--ghost-accent"
-                  target="_blank"
-                  rel="noopener"
-                  data-i18n="resources.hr.promo.consult"
-                >Nhắn fanpage tư vấn lộ trình →</a>
-              </div>
-            </aside>
-          </article>
+          <div class="faq-list resources-panels" id="resourcesPanels">
 
-          <!-- 1) Programming Foundation playlist -->
-          <article class="resource-block" id="resFoundation">
-            <header class="resource-block__head">
-              <div>
-                <span class="resource-block__kicker" data-i18n="resources.foundation.kicker">📺 PLAYLIST · YOUTUBE</span>
-                <h3 id="resFoundationTitle"></h3>
-                <p id="resFoundationSub" class="muted"></p>
-              </div>
-              <a
-                id="resFoundationCta"
-                class="btn btn--ghost btn--ghost-dark"
-                target="_blank"
-                rel="noopener"
-                data-i18n="resources.foundation.cta"
-              >Mở full playlist ↗</a>
-            </header>
-            <p class="resource-block__desc" id="resFoundationDesc"></p>
-            <div class="video-grid" id="resFoundationGrid"></div>
-          </article>
-
-          <!-- 2) Golang Tour — 3 video free -->
-          <article class="resource-block" id="resGolangTour">
-            <header class="resource-block__head">
-              <div>
-                <span class="resource-block__kicker" data-i18n="resources.golangTour.kicker">📺 PLAYLIST · YOUTUBE</span>
-                <h3 id="resGolangTourTitle"></h3>
-                <p id="resGolangTourSub" class="muted"></p>
-              </div>
-              <a
-                id="resGolangTourCta"
-                class="btn btn--ghost btn--ghost-dark"
-                target="_blank"
-                rel="noopener"
-                data-i18n="resources.golangTour.cta"
-              >Mở full playlist ↗</a>
-            </header>
-            <p class="resource-block__desc" id="resGolangTourDesc"></p>
-            <div class="video-grid" id="resGolangTourGrid"></div>
-          </article>
-
-          <!-- 3) CV resources -->
-          <article class="resource-block" id="resCV">
-            <header class="resource-block__head">
-              <div>
+          <!-- 1 · CV kit -->
+          <details class="faq-item resource-panel" id="resCV">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">1</span>
+              <div class="resource-panel__head">
                 <span class="resource-block__kicker" data-i18n="resources.cv.kicker">📄 BỘ TÀI LIỆU VIẾT CV</span>
-                <h3 data-i18n="resources.cv.head">Viết CV chuẩn Big Tech</h3>
-                <p class="muted" id="resCVIntro"></p>
+                <span class="faq-item__qtext" data-i18n="resources.cv.head">Viết CV chuẩn Big Tech</span>
+                <span class="resource-panel__sub muted" id="resCVIntro"></span>
               </div>
-            </header>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested">
 
             <article class="cv-sample" id="cvSample">
               <div class="cv-sample__preview">
@@ -1281,7 +1135,451 @@
                 </div>
               </a>
             </div>
-          </article>
+
+            </div>
+            </div>
+          </details>
+
+          <!-- 2 · HR phone screen checklist -->
+          <details class="faq-item resource-panel resource-panel--hr" id="resHrScreen">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">2</span>
+              <div class="resource-panel__head">
+                <span class="resource-block__kicker" data-i18n="resources.hr.kicker">✅ CHECKLIST · HR PHONE SCREEN</span>
+                <span class="faq-item__qtext" data-i18n="resources.hr.head">HR / Recruiter call — đừng fail vì phần “dễ”</span>
+                <span class="resource-panel__sub muted" data-i18n="resources.hr.sub">
+                  Vòng gọi 20–30 phút trước technical — thường bị đánh giá chủ quan nếu chưa chuẩn bị.
+                </span>
+              </div>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested resource-block--hr">
+            <p class="resource-block__desc" data-i18n="resources.hr.intro">
+              Nhiều bạn rớt sớm không phải vì coding, mà vì HR/recruiter hỏi self-intro, behaviour,
+              project depth và motivation — và cảm thấy bạn chưa “own” công việc mình làm hoặc chưa
+              thật sự muốn vào công ty. Bấm từng mục để xem tips chi tiết.
+            </p>
+
+            <div class="faq-controls hr-checklist__controls">
+              <input
+                id="hrSearch"
+                class="faq-search"
+                type="search"
+                autocomplete="off"
+                placeholder="Tìm trong checklist… (vd: STAR, motivation, project)"
+                data-i18n-attr="placeholder|resources.hr.searchPh"
+              />
+              <button id="hrExpandAll" class="btn-mini" type="button" data-i18n="resources.hr.expand">Mở tất cả</button>
+              <button id="hrCollapseAll" class="btn-mini" type="button" data-i18n="resources.hr.collapse">Thu gọn</button>
+            </div>
+
+            <div class="faq-list hr-checklist__list" id="hrChecklist">
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">1</span>
+                  <span class="faq-item__qtext" data-i18n="resources.hr.item1.title">Tell me about yourself</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.hr.item1.why">
+                    Mở đầu ~90 giây – 2 phút — HR quyết định có muốn đẩy bạn sang vòng sau không.
+                  </p>
+                  <ul>
+                    <li data-i18n="resources.hr.item1.t1">Present → Past → Future: role hiện tại, highlight có số liệu, vì sao apply vị trí/công ty này.</li>
+                    <li data-i18n="resources.hr.item1.t2">Không đọc CV từng dòng; kết bằng hook “That’s why I’m excited about …”.</li>
+                    <li data-i18n="resources.hr.item1.t3">Luyện nói to, rõ — tránh monologue quá dài.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">2</span>
+                  <span class="faq-item__qtext" data-i18n="resources.hr.item2.title">Behavioural / situational (STAR)</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.hr.item2.why">
+                    HR hay hỏi conflict, failure, leadership, deadline — để xem bạn phản ứng thế nào khi làm việc thật.
+                  </p>
+                  <ul>
+                    <li data-i18n="resources.hr.item2.t1">Chuẩn bị đủ story behavioural: conflict, mistake, influence without authority, tight deadline, disagreement.</li>
+                    <li data-i18n="resources.hr.item2.t2">STAR gọn: Situation → Task → Action (chi tiết <strong>I</strong> làm gì) → Result (metric nếu có).</li>
+                    <li data-i18n="resources.hr.item2.t3">Tránh “we did…” suốt — recruiter cần signal cá nhân, không phải team generic.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">3</span>
+                  <span class="faq-item__qtext" data-i18n="resources.hr.item3.title">Past projects — chứng minh bạn nắm việc mình làm</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.hr.item3.why">
+                    HR/recruiter thường drill project trên CV để xem có “resume inflation” không.
+                  </p>
+                  <ul>
+                    <li data-i18n="resources.hr.item3.t1">Chọn project gần nhất: problem, scope của bạn, trade-offs, outcome, stack — nói được không cần slide.</li>
+                    <li data-i18n="resources.hr.item3.t2">Walk-through flow / architecture ở mức high-level; sẵn sàng giải thích quyết định kỹ thuật bạn chịu trách nhiệm.</li>
+                    <li data-i18n="resources.hr.item3.t3">Project team → nói rõ phần việc của bạn; đừng claim credit cả team.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">4</span>
+                  <span class="faq-item__qtext" data-i18n="resources.hr.item4.title">Motivation — why company / why role</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.hr.item4.why">
+                    Thiếu motivation cụ thể = red flag “ứng tượng trúng đâu hay đấy”.
+                  </p>
+                  <ul>
+                    <li data-i18n="resources.hr.item4.t1">Research điểm cụ thể: sản phẩm, culture/values, scope level role — không chỉ “công ty lớn”.</li>
+                    <li data-i18n="resources.hr.item4.t2">Nối motivation với mục tiêu nghề nghiệp trung hạn của bạn.</li>
+                    <li data-i18n="resources.hr.item4.t3">Không diss công ty cũ; compensation chỉ là một phần của câu trả lời.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">5</span>
+                  <span class="faq-item__qtext" data-i18n="resources.hr.item5.title">Logistics &amp; chuyên nghiệp</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.hr.item5.why">
+                    Vòng HR cũng screen fit thực tế — timeline, package, next steps.
+                  </p>
+                  <ul>
+                    <li data-i18n="resources.hr.item5.t1">Biết notice period, salary range mong muốn (hoặc “open depending on package”), work authorization nếu apply abroad.</li>
+                    <li data-i18n="resources.hr.item5.t2">Chuẩn bị câu hỏi ngược: process, team structure, timeline các vòng sau.</li>
+                    <li data-i18n="resources.hr.item5.t3">Test mic/line; chỗ yên tĩnh; CV + JD mở sẵn trước mặt.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">6</span>
+                  <span class="faq-item__qtext" data-i18n="resources.hr.item6.title">Sau cuộc gọi</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.hr.item6.why">
+                    Iteration nhỏ giúp vòng sau mạnh hơn — kể cả khi bạn pass HR screen.
+                  </p>
+                  <ul>
+                    <li data-i18n="resources.hr.item6.t1">Ghi lại câu hỏi HR đã hỏi → refine story / pitch cho lần sau.</li>
+                    <li data-i18n="resources.hr.item6.t2">Thank-you note ngắn trong ngày (optional nhưng tăng impression).</li>
+                  </ul>
+                </div>
+              </details>
+            </div>
+
+            <p class="faq-empty" id="hrEmpty" hidden data-i18n="resources.hr.empty">
+              Không tìm thấy mục nào khớp.
+            </p>
+
+            <aside class="hr-checklist__promo">
+              <div class="hr-checklist__promo-copy">
+                <span class="hr-checklist__promo-badge" data-i18n="resources.hr.promo.badge">Khóa học gợi ý</span>
+                <h4 data-i18n="resources.hr.promo.head">Behaviour Interview Course — luyện đúng phần HR hay hỏi</h4>
+                <p data-i18n="resources.hr.promo.text">
+                  12 buổi live: self-intro, behavioural phổ biến, leadership principles &amp; STAR bằng tiếng Anh —
+                  format nhiều Big Tech dùng từ recruiter screen đến onsite behavioural.
+                </p>
+              </div>
+              <div class="hr-checklist__promo-actions">
+                <a
+                  href="/courses/behaviour-interview-course/"
+                  class="btn btn--primary"
+                  data-i18n="resources.hr.promo.cta"
+                >Xem khóa Behaviour Interview →</a>
+                <a
+                  href="https://m.me/EngineerPro.Official"
+                  class="btn btn--ghost btn--ghost-accent"
+                  target="_blank"
+                  rel="noopener"
+                  data-i18n="resources.hr.promo.consult"
+                >Nhắn fanpage tư vấn lộ trình →</a>
+              </div>
+            </aside>
+            </div>
+            </div>
+          </details>
+
+          <!-- 3 · PIP at Big Tech -->
+          <details class="faq-item resource-panel resource-panel--pip" id="resPipBigTech">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">3</span>
+              <div class="resource-panel__head">
+                <span class="resource-block__kicker" data-i18n="resources.pip.kicker">⚠️ GUIDE · PIP BIG TECH</span>
+                <span class="faq-item__qtext" data-i18n="resources.pip.head">How to handle PIP — Axon, Grab, TikTok, Shopee, Nvidia, Google, Amazon…</span>
+                <span class="resource-panel__sub muted" data-i18n="resources.pip.sub">
+                  Thoát PIP hiếm khi thành công — ưu tiên negotiate mutual severance (N+1, N+2…) có lợi cho bạn.
+                </span>
+              </div>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested resource-block--pip">
+            <p class="resource-block__desc" data-i18n="resources.pip.intro">
+              Performance Improvement Plan (PIP) ở Big Tech thường là bước chuẩn bị cho offboarding, không phải
+              “cơ hội công bằng” để cứu job. EngineerPro khuyên anh em tập trung đàm phán exit package sạch,
+              bảo vệ uy tín và runway tìm việc — thay vì hy vọng turnaround trong timeline ngắn.
+            </p>
+
+            <div class="faq-controls pip-guide__controls">
+              <input
+                id="pipSearch"
+                class="faq-search"
+                type="search"
+                autocomplete="off"
+                placeholder="Tìm trong guide PIP… (vd: severance, RSU, garden leave)"
+                data-i18n-attr="placeholder|resources.pip.searchPh"
+              />
+              <button id="pipExpandAll" class="btn-mini" type="button" data-i18n="resources.pip.expand">Mở tất cả</button>
+              <button id="pipCollapseAll" class="btn-mini" type="button" data-i18n="resources.pip.collapse">Thu gọn</button>
+            </div>
+
+            <div class="faq-list pip-guide__list" id="pipChecklist">
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">1</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item1.title">PIP ở Big Tech thực sự là gì?</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item1.why">Google, Amazon, Meta, TikTok, Shopee, Grab, Nvidia, Axon… đều có khung tương tự: goal đo lường, check-in hàng tuần, quyết định cuối từ manager + HR.</p>
+                  <p data-i18n="resources.pip.item1.namesIntro">Cùng bản chất (formal performance coaching, thường dẫn tới exit) — mỗi công ty đặt tên khác nhau:</p>
+                  <ul class="pip-guide__names">
+                    <li data-i18n="resources.pip.item1.n1">Amazon: Focus (giai đoạn 1) → Pivot nếu không pass Focus</li>
+                    <li data-i18n="resources.pip.item1.n2">TikTok / ByteDance: Formal Coaching</li>
+                    <li data-i18n="resources.pip.item1.n3">Google: Performance Improvement Plan (PIP)</li>
+                    <li data-i18n="resources.pip.item1.n4">Meta: Performance Improvement Plan (PIP)</li>
+                    <li data-i18n="resources.pip.item1.n5">Microsoft: Performance Improvement Plan</li>
+                    <li data-i18n="resources.pip.item1.n6">Nvidia: Performance Improvement Plan (PIP) / performance coaching track</li>
+                    <li data-i18n="resources.pip.item1.n7">Apple: Performance Improvement Plan</li>
+                    <li data-i18n="resources.pip.item1.n8">Shopee / Grab: Performance Improvement Plan (thường gọi PIP)</li>
+                    <li data-i18n="resources.pip.item1.n9">Axon &amp; nhiều US tech khác: PIP hoặc Performance Coaching</li>
+                  </ul>
+                  <ul>
+                    <li data-i18n="resources.pip.item1.t1">PIP = quy trình tài liệu hoá performance, giảm rủi ro pháp lý cho công ty khi terminate.</li>
+                    <li data-i18n="resources.pip.item1.t2">Manager đã có signal “does not meet bar” từ trước — PIP thường là formalize bước cuối, không phải bất ngờ.</li>
+                    <li data-i18n="resources.pip.item1.t3">Ở nhiều nơi, pass rate sau PIP rất thấp; đừng lên kế hoạch tài chính dựa trên “mình sẽ pass”.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">2</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item2.title">Vì sao “cơ hội thoát PIP” cực khó</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item2.why">Timeline ngắn (thường vài tuần đến hai chu kỳ review) + bar cao + bias xác nhận — bạn phải overturn perception đã tồn tại.</p>
+                  <ul>
+                    <li data-i18n="resources.pip.item2.t1">Goal PIP thường gắn delivery đã miss — khó chứng minh turnaround trong cửa sổ hẹp.</li>
+                    <li data-i18n="resources.pip.item2.t2">Stakeholder ít muốn “bet” lại headcount đã flagged; headcount planning & promo freeze làm PIP pass hiếm hơn.</li>
+                    <li data-i18n="resources.pip.item2.t3">Năng lượng tốt nhất: chuẩn bị exit có kiểm soát — không burn bridge, không ký thức gì khi chưa hiểu.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">3</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item3.title">Chiến lược số 1: Mutual separation / severance</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item3.why">Đàm phán package chấm dứt hợp đồng hai bên (mutual agreement) thường tốt hơn bị terminate for cause sau fail PIP.</p>
+                  <ul>
+                    <li data-i18n="resources.pip.item3.t1">Mục tiêu: exit “clean” — employment record không gắn performance termination; có runway và tiền buffer.</li>
+                    <li data-i18n="resources.pip.item3.t2">Khung thương lượng: severance theo tháng lương (N+1, N+2… tùy level, tenure, và leverage), không chỉ statutory minimum.</li>
+                    <li data-i18n="resources.pip.item3.t3">Có thể thêm: bonus pro-rate, PTO payout, healthcare bridge, garden leave, hỗ trợ outplacement, reference wording.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">4</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item4.title">Checklist package cần negotiate</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item4.why">HR có playbook — bạn cũng cần checklist riêng; đừng chỉ nhìn vào một dòng “severance months”.</p>
+                  <ul>
+                    <li data-i18n="resources.pip.item4.t1">Cash: base severance (N+1 / N+2 / higher), signing bonus clawback waiver, unpaid bonus cycle, relocation repayment waiver.</li>
+                    <li data-i18n="resources.pip.item4.t2">Equity: unvested RSU/ESOP — accelerated vesting một phần, extended exercise window, hoặc treatment khi mutual leave (tùy grant & policy).</li>
+                    <li data-i18n="resources.pip.item4.t3">Benefits & time: COBRA/health subsidy, garden leave paid, unused PTO, non-compete / non-disparagement đối xứng.</li>
+                    <li data-i18n="resources.pip.item4.t4">Reputation: reference check wording, title on paper, LinkedIn-friendly departure narrative nội bộ.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">5</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item5.title">Trước khi họp HR / People Partner</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item5.why">Cuộc họp đầu quyết định leverage — chuẩn bị như một negotiation, không như “xin tha”.</p>
+                  <ul>
+                    <li data-i18n="resources.pip.item5.t1">Đọc kỹ PIP letter, handbook, equity plan, offer letter — ghi deadline, metric, ai sign-off.</li>
+                    <li data-i18n="resources.pip.item5.t2">Thu thập context: tenure, level, prior reviews, reorg, health/family nếu relevant (không overshare), market comp.</li>
+                    <li data-i18n="resources.pip.item5.t3">Chốt BATNA nội bộ: bạn muốn mutual exit với package tối thiểu nào; ai có authority approve (HRBP, comp, legal).</li>
+                    <li data-i18n="resources.pip.item5.t4">Mang proposal bằng văn bản sau họp — đừng agree verbal; xin vài ngày review với luật sư/ advisor nếu cần.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">6</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item6.title">Những điều tuyệt đối tránh</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item6.why">Một sai lầm có thể mất hết leverage severance hoặc bị terminate ngay.</p>
+                  <ul>
+                    <li data-i18n="resources.pip.item6.t1">Ký separation agreement ngay trong phòng họp — luôn mang về đọc, tối thiểu 48-72 giờ.</li>
+                    <li data-i18n="resources.pip.item6.t2">Emotional outburst, email cc cả org, Slack drama — company sẽ document thêm “conduct”.</li>
+                    <li data-i18n="resources.pip.item6.t3">Tự ý nghỉ việc (rage quit) trước khi deal — thường mất severance và equity treatment xấu hơn.</li>
+                    <li data-i18n="resources.pip.item6.t4">Đăng chi tiết nội bộ lên mạng xã hội — vi phạm policy + làm negotiation khó hơn.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="faq-item">
+                <summary class="faq-item__q">
+                  <span class="faq-item__n">7</span>
+                  <span class="faq-item__qtext" data-i18n="resources.pip.item7.title">Sau khi có deal — chuyển sang hunt job</span>
+                  <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+                  <span class="faq-item__chevron" aria-hidden="true">›</span>
+                </summary>
+                <div class="faq-item__a">
+                  <p data-i18n="resources.pip.item7.why">Package tốt chỉ có ý nghĩa nếu bạn dùng runway đó để land offer tiếp theo đúng hướng.</p>
+                  <ul>
+                    <li data-i18n="resources.pip.item7.t1">Update CV + LinkedIn theo framing neutral (“team restructure / mutual separation”) — đồng bộ với reference đã thỏa thuận.</li>
+                    <li data-i18n="resources.pip.item7.t2">Ưu tiên mock behavioural + system/DSA nếu target Big Tech — xem Resources HR checklist & khóa Behaviour Interview.</li>
+                    <li data-i18n="resources.pip.item7.t3">Network warm intro > cold apply; mentor review story trước onsite.</li>
+                  </ul>
+                </div>
+              </details>
+            </div>
+
+            <p class="faq-empty" id="pipEmpty" hidden data-i18n="resources.pip.empty">
+              Không tìm thấy mục nào khớp.
+            </p>
+
+            <aside class="pip-guide__promo hr-checklist__promo">
+              <div class="hr-checklist__promo-copy">
+                <span class="hr-checklist__promo-badge" data-i18n="resources.pip.promo.badge">Bị PIP — cần tư vấn riêng?</span>
+                <h4 data-i18n="resources.pip.promo.head">Đặt lịch tư vấn 1-1 qua fanpage</h4>
+                <p data-i18n="resources.pip.promo.text">
+                  Nếu bạn đang trong PIP và cần hướng negotiate / severance, vui lòng nhắn fanpage EngineerPro để đặt lịch tư vấn.
+                  Mỗi công ty (US / SG / VN entity) có policy khác nhau — hỗ trợ chiến lược, script nói chuyện HR, lộ trình sau exit;
+                  không thay thế luật sư lao động.
+                </p>
+              </div>
+              <div class="hr-checklist__promo-actions">
+                <a
+                  href="https://m.me/EngineerPro.Official"
+                  class="btn btn--primary"
+                  target="_blank"
+                  rel="noopener"
+                  data-i18n="resources.pip.promo.consult"
+                >Nhắn fanpage đặt lịch tư vấn →</a>
+              </div>
+            </aside>
+            </div>
+            </div>
+          </details>
+
+          <!-- 4 · Golang Tour playlist -->
+          <details class="faq-item resource-panel" id="resGolangTour">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">4</span>
+              <div class="resource-panel__head">
+                <span class="resource-block__kicker" data-i18n="resources.golangTour.kicker">📺 PLAYLIST · YOUTUBE</span>
+                <span class="faq-item__qtext" id="resGolangTourTitle"></span>
+                <span class="resource-panel__sub muted" id="resGolangTourSub"></span>
+              </div>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested">
+            <div class="resource-block__toolbar">
+              <a
+                id="resGolangTourCta"
+                class="btn btn--ghost btn--ghost-dark"
+                target="_blank"
+                rel="noopener"
+                data-i18n="resources.golangTour.cta"
+              >Mở full playlist ↗</a>
+            </div>
+            <p class="resource-block__desc" id="resGolangTourDesc"></p>
+            <div class="video-grid" id="resGolangTourGrid"></div>
+            </div>
+            </div>
+          </details>
+
+          <!-- 5 · Programming Foundation playlist -->
+          <details class="faq-item resource-panel" id="resFoundation">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">5</span>
+              <div class="resource-panel__head">
+                <span class="resource-block__kicker" data-i18n="resources.foundation.kicker">📺 PLAYLIST · YOUTUBE</span>
+                <span class="faq-item__qtext" id="resFoundationTitle"></span>
+                <span class="resource-panel__sub muted" id="resFoundationSub"></span>
+              </div>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested">
+            <div class="resource-block__toolbar">
+              <a
+                id="resFoundationCta"
+                class="btn btn--ghost btn--ghost-dark"
+                target="_blank"
+                rel="noopener"
+                data-i18n="resources.foundation.cta"
+              >Mở full playlist ↗</a>
+            </div>
+            <p class="resource-block__desc" id="resFoundationDesc"></p>
+            <div class="video-grid" id="resFoundationGrid"></div>
+            </div>
+            </div>
+          </details>
+
+          </div><!-- /#resourcesPanels -->
         </div>
       </section>
 
