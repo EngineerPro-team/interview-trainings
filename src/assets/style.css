@@ -2679,6 +2679,31 @@ p {
 .pip-guide__names li {
   margin-bottom: 0.35rem;
 }
+.pip-guide__callout {
+  margin: 1rem 0 1.1rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(220, 160, 40, 0.45);
+  background: rgba(220, 160, 40, 0.08);
+}
+.pip-guide__callout-title {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--navy);
+}
+:root[data-theme="dark"] .pip-guide__callout-title {
+  color: var(--text);
+}
+.pip-guide__callout ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+.pip-guide__callout li {
+  margin-bottom: 0.4rem;
+}
 .resources-panels {
   max-width: none;
 }
