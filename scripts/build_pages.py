@@ -625,7 +625,7 @@ ROUTE_DESCRIPTIONS_VI = {
     "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "book":      "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
     "mock":      "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
-    "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — video lập trình nền tảng, template CV Big Tech, playlist review CV.",
+    "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech, playlist review CV.",
     "mentors":   "17 mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",
     "stories":   "94+ học viên EngineerPro đã nhận offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",
     "podcast":   "Podcast EngineerPro trên Substack & Spotify — tips sự nghiệp & phỏng vấn từ mentor Big Tech.",
@@ -767,6 +767,7 @@ def main() -> int:
         ROUTE_DESCRIPTIONS_VI["resources"],
     )
     RESOURCES_ALIASES = {
+        "hr-screen":   ("HR Phone Screen Checklist · ", "Checklist chuẩn bị HR/recruiter call — self-intro, STAR, project depth, motivation. Gợi ý khóa Behaviour Interview."),
         "foundation":  ("Programming Foundation · ", "16 video nền tảng lập trình free (C++ / Java / Golang / Python) từ EngineerPro."),
         "golang-tour": ("Golang Tour · ",            "3 video free học Golang cơ bản cùng Senior SWE tại Shopee Singapore."),
         "cv-kit":      ("Viết CV chuẩn Big Tech · ", "Bộ tài liệu viết CV chuẩn Big Tech — CV mẫu đã pass Google, template LaTeX, playlist review CV."),

@@ -226,6 +226,7 @@
   // /resources/golang-tour lands on /resources/ and scrolls straight to
   // that resource block.
   const RESOURCES_ANCHORS = {
+    "hr-screen":   "resHrScreen",
     "foundation":  "resFoundation",
     "golang-tour": "resGolangTour",
     "cv-kit":      "resCV",
@@ -363,7 +364,7 @@
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-        resources: en ? "Free interview resources from EngineerPro — programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — video lập trình nền tảng, template CV Big Tech và playlist review CV.",
+        resources: en ? "Free interview resources from EngineerPro — HR phone screen checklist, programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech và playlist review CV.",
         mentors:   en ? `${nMentors} mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…` : `${nMentors} mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…`,
         stories:   en ? `${nStories}+ EngineerPro students landed offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…` : `${nStories}+ học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…`,
         podcast:   en ? "EngineerPro podcast on Substack & Spotify — tech career and interview tips from Big Tech mentors." : "Podcast EngineerPro trên Substack & Spotify — tips sự nghiệp & phỏng vấn từ mentor Big Tech.",
