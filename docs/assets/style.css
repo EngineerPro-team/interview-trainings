@@ -3860,6 +3860,149 @@ a.faq-cta:hover { transform: translateY(-1px); }
   flex-wrap: wrap;
 }
 
+/* ===================== SUCCESS TOAST — social proof ===================== */
+.success-toast {
+  position: fixed;
+  left: max(1.25rem, env(safe-area-inset-left, 0px));
+  bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+  width: min(22rem, calc(100vw - 2rem));
+  max-width: 22rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 122, 24, 0.45);
+  background: linear-gradient(145deg, rgba(255, 122, 24, 0.14) 0%, var(--paper) 42%);
+  box-shadow:
+    0 20px 48px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transform: translateX(-120%);
+  opacity: 0;
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.32s ease;
+  pointer-events: none;
+  overflow: hidden;
+}
+.success-toast::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--orange) 0%, #ff5b48 100%);
+}
+:root[data-theme="dark"] .success-toast {
+  background: linear-gradient(145deg, rgba(255, 122, 24, 0.18) 0%, var(--paper) 48%);
+  box-shadow:
+    0 22px 52px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 122, 24, 0.2);
+}
+.success-toast--visible {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.success-toast__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.15rem 2.75rem 1.1rem 1.25rem;
+  color: var(--text) !important;
+  text-decoration: none !important;
+}
+.success-toast__link:hover .success-toast__cta {
+  color: var(--orange-2);
+}
+.success-toast__kicker {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange);
+  padding-left: 0.15rem;
+}
+.success-toast__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+.success-toast__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  font-size: 1.35rem;
+  line-height: 1;
+  background: linear-gradient(135deg, rgba(255, 122, 24, 0.22) 0%, rgba(255, 91, 72, 0.14) 100%);
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  box-shadow: 0 6px 16px rgba(255, 122, 24, 0.2);
+}
+.success-toast__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--navy);
+  padding-top: 0.15rem;
+}
+:root[data-theme="dark"] .success-toast__text {
+  color: var(--text);
+}
+.success-toast__cta {
+  display: inline-block;
+  padding-left: 3.6rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--orange);
+  transition: color 0.15s ease;
+}
+.success-toast__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  z-index: 1;
+}
+:root[data-theme="dark"] .success-toast__close {
+  background: rgba(255, 255, 255, 0.08);
+}
+.success-toast__close:hover {
+  background: rgba(255, 122, 24, 0.18);
+  color: var(--orange);
+  transform: scale(1.05);
+}
+@media (min-width: 521px) {
+  .success-toast {
+    width: min(26rem, calc(100vw - 2rem));
+    max-width: 26rem;
+  }
+  .success-toast__text {
+    font-size: 1.08rem;
+  }
+}
+@media (max-width: 520px) {
+  .success-toast {
+    width: calc(100vw - 1.25rem);
+    max-width: none;
+    left: max(0.65rem, env(safe-area-inset-left, 0px));
+  }
+  .success-toast__text {
+    font-size: 1rem;
+  }
+}
+
 /* ===================== FLOATING CTAs — Đặt lịch tư vấn ===================== */
 .cta-stack {
   position: fixed;

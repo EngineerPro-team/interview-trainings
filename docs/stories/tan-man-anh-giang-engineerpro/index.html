@@ -1839,6 +1839,18 @@
       </div>
     </footer>
 
+    <div id="successToast" class="success-toast" hidden aria-live="polite" aria-atomic="true">
+      <button type="button" class="success-toast__close" aria-label="Đóng" data-i18n-attr="aria-label|toast.success.close">×</button>
+      <a class="success-toast__link" id="successToastLink" href="/stories/">
+        <span class="success-toast__kicker" data-i18n="toast.success.badge">CÂU CHUYỆN THÀNH CÔNG</span>
+        <span class="success-toast__body">
+          <span class="success-toast__icon" aria-hidden="true">🎉</span>
+          <span class="success-toast__text" id="successToastText"></span>
+        </span>
+        <span class="success-toast__cta" data-i18n="toast.success.cta">Xem chi tiết →</span>
+      </a>
+    </div>
+
     <script>window.EP_BASE_PATH = "";</script>
     <script src="/assets/i18n.js"></script>
     <script src="/assets/data.js"></script>

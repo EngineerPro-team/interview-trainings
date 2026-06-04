@@ -99,6 +99,9 @@ window.I18N = {
     "stories.cta.substack": "Xem bản gốc trên Substack ↗",
     "stories.card.cta": "Đọc bài →",
     "stories.empty": "Không có câu chuyện nào khớp.",
+    "toast.success.close": "Đóng",
+    "toast.success.badge": "CÂU CHUYỆN THÀNH CÔNG",
+    "toast.success.cta": "Xem chi tiết →",
 
     // ============== PODCAST ==============
     "podcast.head": "Podcast",
@@ -489,6 +492,9 @@ window.I18N = {
     "stories.cta.substack": "View original on Substack ↗",
     "stories.card.cta": "Read more →",
     "stories.empty": "No stories match.",
+    "toast.success.close": "Close",
+    "toast.success.badge": "SUCCESS STORY",
+    "toast.success.cta": "Read story →",
 
     "podcast.head": "Podcast",
     "podcast.intro.html":

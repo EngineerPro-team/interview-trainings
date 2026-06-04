@@ -1289,6 +1289,152 @@
     });
   }
 
+  function initSuccessToast() {
+    const root = document.getElementById("successToast");
+    if (!root) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const textEl = document.getElementById("successToastText");
+    const linkEl = document.getElementById("successToastLink");
+    const closeBtn = root.querySelector(".success-toast__close");
+
+    const TOAST_INTERVAL_MS = 10000;
+    const TOAST_VISIBLE_MS = 4500;
+
+    const TEMPLATES_VI = [
+      "{name} vừa đỗ {company} cùng EngineerPro",
+      "{name} đã nhận offer tại {company} sau lộ trình EngineerPro",
+      "Chúc mừng {name} — đỗ {company} rồi!",
+    ];
+    const TEMPLATES_EN = [
+      "{name} just landed {company} with EngineerPro",
+      "{name} got an offer at {company} after EngineerPro training",
+      "Congrats {name} — offer at {company}!",
+    ];
+
+    function formatCompanies(companies) {
+      if (!companies?.length) return currentLang === "en" ? "Big Tech" : "Big Tech";
+      if (companies.length === 1) return companies[0];
+      return companies.slice(0, 2).join(" & ");
+    }
+
+    function isMentorSharingStory(s) {
+      const blob = [
+        s.rawTitle,
+        s.originalTitle,
+        s.originalTitleEn,
+        s.title,
+        s.titleEn,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return /mentor|giảng viên|giang vien|instructor|lecturer/.test(blob);
+    }
+
+    function buildPool() {
+      return stories.filter((s) => {
+        if (s.anonymous || s.isArticle || isMentorSharingStory(s)) return false;
+        if (!s.companies?.length) return false;
+        const name = (s.name || "").trim();
+        if (!name || /^Học viên EngineerPro$/i.test(name)) return false;
+        return true;
+      });
+    }
+
+    let pool = buildPool();
+    if (pool.length < 3) return;
+
+    let queue = [];
+    let lastSlug = "";
+    let showTimer = null;
+    let cycleTimer = null;
+    let pausedUntil = 0;
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function refillQueue() {
+      queue = shuffle(pool.slice());
+    }
+    refillQueue();
+
+    function pickNext() {
+      if (!queue.length) refillQueue();
+      let s = queue.pop();
+      if (s.slug === lastSlug && queue.length) {
+        queue.unshift(s);
+        s = queue.pop();
+      }
+      lastSlug = s.slug;
+      return s;
+    }
+
+    function renderMessage(s) {
+      const templates = currentLang === "en" ? TEMPLATES_EN : TEMPLATES_VI;
+      const tpl = templates[Math.floor(Math.random() * templates.length)];
+      const name = (s.name || "").trim();
+      const company = formatCompanies(s.companies);
+      return tpl.replace("{name}", name).replace("{company}", company);
+    }
+
+    function hideToast() {
+      root.classList.remove("success-toast--visible");
+      window.setTimeout(() => {
+        if (!root.classList.contains("success-toast--visible")) root.hidden = true;
+      }, 320);
+    }
+
+    function showToast() {
+      if (Date.now() < pausedUntil) {
+        scheduleNext();
+        return;
+      }
+      pool = buildPool();
+      if (pool.length < 1) return;
+
+      const s = pickNext();
+      if (textEl) textEl.textContent = renderMessage(s);
+      if (linkEl) linkEl.href = pathFor("story", s.slug);
+      root.hidden = false;
+      requestAnimationFrame(() => root.classList.add("success-toast--visible"));
+
+      clearTimeout(showTimer);
+      showTimer = window.setTimeout(() => {
+        hideToast();
+        scheduleNext();
+      }, TOAST_VISIBLE_MS);
+    }
+
+    function scheduleNext() {
+      clearTimeout(cycleTimer);
+      cycleTimer = window.setTimeout(showToast, TOAST_INTERVAL_MS);
+    }
+
+    closeBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideToast();
+      clearTimeout(showTimer);
+      pausedUntil = Date.now() + 90000;
+      scheduleNext();
+    });
+
+    window.__refreshSuccessToast = function () {
+      pool = buildPool();
+      if (!root.classList.contains("success-toast--visible") || !textEl) return;
+      const s = stories.find((x) => x.slug === lastSlug);
+      if (s) textEl.textContent = renderMessage(s);
+    };
+
+    window.setTimeout(showToast, TOAST_INTERVAL_MS);
+  }
+
   // ===================== ROADMAP =====================
   function renderRoadmap() {
     const r = data.roadmap;
@@ -2084,6 +2230,7 @@
     // Translate any data-i18n elements created by renderers
     applyI18n();
     if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+    if (typeof window.__refreshSuccessToast === "function") window.__refreshSuccessToast();
     // Re-render current detail page if applicable
     const h = parseHash();
     if (h.route === "course") renderCourseDetail(h.slug);
@@ -2155,6 +2302,7 @@
   initResourcesPanels();
   initHrChecklist();
   initPipChecklist();
+  initSuccessToast();
   renderRoadmap();
   renderPartners();
   renderResources();
