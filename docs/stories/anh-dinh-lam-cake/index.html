@@ -1544,10 +1544,88 @@
             </div>
           </details>
 
-          <!-- 4 · Golang Tour playlist -->
-          <details class="faq-item resource-panel" id="resGolangTour">
+          <!-- 4 · CS Fundamental interview questions (LeetCode Discuss) -->
+          <details class="faq-item resource-panel resource-panel--cs" id="resCsFundamental">
             <summary class="faq-item__q resource-panel__summary">
               <span class="faq-item__n">4</span>
+              <div class="resource-panel__head">
+                <span class="resource-block__kicker" data-i18n="resources.cs.kicker">🧠 CS FUNDAMENTALS · REAL INTERVIEW QUESTIONS</span>
+                <span class="faq-item__qtext" data-i18n="resources.cs.head">~100 câu hỏi CS Fundamentals từ phỏng vấn thật — crawl LeetCode Discuss</span>
+                <span class="resource-panel__sub muted" data-i18n="resources.cs.sub">
+                  List câu hỏi thật từ LeetCode Discuss + khóa live CS Fundamental Interview (12 buổi qua Zoom).
+                </span>
+              </div>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested resource-block--cs">
+            <aside class="hr-checklist__promo cs-fundamental__promo cs-fundamental__promo--top">
+              <div class="hr-checklist__promo-copy">
+                <span class="hr-checklist__promo-badge" data-i18n="resources.cs.promo.badge">Khóa EngineerPro · CS Fundamentals</span>
+                <h4 data-i18n="resources.cs.promo.head">Computer Science Fundamental Interview — 12 buổi live qua Zoom</h4>
+                <p data-i18n="resources.cs.promo.text">
+                  List câu hỏi free ở dưới giúp biết Big Tech hay hỏi gì — khóa live qua Zoom giúp bạn trả lời trọn vẹn: OS, networking, DB, concurrency, OOP…
+                </p>
+              </div>
+              <div class="hr-checklist__promo-actions">
+                <a
+                  href="/courses/computer-science-fundamental-interview/"
+                  class="btn btn--primary"
+                  data-i18n="resources.cs.promo.cta"
+                >Xem & đăng ký khóa CS Fundamentals →</a>
+                <a
+                  href="https://m.me/EngineerPro.Official"
+                  class="btn btn--ghost btn--ghost-accent"
+                  target="_blank"
+                  rel="noopener"
+                  data-i18n="resources.cs.promo.consult"
+                >Nhắn fanpage tư vấn lộ trình →</a>
+              </div>
+            </aside>
+
+            <p class="resource-block__desc" data-i18n-html="resources.cs.intro.html">
+              Danh sách <strong>free</strong> tổng hợp từ
+              <a href="https://leetcode.com/discuss/" target="_blank" rel="noopener">LeetCode Discuss</a>
+              — câu hỏi non-coding (OS, network, DB…), kèm công ty &amp; vị trí/location được hỏi. Muốn ôn có hệ thống + mock đúng format Big Tech →
+              <a href="/courses/computer-science-fundamental-interview/">khóa CS Fundamental Interview</a>
+              (12 buổi live qua Zoom).
+            </p>
+
+            <div class="faq-controls cs-fundamental__controls">
+              <input
+                id="csFundamentalSearch"
+                class="faq-search"
+                type="search"
+                autocomplete="off"
+                placeholder="Tìm câu hỏi… (vd: TCP, deadlock, ACID, thread)"
+                data-i18n-attr="placeholder|resources.cs.searchPh"
+              />
+              <select id="csFundamentalTopic" class="faq-search cs-fundamental__topic" aria-label="Filter by topic">
+                <option value="" data-i18n="resources.cs.topicAll">Tất cả chủ đề</option>
+              </select>
+              <button id="csFundamentalExpandAll" class="btn-mini" type="button" data-i18n="resources.cs.expand">Mở tất cả</button>
+              <button id="csFundamentalCollapseAll" class="btn-mini" type="button" data-i18n="resources.cs.collapse">Thu gọn</button>
+            </div>
+
+            <p class="cs-fundamental__meta muted" id="csFundamentalMeta"></p>
+            <div class="faq-list cs-fundamental__list" id="csFundamentalList"></div>
+            <p class="faq-empty" id="csFundamentalEmpty" hidden data-i18n="resources.cs.empty">
+              Không tìm thấy câu hỏi nào khớp.
+            </p>
+
+            <p class="cs-fundamental__footer muted" data-i18n-html="resources.cs.footer.html">
+              Muốn luyện trả lời + feedback mentor?
+              <a href="/courses/computer-science-fundamental-interview/">Đăng ký khóa CS Fundamental Interview →</a>
+            </p>
+            </div>
+            </div>
+          </details>
+
+          <!-- 5 · Golang Tour playlist -->
+          <details class="faq-item resource-panel" id="resGolangTour">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">5</span>
               <div class="resource-panel__head">
                 <span class="resource-block__kicker" data-i18n="resources.golangTour.kicker">📺 PLAYLIST · YOUTUBE</span>
                 <span class="faq-item__qtext" id="resGolangTourTitle"></span>
@@ -1573,10 +1651,10 @@
             </div>
           </details>
 
-          <!-- 5 · Programming Foundation playlist -->
+          <!-- 6 · Programming Foundation playlist -->
           <details class="faq-item resource-panel" id="resFoundation">
             <summary class="faq-item__q resource-panel__summary">
-              <span class="faq-item__n">5</span>
+              <span class="faq-item__n">6</span>
               <div class="resource-panel__head">
                 <span class="resource-block__kicker" data-i18n="resources.foundation.kicker">📺 PLAYLIST · YOUTUBE</span>
                 <span class="faq-item__qtext" id="resFoundationTitle"></span>
@@ -1861,6 +1939,7 @@
     <script src="/assets/faqs-data.js"></script>
     <script src="/assets/resources-data.js"></script>
     <script src="/assets/resources-i18n.js"></script>
+    <script src="/assets/cs-fundamental-questions-data.js"></script>
     <script src="/assets/stories-data.js"></script>
     <script src="/assets/app.js"></script>
   </body>

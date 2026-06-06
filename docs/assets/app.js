@@ -229,6 +229,8 @@
     "hr-screen":     "resHrScreen",
     "pip-big-tech":  "resPipBigTech",
     "pip":           "resPipBigTech", // back-compat alias
+    "cs-fundamental":"resCsFundamental",
+    "cs-fundamentals":"resCsFundamental",
     "foundation":    "resFoundation",
     "golang-tour":   "resGolangTour",
     "cv-kit":        "resCV",
@@ -1185,7 +1187,7 @@
       list.querySelectorAll(":scope > details.resource-panel:not([hidden])").forEach((it) => {
         it.open = true;
       });
-      document.querySelectorAll("#hrChecklist .faq-item, #pipChecklist .faq-item").forEach((it) => {
+      document.querySelectorAll("#hrChecklist .faq-item, #pipChecklist .faq-item, #csFundamentalList .faq-item").forEach((it) => {
         it.open = true;
       });
       syncResourceExpandLabels();
@@ -1194,7 +1196,7 @@
       list.querySelectorAll(":scope > details.resource-panel").forEach((it) => {
         it.open = false;
       });
-      document.querySelectorAll("#hrChecklist .faq-item, #pipChecklist .faq-item").forEach((it) => {
+      document.querySelectorAll("#hrChecklist .faq-item, #pipChecklist .faq-item, #csFundamentalList .faq-item").forEach((it) => {
         it.open = false;
       });
       syncResourceExpandLabels();
@@ -1238,6 +1240,182 @@
       syncResourceExpandLabels();
     });
     document.getElementById("hrCollapseAll")?.addEventListener("click", () => {
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        it.open = false;
+      });
+      syncResourceExpandLabels();
+    });
+  }
+
+  function formatCsSourceLabel(item, lang) {
+    if (item.sourceLabel) return item.sourceLabel;
+
+    const company = (item.company || "Big Tech").split(",")[0].trim();
+    const outcomeNoise = /^(reject(ed)?|offer|selected|pending|failed|passed|waiting|pass\/fail)$/i;
+    const yoeNoise = /^\d+(\.\d+)?\s*yoe$/i;
+    const dateNoise = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}\b/i;
+    const metaTitleNoise =
+      /\b(journey|my journey|prep journey|experience journey|interview experience|chances|expectations|overview|story|guide|how i|lessons from|worst interview)\b/i;
+    const roleHint =
+      /\b(SDE-?\d*|SSE|E\d+|L\d+|L60|MTS-?\d*|SWE\s*\d*|Staff|Senior|Software Engineer|Data Engineer|Cloud Support|Human Engineering|Product Engineer|Analyst|Intern|Infra|Level\s*\d+[A-Z]?|AA Round|Bar Raiser|phone screen)\b/i;
+    const locationRe =
+      /\b(bangalore|bengaluru|hyderabad|chennai|mumbai|pune|delhi|india|usa|us|singapore|london|seattle|cupertino|germany|switzerland|mountain view|san francisco|blr|nyc|new york|vietnam|vn|sg)\b/i;
+    const companyRe = new RegExp(`\\b${company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+
+    const parts = (item.sourceTitle || "")
+      .split("|")
+      .map((s) => s.replace(/\[.*?\]/g, "").trim())
+      .filter(Boolean)
+      .filter((s) => !outcomeNoise.test(s))
+      .filter((s) => !yoeNoise.test(s))
+      .filter((s) => !metaTitleNoise.test(s) || roleHint.test(s));
+
+    const roles = [];
+    const locations = [];
+
+    for (const part of parts) {
+      if (companyRe.test(part) && part.length <= company.length + 12) continue;
+      if (/^(aws|amazon|google|meta|microsoft|apple|uber|linkedin|oracle|bytedance|dropbox)$/i.test(part)) {
+        continue;
+      }
+      if (locationRe.test(part) && !roleHint.test(part)) {
+        locations.push(part.trim());
+        continue;
+      }
+      const cleaned = part
+        .replace(/\b(interview experience|phone screen|tech screen|technical phone screen|onsite|full interview experience)\b/gi, "")
+        .replace(companyRe, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      if (!cleaned || cleaned.length <= 2 || companyRe.test(cleaned)) continue;
+      if (metaTitleNoise.test(cleaned) && !roleHint.test(cleaned)) continue;
+      if (dateNoise.test(cleaned) && !roleHint.test(cleaned)) continue;
+      if (/^[\w\s-]+:\s/.test(cleaned) && !roleHint.test(cleaned)) continue;
+      if (!roleHint.test(cleaned) && (cleaned.length > 48 || /\d{4}/.test(cleaned))) continue;
+      roles.push(cleaned);
+    }
+
+    const roleStr = [...new Set(roles)].slice(0, 2).join(" · ");
+    const locStr = [...new Set(locations)].slice(0, 2).join(" · ");
+
+    if (lang === "en") {
+      let s = `Source: ${company} interview`;
+      if (roleStr) s += ` — ${roleStr}`;
+      if (locStr) s += ` · ${locStr}`;
+      return `${s}.`;
+    }
+    let s = `Nguồn: Phỏng vấn ${company}`;
+    if (roleStr) s += `, vị trí ${roleStr}`;
+    if (locStr) s += ` · ${locStr}`;
+    return `${s}.`;
+  }
+
+  function initCsFundamentalList() {
+    const list = document.getElementById("csFundamentalList");
+    if (!list) return;
+
+    const data = window.CS_FUNDAMENTAL_QUESTIONS || [];
+    const search = document.getElementById("csFundamentalSearch");
+    const topicSel = document.getElementById("csFundamentalTopic");
+    const empty = document.getElementById("csFundamentalEmpty");
+    const meta = document.getElementById("csFundamentalMeta");
+    const lang = document.documentElement.lang || "vi";
+
+    const topics = [...new Set(data.map((q) => q.topic).filter(Boolean))].sort();
+    if (topicSel && topicSel.options.length <= 1) {
+      topics.forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        topicSel.appendChild(opt);
+      });
+    }
+
+    const render = () => {
+      list.innerHTML = "";
+      const q = (search?.value || "").trim().toLowerCase();
+      const topic = topicSel?.value || "";
+      let visible = 0;
+
+      data.forEach((item, idx) => {
+        const hay = `${item.question} ${item.company} ${item.topic} ${item.sourceTitle} ${formatCsSourceLabel(item, lang)}`.toLowerCase();
+        const show = (!q || hay.includes(q)) && (!topic || item.topic === topic);
+        if (!show) return;
+        visible++;
+
+        const details = document.createElement("details");
+        details.className = "faq-item cs-fundamental__item";
+
+        const summary = document.createElement("summary");
+        summary.className = "faq-item__q";
+
+        const num = document.createElement("span");
+        num.className = "faq-item__n";
+        num.textContent = String(idx + 1);
+
+        const qtext = document.createElement("span");
+        qtext.className = "faq-item__qtext";
+        qtext.textContent = item.question;
+
+        const action = document.createElement("span");
+        action.className = "faq-item__action";
+        action.setAttribute("data-i18n", "resources.expandOne");
+
+        const chevron = document.createElement("span");
+        chevron.className = "faq-item__chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "›";
+
+        summary.append(num, qtext, action, chevron);
+
+        const body = document.createElement("div");
+        body.className = "faq-item__a cs-fundamental__detail";
+
+        const badges = document.createElement("p");
+        badges.className = "cs-fundamental__badges";
+        badges.innerHTML =
+          `<span class="cs-fundamental__badge cs-fundamental__badge--company">${escapeText(item.company)}</span>` +
+          `<span class="cs-fundamental__badge cs-fundamental__badge--topic">${escapeText(item.topic)}</span>`;
+
+        const source = document.createElement("p");
+        source.className = "muted cs-fundamental__source";
+        source.textContent = formatCsSourceLabel(item, lang);
+
+        body.append(badges, source);
+        details.append(summary, body);
+        list.appendChild(details);
+
+        if (q || topic) details.open = true;
+      });
+
+      if (empty) empty.hidden = visible !== 0;
+      if (meta) {
+        const total = data.length;
+        meta.textContent =
+          lang === "en"
+            ? `${visible} of ${total} questions shown · crawled from LeetCode Discuss`
+            : `Hiển thị ${visible}/${total} câu · crawl từ LeetCode Discuss`;
+      }
+      if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+    };
+
+    render();
+    search?.addEventListener("input", render);
+    topicSel?.addEventListener("change", render);
+
+    list.addEventListener("toggle", (ev) => {
+      if (ev.target.matches(".faq-item")) syncResourceExpandLabels();
+    }, true);
+
+    document.getElementById("csFundamentalExpandAll")?.addEventListener("click", () => {
+      const panel = document.getElementById("resCsFundamental");
+      if (panel && !panel.open) panel.open = true;
+      list.querySelectorAll(":scope > .faq-item:not([hidden])").forEach((it) => {
+        it.open = true;
+      });
+      syncResourceExpandLabels();
+    });
+    document.getElementById("csFundamentalCollapseAll")?.addEventListener("click", () => {
       list.querySelectorAll(":scope > .faq-item").forEach((it) => {
         it.open = false;
       });
@@ -2302,6 +2480,7 @@
   initResourcesPanels();
   initHrChecklist();
   initPipChecklist();
+  initCsFundamentalList();
   initSuccessToast();
   renderRoadmap();
   renderPartners();

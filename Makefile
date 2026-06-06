@@ -12,7 +12,7 @@ PORT      := 8001
 # Override with: make PYTHON=python3 crawl
 PYTHON   ?= python3.11
 
-.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks help
+.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks help
 
 help:
 	@echo "EngineerPro rebuild — available targets:"
@@ -21,6 +21,7 @@ help:
 	@echo "  make crawl-podcasts  Just the Substack archive → src/assets/podcasts-data.js"
 	@echo "  make crawl-faqs      Just the FAQ page         → src/assets/faqs-data.js"
 	@echo "  make crawl-resources Just YouTube playlists    → src/assets/resources-data.js"
+	@echo "  make crawl-cs-fundamental LeetCode Discuss CS Q → src/assets/cs-fundamental-questions-data.js"
 	@echo "  make parse-stories   Parse sheet markdown      → src/assets/stories-data.js"
 	@echo "  make crawl-story-images  Match + download covers (run after parse-stories)"
 	@echo "  make og              Re-generate share card    → src/assets/img/og-share.png"
@@ -51,6 +52,10 @@ crawl-faqs:
 crawl-resources:
 	@echo "→ Crawling free interview resources (YouTube playlists) ..."
 	@$(PYTHON) scripts/crawl_resources.py
+
+crawl-cs-fundamental:
+	@echo "→ Crawling CS Fundamental questions from LeetCode Discuss ..."
+	@$(PYTHON) scripts/crawl_cs_fundamental_discuss.py
 
 parse-stories:
 	@echo "→ Parsing Success Stories from Google Sheet markdown ..."

@@ -2757,6 +2757,72 @@ p {
   margin-left: 0;
   margin-right: 0;
 }
+.cs-fundamental__controls {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.cs-fundamental__topic {
+  width: auto;
+  min-width: 11rem;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+.cs-fundamental__meta {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.88rem;
+}
+.cs-fundamental__list {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+.cs-fundamental__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
+}
+.cs-fundamental__badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.cs-fundamental__badge--company {
+  background: rgba(66, 133, 244, 0.14);
+  color: #1a56c4;
+}
+.cs-fundamental__badge--topic {
+  background: rgba(255, 122, 24, 0.12);
+  color: #c45a00;
+}
+:root[data-theme="dark"] .cs-fundamental__badge--company {
+  color: #8ab4f8;
+}
+:root[data-theme="dark"] .cs-fundamental__badge--topic {
+  color: #ffb07a;
+}
+.cs-fundamental__source a {
+  word-break: break-word;
+}
+.cs-fundamental__promo--top {
+  margin: 0 0 1.25rem;
+}
+.cs-fundamental__footer {
+  margin-top: 1.25rem;
+  font-size: 0.92rem;
+  text-align: center;
+}
+.cs-fundamental__footer a {
+  font-weight: 600;
+}
 .hr-checklist__promo {
   display: flex;
   flex-wrap: wrap;
