@@ -58,6 +58,7 @@ RESOURCES_ALIASES: dict[str, tuple[str, str]] = {
     "hr-screen":      ("HR Phone Screen Checklist · ", "Checklist chuẩn bị HR/recruiter call — self-intro, STAR, project depth, motivation. Gợi ý khóa Behaviour Interview."),
     "pip-big-tech":   ("PIP at Big Tech · ", "Guide xử lý PIP — Axon, Grab, TikTok, Shopee, Nvidia, Google, Amazon… Thoát PIP khó; ưu tiên negotiate mutual severance N+1, N+2."),
     "cs-fundamental": ("CS Fundamental Interview Questions · ", "~100 câu hỏi CS Fundamentals từ LeetCode Discuss + khóa live CS Fundamental Interview (12 buổi qua Zoom)."),
+    "interview-formats": ("Interview Format by Company · ", "Format phỏng vấn tham khảo — Amazon, Google, Meta, Grab, Axon, Shopee, TikTok, Nvidia… EngineerPro cheatsheet V2."),
     "foundation":     ("Programming Foundation · ", "16 video nền tảng lập trình free (C++ / Java / Golang / Python) từ EngineerPro."),
     "golang-tour":    ("Golang Tour · ", "3 video free học Golang cơ bản cùng Senior SWE tại Shopee Singapore."),
     "cv-kit":         ("Viết CV chuẩn Big Tech · ", "Bộ tài liệu viết CV chuẩn Big Tech — CV mẫu đã pass Google, template LaTeX, playlist review CV."),

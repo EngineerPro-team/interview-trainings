@@ -231,6 +231,9 @@
     "pip":           "resPipBigTech", // back-compat alias
     "cs-fundamental":"resCsFundamental",
     "cs-fundamentals":"resCsFundamental",
+    "interview-formats": "resInterviewFormats",
+    "interview-format":  "resInterviewFormats",
+    "formats":           "resInterviewFormats",
     "foundation":    "resFoundation",
     "golang-tour":   "resGolangTour",
     "cv-kit":        "resCV",
@@ -1423,6 +1426,253 @@
     });
   }
 
+  function initInterviewFormats() {
+    const data = window.INTERVIEW_FORMATS || [];
+    const list = document.getElementById("interviewFormatsList");
+    if (!list || !data.length) return;
+
+    const search = document.getElementById("interviewFormatsSearch");
+    const companySel = document.getElementById("interviewFormatsCompany");
+    const empty = document.getElementById("interviewFormatsEmpty");
+    const meta = document.getElementById("interviewFormatsMeta");
+
+    if (companySel && companySel.options.length <= 1) {
+      data.forEach((co) => {
+        const opt = document.createElement("option");
+        opt.value = co.id;
+        opt.textContent = co.company;
+        companySel.appendChild(opt);
+      });
+    }
+
+    function appendBullets(parent, bullets) {
+      if (!bullets?.length) return;
+      const ul = document.createElement("ul");
+      bullets.forEach((b) => {
+        const li = document.createElement("li");
+        li.textContent = b;
+        ul.appendChild(li);
+      });
+      parent.appendChild(ul);
+    }
+
+    function appendBlocks(parent, blocks) {
+      if (!blocks?.length) return;
+      blocks.forEach((block) => {
+        const wrap = document.createElement("div");
+        wrap.className = "interview-formats__block";
+        const head = document.createElement("p");
+        head.className = "interview-formats__block-head";
+        head.textContent = `${block.icon ? block.icon + " " : ""}${block.title}`;
+        wrap.appendChild(head);
+        appendBullets(wrap, block.bullets);
+        parent.appendChild(wrap);
+      });
+    }
+
+    function buildProfileBody(profile) {
+      const body = document.createElement("div");
+      body.className = "faq-item__a interview-formats__profile-body";
+      (profile.sections || []).forEach((sec) => {
+        const secEl = document.createElement("div");
+        secEl.className = "interview-formats__section";
+        const h = document.createElement("h5");
+        h.className = "interview-formats__section-title";
+        h.textContent = sec.title;
+        secEl.appendChild(h);
+        appendBullets(secEl, sec.bullets);
+        appendBlocks(secEl, sec.blocks);
+        body.appendChild(secEl);
+      });
+      return body;
+    }
+
+    function courseTitleForSlug(slug, lang) {
+      const c = (window.COURSES || []).find((x) => x.slug === slug);
+      if (!c) return slug;
+      const enMap = window.COURSES_EN || {};
+      const en = enMap[slug];
+      if (lang === "en" && en?.title) return en.title;
+      return c.title;
+    }
+
+    function buildRecommendations(co, langNow) {
+      if (!co.recommendations?.length) return null;
+      const dict = window.I18N?.[langNow] || window.I18N?.vi || {};
+      const box = document.createElement("div");
+      box.className = "interview-formats__reco";
+      const title = document.createElement("p");
+      title.className = "interview-formats__reco-title";
+      title.textContent = `${dict["resources.formats.reco.title"] || "Khóa EngineerPro gợi ý"} — ${co.company}`;
+      box.appendChild(title);
+      const ul = document.createElement("ul");
+      ul.className = "interview-formats__reco-list";
+      co.recommendations.forEach((rec) => {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        if (rec.slug === "mock") {
+          a.href = pathFor("mock");
+          a.textContent = dict["resources.formats.reco.mock"] || "Mock Interview 1-1";
+        } else {
+          a.href = pathFor("course", rec.slug);
+          a.textContent = courseTitleForSlug(rec.slug, langNow);
+        }
+        li.appendChild(a);
+        if (rec.note) {
+          const note = document.createElement("span");
+          note.className = "interview-formats__reco-note muted";
+          note.textContent = ` — ${rec.note}`;
+          li.appendChild(note);
+        }
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+      return box;
+    }
+
+    function buildCompanyBody(co, langNow) {
+      const body = document.createElement("div");
+      body.className = "faq-item__a interview-formats__company-body";
+
+      if (co.note) {
+        const note = document.createElement("p");
+        note.className = "interview-formats__company-note muted";
+        note.textContent = co.note;
+        body.appendChild(note);
+      }
+      if (co.tag) {
+        const tag = document.createElement("p");
+        tag.className = "interview-formats__tag";
+        tag.textContent = co.tag;
+        body.appendChild(tag);
+      }
+
+      const profiles = document.createElement("div");
+      profiles.className = "interview-formats__profiles";
+      (co.profiles || []).forEach((profile, pIdx) => {
+        const det = document.createElement("details");
+        det.className = "faq-item interview-formats__profile";
+        const sum = document.createElement("summary");
+        sum.className = "faq-item__q";
+        const num = document.createElement("span");
+        num.className = "faq-item__n";
+        num.textContent = String(pIdx + 1);
+        const qtext = document.createElement("span");
+        qtext.className = "faq-item__qtext";
+        qtext.textContent = profile.title;
+        const action = document.createElement("span");
+        action.className = "faq-item__action";
+        action.setAttribute("data-i18n", "resources.expandOne");
+        const chevron = document.createElement("span");
+        chevron.className = "faq-item__chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "›";
+        sum.append(num, qtext, action, chevron);
+        det.append(sum, buildProfileBody(profile));
+        profiles.appendChild(det);
+      });
+      body.appendChild(profiles);
+
+      if (co.tips) {
+        const tips = document.createElement("div");
+        tips.className = "interview-formats__tips";
+        const th = document.createElement("p");
+        th.className = "interview-formats__tips-title";
+        th.textContent = co.tips.title;
+        tips.appendChild(th);
+        appendBullets(tips, co.tips.bullets);
+        body.appendChild(tips);
+      }
+
+      const reco = buildRecommendations(co, langNow);
+      if (reco) body.appendChild(reco);
+      return body;
+    }
+
+    const render = () => {
+      const langNow = document.documentElement.lang || "vi";
+      list.innerHTML = "";
+      const q = (search?.value || "").trim().toLowerCase();
+      const companyId = companySel?.value || "";
+      let visible = 0;
+
+      data.forEach((co) => {
+        const hay = JSON.stringify(co).toLowerCase();
+        const show = (!companyId || co.id === companyId) && (!q || hay.includes(q));
+        if (!show) return;
+        visible++;
+
+        const details = document.createElement("details");
+        details.className = "faq-item interview-formats__company";
+        details.dataset.companyId = co.id;
+
+        const summary = document.createElement("summary");
+        summary.className = "faq-item__q";
+        const num = document.createElement("span");
+        num.className = "faq-item__n";
+        num.textContent = String(visible);
+        const qtext = document.createElement("span");
+        qtext.className = "faq-item__qtext";
+        qtext.textContent = co.company + (co.tag ? ` · ${co.tag}` : "");
+        const action = document.createElement("span");
+        action.className = "faq-item__action";
+        action.setAttribute("data-i18n", "resources.expandOne");
+        const chevron = document.createElement("span");
+        chevron.className = "faq-item__chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "›";
+        summary.append(num, qtext, action, chevron);
+        details.append(summary, buildCompanyBody(co, langNow));
+        list.appendChild(details);
+        if (q || companyId) details.open = true;
+      });
+
+      if (empty) empty.hidden = visible !== 0;
+      if (meta) {
+        const total = data.length;
+        meta.textContent =
+          langNow === "en"
+            ? `${visible} of ${total} companies shown · EngineerPro cheatsheet V2`
+            : `Hiển thị ${visible}/${total} công ty · EngineerPro cheatsheet V2`;
+      }
+      if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+    };
+
+    list.__formatsRender = render;
+    render();
+
+    if (list.dataset.formatsBound) return;
+    list.dataset.formatsBound = "1";
+
+    search?.addEventListener("input", render);
+    companySel?.addEventListener("change", render);
+
+    list.addEventListener("toggle", (ev) => {
+      if (ev.target.matches(".faq-item")) syncResourceExpandLabels();
+    }, true);
+
+    document.getElementById("interviewFormatsExpandAll")?.addEventListener("click", () => {
+      const panel = document.getElementById("resInterviewFormats");
+      if (panel && !panel.open) panel.open = true;
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        it.open = true;
+        it.querySelectorAll(".interview-formats__profile").forEach((p) => {
+          p.open = true;
+        });
+      });
+      syncResourceExpandLabels();
+    });
+    document.getElementById("interviewFormatsCollapseAll")?.addEventListener("click", () => {
+      list.querySelectorAll(":scope > .faq-item").forEach((it) => {
+        it.open = false;
+        it.querySelectorAll(".interview-formats__profile").forEach((p) => {
+          p.open = false;
+        });
+      });
+      syncResourceExpandLabels();
+    });
+  }
+
   function initPipChecklist() {
     const list = document.getElementById("pipChecklist");
     if (!list) return;
@@ -2405,6 +2655,11 @@
     if (typeof renderPartners === "function") renderPartners();
     if (typeof renderResources === "function") renderResources();
     if (typeof renderStories === "function") renderStories();
+    if (typeof initInterviewFormats === "function") {
+      const fl = document.getElementById("interviewFormatsList");
+      if (fl?.__formatsRender) fl.__formatsRender();
+      else initInterviewFormats();
+    }
     // Translate any data-i18n elements created by renderers
     applyI18n();
     if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
@@ -2481,6 +2736,7 @@
   initHrChecklist();
   initPipChecklist();
   initCsFundamentalList();
+  initInterviewFormats();
   initSuccessToast();
   renderRoadmap();
   renderPartners();

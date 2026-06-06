@@ -1618,10 +1618,66 @@
             </div>
           </details>
 
-          <!-- 5 · Golang Tour playlist -->
-          <details class="faq-item resource-panel" id="resGolangTour">
+          <!-- 5 · Interview format by company (EngineerPro cheatsheet V2) -->
+          <details class="faq-item resource-panel resource-panel--formats" id="resInterviewFormats">
             <summary class="faq-item__q resource-panel__summary">
               <span class="faq-item__n">5</span>
+              <div class="resource-panel__head">
+                <span class="resource-block__kicker" data-i18n="resources.formats.kicker">📋 CHEATSHEET · INTERVIEW FORMAT</span>
+                <span class="faq-item__qtext" data-i18n="resources.formats.head">Format phỏng vấn theo công ty — Amazon, Google, Meta, Grab, Axon…</span>
+                <span class="resource-panel__sub muted" data-i18n="resources.formats.sub">
+                  14 công ty · tổng hợp từ EngineerPro cheatsheet V2 — mang tính tham khảo.
+                </span>
+              </div>
+              <span class="faq-item__action" data-i18n="resources.expandOne">Mở rộng</span>
+              <span class="faq-item__chevron" aria-hidden="true">›</span>
+            </summary>
+            <div class="faq-item__a resource-panel__body">
+            <div class="resource-block resource-block--nested resource-block--formats">
+            <div class="interview-formats__callout">
+              <p class="interview-formats__callout-title" data-i18n="resources.formats.disclaimer.title">⚠️ Format mang tính chất tham khảo</p>
+              <p data-i18n="resources.formats.disclaimer.body">Process thực tế phụ thuộc team, hiring manager, location và thời điểm tuyển.</p>
+              <p class="interview-formats__dsa-note muted" data-i18n="resources.formats.dsaNote">Big Tech / rich tech: topic DSA nên ít nhất LeetCode Medium trở lên.</p>
+            </div>
+
+            <p class="resource-block__desc" data-i18n="resources.formats.intro">
+              Mỗi công ty/team/location có thể thay đổi số vòng, thứ tự và độ khó theo thời điểm.
+            </p>
+
+            <div class="faq-controls interview-formats__controls">
+              <input
+                id="interviewFormatsSearch"
+                class="faq-search"
+                type="search"
+                autocomplete="off"
+                placeholder="Tìm công ty, level, vòng… (vd: Amazon LP, Google L4, Axon CS)"
+                data-i18n-attr="placeholder|resources.formats.searchPh"
+              />
+              <select id="interviewFormatsCompany" class="faq-search interview-formats__company" aria-label="Filter by company">
+                <option value="" data-i18n="resources.formats.companyAll">Tất cả công ty</option>
+              </select>
+              <button id="interviewFormatsExpandAll" class="btn-mini" type="button" data-i18n="resources.formats.expand">Mở tất cả</button>
+              <button id="interviewFormatsCollapseAll" class="btn-mini" type="button" data-i18n="resources.formats.collapse">Thu gọn</button>
+            </div>
+
+            <p class="interview-formats__meta muted" id="interviewFormatsMeta"></p>
+            <div class="faq-list interview-formats__list" id="interviewFormatsList"></div>
+            <p class="interview-formats__empty muted" id="interviewFormatsEmpty" hidden data-i18n="resources.formats.empty">
+              Không tìm thấy công ty/level nào khớp.
+            </p>
+
+            <p class="interview-formats__footer muted" data-i18n-html="resources.formats.footer.html">
+              Muốn mock đúng format từng công ty + feedback mentor?
+              <a href="/mock/">Đặt Mock Interview 1-1 →</a>
+            </p>
+            </div>
+            </div>
+          </details>
+
+          <!-- 6 · Golang Tour playlist -->
+          <details class="faq-item resource-panel" id="resGolangTour">
+            <summary class="faq-item__q resource-panel__summary">
+              <span class="faq-item__n">6</span>
               <div class="resource-panel__head">
                 <span class="resource-block__kicker" data-i18n="resources.golangTour.kicker">📺 PLAYLIST · YOUTUBE</span>
                 <span class="faq-item__qtext" id="resGolangTourTitle"></span>
@@ -1647,10 +1703,10 @@
             </div>
           </details>
 
-          <!-- 6 · Programming Foundation playlist -->
+          <!-- 7 · Programming Foundation playlist -->
           <details class="faq-item resource-panel" id="resFoundation">
             <summary class="faq-item__q resource-panel__summary">
-              <span class="faq-item__n">6</span>
+              <span class="faq-item__n">7</span>
               <div class="resource-panel__head">
                 <span class="resource-block__kicker" data-i18n="resources.foundation.kicker">📺 PLAYLIST · YOUTUBE</span>
                 <span class="faq-item__qtext" id="resFoundationTitle"></span>
@@ -1936,6 +1992,7 @@
     <script src="/assets/resources-data.js"></script>
     <script src="/assets/resources-i18n.js"></script>
     <script src="/assets/cs-fundamental-questions-data.js"></script>
+    <script src="/assets/interview-formats-data.js"></script>
     <script src="/assets/stories-data.js"></script>
     <script src="/assets/app.js"></script>
   </body>
