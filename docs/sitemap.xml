@@ -937,4 +937,52 @@
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/acm-icpc-engineerpro/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/acm-icpc-engineerpro/" />
   </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/hr-screen/</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/hr-screen/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/hr-screen/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/pip-big-tech/</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/pip-big-tech/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/pip-big-tech/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/cs-fundamental/</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/cs-fundamental/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/cs-fundamental/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/foundation/</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/foundation/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/foundation/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/golang-tour/</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/golang-tour/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/golang-tour/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/cv-kit/</loc>
+    <lastmod>2026-06-06</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/cv-kit/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/cv-kit/" />
+  </url>
 </urlset>

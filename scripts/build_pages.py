@@ -47,7 +47,7 @@ SRC = os.path.join(ROOT, "src")
 DOCS = os.path.join(ROOT, os.environ.get("EP_OUT", "docs"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, SITE_NAME, OG_IMAGE  # noqa: E402
+from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, RESOURCES_ALIASES, SITE_NAME, OG_IMAGE  # noqa: E402
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -766,14 +766,6 @@ def main() -> int:
         template, "resources", "Interview Resources", "Interview Resources",
         ROUTE_DESCRIPTIONS_VI["resources"],
     )
-    RESOURCES_ALIASES = {
-        "hr-screen":     ("HR Phone Screen Checklist · ", "Checklist chuẩn bị HR/recruiter call — self-intro, STAR, project depth, motivation. Gợi ý khóa Behaviour Interview."),
-        "pip-big-tech":  ("PIP at Big Tech · ", "Guide xử lý PIP — Axon, Grab, TikTok, Shopee, Nvidia, Google, Amazon… Thoát PIP khó; ưu tiên negotiate mutual severance N+1, N+2."),
-        "cs-fundamental": ("CS Fundamental Interview Questions · ", "~100 câu hỏi CS Fundamentals từ LeetCode Discuss + khóa live CS Fundamental Interview (12 buổi qua Zoom)."),
-        "foundation":    ("Programming Foundation · ", "16 video nền tảng lập trình free (C++ / Java / Golang / Python) từ EngineerPro."),
-        "golang-tour": ("Golang Tour · ",            "3 video free học Golang cơ bản cùng Senior SWE tại Shopee Singapore."),
-        "cv-kit":      ("Viết CV chuẩn Big Tech · ", "Bộ tài liệu viết CV chuẩn Big Tech — CV mẫu đã pass Google, template LaTeX, playlist review CV."),
-    }
     for slug, (title_prefix, desc) in RESOURCES_ALIASES.items():
         page = resources_html
         anchor_url = f"{SITE_BASE}/resources/{slug}/"

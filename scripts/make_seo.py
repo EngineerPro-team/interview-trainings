@@ -21,7 +21,7 @@ SRC = os.path.join(ROOT, "src")
 OUT_DIR = os.path.join(ROOT, os.environ.get("EP_OUT", "src"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES  # noqa: E402
+from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, RESOURCES_ALIASES  # noqa: E402
 
 ROUTE_PRIORITY = {
     "courses":   (0.9, "weekly"),
@@ -65,6 +65,10 @@ def main() -> int:
     # Story detail pages
     for s in load_slugs("stories-data.js", "STORIES"):
         urls.append((f"{SITE_BASE}/stories/{s}/", today, 0.6, "monthly"))
+
+    # Resources deep-link sub-pages (/resources/hr-screen/, /resources/cs-fundamental/, …)
+    for slug in RESOURCES_ALIASES:
+        urls.append((f"{SITE_BASE}/resources/{slug}/", today, 0.75, "monthly"))
 
     # Build XML
     sm = [
