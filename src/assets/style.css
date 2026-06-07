@@ -4081,52 +4081,6 @@ a.faq-cta:hover { transform: translateY(-1px); }
   background: linear-gradient(135deg, var(--navy), var(--navy-2));
   color: #fff;
 }
-.book-chapter--soon {
-  opacity: 0.72;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.sd-soon-badge {
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 0.2rem 0.45rem;
-  border-radius: 6px;
-  background: var(--line);
-  color: var(--muted);
-}
-.sd-attribution {
-  font-size: 0.88rem;
-  margin-top: 0.35rem;
-}
-.sd-figure {
-  margin: 1rem 0 1.25rem;
-}
-.sd-figure img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-}
-.sd-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0 1.25rem;
-  font-size: 0.92rem;
-}
-.sd-table th,
-.sd-table td {
-  border: 1px solid var(--line);
-  padding: 0.55rem 0.75rem;
-  text-align: left;
-}
-.sd-table th {
-  background: var(--paper);
-  font-weight: 600;
-}
 .book-chapter__title {
   flex: 1;
   line-height: 1.3;

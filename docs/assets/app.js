@@ -208,7 +208,7 @@
   //  #home, #courses, #book, #resources, #mentors, #stories, #podcast, #partners, #faq, #contact
   //  (#home-roadmap and #home-format are anchor scrolls into the home page)
   const TOP_ROUTES = [
-    "home", "courses", "book", "system-design", "mock", "resources",
+    "home", "courses", "book", "mock", "resources",
     "mentors", "stories", "podcast", "partners", "faq", "terms", "contact",
   ];
 
@@ -245,11 +245,10 @@
     let m;
     if ((m = path.match(/^\/courses\/([^/]+)\/?$/))) return { route: "course", slug: m[1] };
     if ((m = path.match(/^\/stories\/([^/]+)\/?$/))) return { route: "story", slug: m[1] };
-    if ((m = path.match(/^\/system-design\/([^/]+)\/?$/))) return { route: "sd-chapter", slug: m[1] };
     if ((m = path.match(/^\/resources\/([\w-]+)\/?$/)) && RESOURCES_ANCHORS[m[1]]) {
       return { route: "resources", slug: null, scrollTo: RESOURCES_ANCHORS[m[1]] };
     }
-    if ((m = path.match(/^\/(courses|book|system-design|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
+    if ((m = path.match(/^\/(courses|book|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
       return { route: m[1], slug: null };
     }
     if ((m = path.match(/^\/(roadmap|format)\/?$/))) {
@@ -261,7 +260,6 @@
     const [head, ...rest] = raw.split("/");
     if (head === "course" && rest.length) return { route: "course", slug: rest.join("/") };
     if (head === "story" && rest.length) return { route: "story", slug: rest.join("/") };
-    if (head === "sd-chapter" && rest.length) return { route: "sd-chapter", slug: rest.join("/") };
     if (TOP_ROUTES.includes(head)) return { route: head, slug: null };
     if (HOME_ANCHORS[head]) return { route: "home", slug: null, scrollTo: HOME_ANCHORS[head] };
     return { route: "home", slug: null };
@@ -274,7 +272,6 @@
     if (route === "home" || !route) p = "/";
     else if (route === "course" && slug) p = `/courses/${slug}/`;
     else if (route === "story"  && slug) p = `/stories/${slug}/`;
-    else if (route === "sd-chapter" && slug) p = `/system-design/${slug}/`;
     else p = `/${route}/`;
     return BASE_PATH ? BASE_PATH + (p === "/" ? "/" : p) : p;
   }
@@ -291,8 +288,7 @@
       const active =
         a.dataset.route === route ||
         (route === "course" && a.dataset.route === "courses") ||
-        (route === "story" && a.dataset.route === "stories") ||
-        (route === "sd-chapter" && a.dataset.route === "system-design");
+        (route === "story" && a.dataset.route === "stories");
       a.classList.toggle("is-active", active);
     });
 
@@ -303,9 +299,6 @@
     }
     if (route === "story") {
       renderStoryDetail(slug);
-    }
-    if (route === "sd-chapter") {
-      renderSdChapter(slug);
     }
     if (scrollTo) {
       // Deep links like /roadmap or /format land on the home page and need
@@ -370,12 +363,6 @@
         title = SUFFIX;
         desc = "";
       }
-    } else if (route === "sd-chapter") {
-      const ch = (window.SYSTEM_DESIGN && window.SYSTEM_DESIGN.chapters || [])
-        .find((x) => x.slug === slug);
-      const chTitle = ch ? (en && ch.titleEn ? ch.titleEn : ch.title) : "";
-      title = chTitle ? `${chTitle} · ${SUFFIX}` : SUFFIX;
-      desc = chTitle ? `System Design — ${chTitle}` : "";
     } else {
       const label = labelFor(route);
       title = route === "home"
@@ -391,7 +378,6 @@
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-        "system-design": en ? "System Design Interview notes (Alex Xu) — read chapter by chapter. VI & EN. Chapters load on demand." : "Ghi chú System Design Interview (Alex Xu) — đọc từng chương, VI & EN. Nội dung tải khi mở chương.",
         resources: en ? "Free interview resources from EngineerPro — HR phone screen checklist, programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech và playlist review CV.",
         mentors:   en ? `${nMentors} mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…` : `${nMentors} mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…`,
         stories:   en ? `${nStories}+ EngineerPro students landed offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…` : `${nStories}+ học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…`,
@@ -446,18 +432,10 @@
       const s = (window.STORIES || []).find((x) => x.slug === slug);
       return s ? (s.originalTitle || s.title) : t("nav.stories");
     }
-    if (name === "sd-chapter") {
-      const en = currentLang === "en";
-      const ch = (window.SYSTEM_DESIGN && window.SYSTEM_DESIGN.chapters || [])
-        .find((x) => x.slug === slug);
-      if (!ch) return t("nav.systemDesign");
-      return en && ch.titleEn ? ch.titleEn : ch.title;
-    }
     return (
       {
         courses:   t("nav.courses"),
         book:      t("nav.book"),
-        "system-design": t("nav.systemDesign"),
         resources: t("nav.resources"),
         mentors:   t("nav.mentors"),
         stories:   t("nav.stories"),
@@ -517,7 +495,6 @@
       const [head, ...rest] = raw.split("/");
       if (head === "course" && rest.length) target = { route: "course", slug: rest.join("/") };
       else if (head === "story" && rest.length) target = { route: "story", slug: rest.join("/") };
-      else if (head === "sd-chapter" && rest.length) target = { route: "sd-chapter", slug: rest.join("/") };
       else target = { route: head, slug: null };
     } else if (rawHref.startsWith("/") && !rawHref.startsWith("//")) {
       // Real path-based link e.g. /courses/foo/ — let parseHash classify it.
@@ -1049,144 +1026,6 @@
         chEl.appendChild(grp);
       });
     }
-  }
-
-  // ===================== SYSTEM DESIGN =====================
-  const sdChapterCache = new Map();
-  let sdChapterRequest = 0;
-
-  function sdLang() {
-    return currentLang === "en" ? "en" : "vi";
-  }
-
-  function getSdChapter(slug) {
-    return (window.SYSTEM_DESIGN && window.SYSTEM_DESIGN.chapters || [])
-      .find((x) => x.slug === slug);
-  }
-
-  async function loadSdChapterBody(slug, lang) {
-    const key = `${lang}:${slug}`;
-    if (sdChapterCache.has(key)) return sdChapterCache.get(key);
-    const url = asset(`assets/content/system-design/${lang}/${slug}.html`);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`chapter ${slug} (${lang}) not found`);
-    const html = await res.text();
-    sdChapterCache.set(key, html);
-    return html;
-  }
-
-  function renderSystemDesign() {
-    const sd = window.SYSTEM_DESIGN;
-    if (!sd) return;
-    const en = currentLang === "en";
-
-    const titleEl = document.getElementById("sdTitle");
-    if (titleEl) titleEl.textContent = en && sd.titleEn ? sd.titleEn : sd.title;
-
-    const introEl = document.getElementById("sdIntro");
-    if (introEl) introEl.textContent = en && sd.introEn ? sd.introEn : sd.intro;
-
-    const attrEl = document.getElementById("sdAttribution");
-    if (attrEl) {
-      attrEl.textContent = en && sd.attributionEn ? sd.attributionEn : sd.attribution;
-    }
-
-    const chEl = document.getElementById("sdChapters");
-    if (!chEl) return;
-    chEl.innerHTML = "";
-
-    const groups = new Map();
-    (sd.chapters || []).forEach((c) => {
-      const g = en && c.groupEn ? c.groupEn : c.group;
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(c);
-    });
-
-    groups.forEach((items, name) => {
-      const grp = el("div", { class: "book-group" }, [
-        el("h3", { class: "book-group__name" }, name),
-        el("div", { class: "book-group__items" }, items.map((c) => {
-          const title = en && c.titleEn ? c.titleEn : c.title;
-          const href = `${BASE_PATH}/system-design/${c.slug}/`;
-          const attrs = {
-            class: "book-chapter" + (c.available ? "" : " book-chapter--soon"),
-            href: c.available ? href : "#",
-            title: `Chapter ${c.n} — ${title}`,
-          };
-          if (c.available) {
-            attrs["data-href"] = `#sd-chapter/${c.slug}`;
-          } else {
-            attrs["aria-disabled"] = "true";
-          }
-          const children = [
-            el("span", { class: "book-chapter__n" }, String(c.n)),
-            el("span", { class: "book-chapter__title" }, title),
-          ];
-          if (!c.available) {
-            children.push(el("span", { class: "sd-soon-badge" }, t("sd.chapter.badgeSoon")));
-          }
-          return el("a", attrs, children);
-        })),
-      ]);
-      chEl.appendChild(grp);
-    });
-  }
-
-  function renderSdChapter(slug) {
-    const wrap = document.getElementById("sdChapterArticle");
-    if (!wrap) return;
-    const ch = getSdChapter(slug);
-    const en = currentLang === "en";
-    const title = ch ? (en && ch.titleEn ? ch.titleEn : ch.title) : "";
-
-    if (!ch) {
-      wrap.innerHTML = en
-        ? "<h1>Chapter not found</h1><p><a data-href=\"#system-design\" href=\"" + pathFor("system-design") + "\">Back to list</a></p>"
-        : "<h1>Không tìm thấy chương</h1><p><a data-href=\"#system-design\" href=\"" + pathFor("system-design") + "\">Về danh sách</a></p>";
-      return;
-    }
-
-    if (!ch.available) {
-      wrap.innerHTML = `
-        <header class="article__head">
-          <span class="badge">${escapeText(t("sd.chapter.badgeSoon"))}</span>
-          <h1>${escapeText(title)}</h1>
-        </header>
-        <div class="article__body"><p>${t("sd.chapter.comingSoon")}</p></div>
-      `;
-      return;
-    }
-
-    const reqId = ++sdChapterRequest;
-    wrap.innerHTML = `
-      <header class="article__head">
-        <span class="badge">Ch. ${escapeText(String(ch.n))}</span>
-        <h1>${escapeText(title)}</h1>
-      </header>
-      <div class="article__body"><p class="muted">${escapeText(t("sd.chapter.loading"))}</p></div>
-    `;
-
-    loadSdChapterBody(slug, sdLang())
-      .then((html) => {
-        if (reqId !== sdChapterRequest) return;
-        const body = buttonifyContactLinks(rewriteAssetUrls(sanitizeHtml(html)));
-        wrap.innerHTML = `
-          <header class="article__head">
-            <span class="badge">Ch. ${escapeText(String(ch.n))}</span>
-            <h1>${escapeText(title)}</h1>
-          </header>
-          <div class="article__body">${body}</div>
-        `;
-      })
-      .catch(() => {
-        if (reqId !== sdChapterRequest) return;
-        wrap.innerHTML = `
-          <header class="article__head">
-            <h1>${escapeText(title)}</h1>
-          </header>
-          <div class="article__body"><p>${t("sd.chapter.error")}</p></div>
-        `;
-      });
   }
 
   // ===================== FAQ =====================
@@ -2811,7 +2650,6 @@
     if (typeof renderMentors === "function") renderMentors();
     if (typeof renderPodcasts === "function") renderPodcasts();
     if (typeof renderBook === "function") renderBook();
-    if (typeof renderSystemDesign === "function") renderSystemDesign();
     if (typeof renderFAQ === "function") renderFAQ();
     if (typeof renderRoadmap === "function") renderRoadmap();
     if (typeof renderPartners === "function") renderPartners();
@@ -2830,7 +2668,6 @@
     const h = parseHash();
     if (h.route === "course") renderCourseDetail(h.slug);
     if (h.route === "story") renderStoryDetail(h.slug);
-    if (h.route === "sd-chapter") renderSdChapter(h.slug);
     // Refresh SEO tags (title/description/canonical) for the current route
     if (typeof updateSeoForRoute === "function") updateSeoForRoute(h.route, h.slug);
   };
@@ -2894,7 +2731,6 @@
   renderMentors();
   renderPodcasts();
   renderBook();
-  renderSystemDesign();
   renderFAQ();
   initResourcesPanels();
   initHrChecklist();
