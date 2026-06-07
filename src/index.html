@@ -162,6 +162,7 @@
           <a href="#home-roadmap" data-href="#home-roadmap" data-i18n="nav.roadmap">Lộ trình</a>
           <a href="/courses/" data-route="courses" data-i18n="nav.courses">Khoá học</a>
           <a href="/book/" data-route="book" data-i18n="nav.book">Coding Book</a>
+          <a href="/system-design/" data-route="system-design" data-i18n="nav.systemDesign">System Design</a>
           <a href="/mock/" data-route="mock" data-i18n="nav.mock">Mock 1-1</a>
           <a href="/resources/" data-route="resources" data-i18n="nav.resources">Resources</a>
           <a href="/mentors/" data-route="mentors" data-i18n="nav.mentors">Giảng viên</a>
@@ -653,6 +654,29 @@
             </div>
           </div>
         </section>
+      </section>
+
+      <!-- ============== SYSTEM DESIGN NOTES ============== -->
+      <section class="route" data-route="system-design" hidden>
+        <div class="container section">
+          <div class="section__head">
+            <span class="book-hero__eyebrow" data-i18n="sd.eyebrow">🏗 System Design · Ghi chú miễn phí</span>
+            <h1 id="sdTitle">System Design Notes</h1>
+            <p id="sdIntro" class="section__lead"></p>
+            <p class="muted sd-attribution" id="sdAttribution"></p>
+          </div>
+          <div class="book-chapters" id="sdChapters"></div>
+        </div>
+      </section>
+
+      <!-- ============== SYSTEM DESIGN CHAPTER ============== -->
+      <section class="route" data-route="sd-chapter" hidden>
+        <div class="container section">
+          <a class="back-link" href="/system-design/" data-route="system-design" data-i18n="sd.chapter.back">← Quay lại danh sách chương</a>
+          <article class="article" id="sdChapterArticle">
+            <!-- lazy-loaded by app.js -->
+          </article>
+        </div>
       </section>
 
       <!-- ============== MOCK INTERVIEW 1-1 ============== -->
@@ -1885,6 +1909,7 @@
             <a href="#home-roadmap" data-href="#home-roadmap" data-i18n="footer.link.roadmap">Lộ trình ôn thi</a>
             <a href="/courses/" data-route="courses" data-i18n="footer.link.courses">Khoá học</a>
             <a href="/book/" data-route="book" data-i18n="footer.link.book">Coding Book</a>
+            <a href="/system-design/" data-route="system-design" data-i18n="footer.link.systemDesign">System Design</a>
             <a href="/mock/" data-route="mock" data-i18n="footer.link.mock">Mock Interview 1-1</a>
             <a href="/resources/" data-route="resources" data-i18n="footer.link.resources">Resources miễn phí</a>
             <a href="#home-format" data-href="#home-format" data-i18n="footer.link.format">Hình thức học</a>
@@ -1971,6 +1996,7 @@
     <script src="assets/cs-fundamental-questions-data.js"></script>
     <script src="assets/interview-formats-data.js"></script>
     <script src="assets/stories-data.js"></script>
+    <script src="assets/system-design-data.js"></script>
     <script src="assets/app.js"></script>
   </body>
 </html>

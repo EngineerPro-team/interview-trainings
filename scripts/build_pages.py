@@ -66,6 +66,32 @@ def load_data_object(filename: str, var_name: str) -> dict:
     return json.loads(m.group(1)) if m else {}
 
 
+def load_sd_chapters() -> list[dict]:
+    """Parse chapter rows from system-design-data.js (JS object literal, not strict JSON)."""
+    path = os.path.join(SRC, "assets", "system-design-data.js")
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    chapters: list[dict] = []
+    for line in raw.splitlines():
+        if "slug:" not in line:
+            continue
+        n_m = re.search(r"n:\s*(\d+)", line)
+        slug_m = re.search(r'slug:\s*"([^"]+)"', line)
+        title_m = re.search(r'title:\s*"([^"]*)"', line)
+        title_en_m = re.search(r'titleEn:\s*"([^"]*)"', line)
+        avail_m = re.search(r"available:\s*(true|false)", line)
+        if not (n_m and slug_m and title_m and title_en_m and avail_m):
+            continue
+        chapters.append({
+            "n": int(n_m.group(1)),
+            "slug": slug_m.group(1),
+            "title": title_m.group(1),
+            "titleEn": title_en_m.group(1),
+            "available": avail_m.group(1) == "true",
+        })
+    return chapters
+
+
 def attr(s: str) -> str:
     """Escape for inside double-quoted HTML attribute."""
     return html.escape(str(s or ""), quote=True)
@@ -619,12 +645,58 @@ def build_story_detail(template: str, s: dict) -> str:
     return out
 
 
+def build_sd_chapter(template: str, ch: dict) -> str:
+    title_vi = ch.get("title", "")
+    title_en = ch.get("titleEn") or title_vi
+    n = ch.get("n", "")
+
+    title = f"{title_vi} · {SITE_NAME} — System Design"
+    description = truncate(f"System Design — {title_vi}", 160)
+    canonical = f"{SITE_BASE}/system-design/{ch['slug']}/"
+
+    og_image = SITE_BASE + OG_IMAGE
+    out = patch_head(template, title=title, description=description,
+                     canonical=canonical, og_image=og_image, og_title=title_vi)
+
+    extra = [{
+        "@type": "Article",
+        "@id": canonical + "#article",
+        "headline": title_vi,
+        "alternativeHeadline": title_en,
+        "description": description,
+        "url": canonical,
+        "publisher": {"@id": f"{SITE_BASE}/#org"},
+        "inLanguage": "vi",
+    }, {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_BASE + "/"},
+            {"@type": "ListItem", "position": 2, "name": "System Design", "item": f"{SITE_BASE}/system-design/"},
+            {"@type": "ListItem", "position": 3, "name": title_vi, "item": canonical},
+        ],
+    }]
+    out = patch_jsonld(out, extra)
+
+    snippet = (
+        f'  <header class="article__head">'
+        f'    <span class="badge">Ch. {text(str(n))}</span>'
+        f'    <h1>{text(title_vi)}</h1>'
+        f'    <p class="muted"><a href="{attr(BASE_PATH)}/system-design/" data-href="#system-design">← System Design</a></p>'
+        f'  </header>'
+    )
+    out = inject_into_mount(out, "sdChapterArticle", snippet)
+    out = show_route_style(out, "sd-chapter")
+    out = inject_boot_script(out)
+    return out
+
+
 # ---------- per-route descriptions for top routes ---------------------------
 
 ROUTE_DESCRIPTIONS_VI = {
     "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
-    "book":      "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-    "mock":      "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
+    "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
+    "system-design": "Ghi chú System Design Interview (Alex Xu) — đọc từng chương, VI & EN. Nội dung tải khi mở chương.",
+    "mock":          "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
     "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech, playlist review CV.",
     "mentors":   "17 mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",
     "stories":   "94+ học viên EngineerPro đã nhận offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",
@@ -733,6 +805,14 @@ def main() -> int:
     for s in stories:
         html_out = build_story_detail(template, s)
         write(os.path.join(DOCS, "stories", s["slug"], "index.html"), html_out)
+        pages += 1
+
+    # 3b. System Design chapter pages (available chapters only)
+    for ch in load_sd_chapters():
+        if not ch.get("available"):
+            continue
+        html_out = build_sd_chapter(template, ch)
+        write(os.path.join(DOCS, "system-design", ch["slug"], "index.html"), html_out)
         pages += 1
 
     # 4. Home anchor shortcuts: /roadmap and /format land on the home page
