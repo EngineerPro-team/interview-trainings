@@ -1,0 +1,251 @@
+<h2>Giới thiệu</h2>
+<p>Chúng ta sẽ thiết kế một phiên bản đơn giản của <strong>Google Maps</strong>.</p>
+<p>Một số sự thật về google maps:<br/>
+ * Bắt đầu vào năm 2005<br/>
+ * Cung cấp các dịch vụ khác nhau - hình ảnh vệ tinh, bản đồ đường phố, điều kiện giao thông thời gian thực, quy hoạch tuyến đường<br/>
+ * Đến năm 2021, có 1 tỷ người dùng hoạt động hàng ngày, phủ sóng 99% thế giới, 25 triệu lượt cập nhật thông tin vị trí theo thời gian thực hàng ngày</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<p>Mẫu hỏi đáp giữa ứng viên và người phỏng vấn:<br/>
+ * C: Chúng ta đang xử lý bao nhiêu người dùng hoạt động hàng ngày?<br/>
+ * I: 1 tỷ DAU<br/>
+ * C: Chúng ta nên tập trung vào những tính năng nào?<br/>
+ * I: Cập nhật vị trí, điều hướng, ETA, hiển thị bản đồ<br/>
+ * C: Dữ liệu đường lớn đến mức nào? Chúng ta có quyền truy cập vào nó không?<br/>
+ * I: Chúng tôi lấy dữ liệu đường bộ từ nhiều nguồn khác nhau, đó là TB dữ liệu thô<br/>
+ * C: Chúng ta có nên xem xét điều kiện giao thông không?<br/>
+ * I: Có, chúng ta nên ước tính thời gian chính xác<br/>
+ * C: Còn các phương thức di chuyển khác nhau - đi bộ, đi xe đạp, lái xe thì sao?<br/>
+ * I: Chúng ta nên hỗ trợ những điều đó<br/>
+ * C: Còn chỉ đường nhiều điểm dừng thì sao?<br/>
+ * I: Đừng tập trung vào vấn đề đó trong phạm vi cuộc phỏng vấn<br/>
+ * C: Địa điểm kinh doanh và hình ảnh?<br/>
+ * I: Câu hỏi hay đấy, nhưng không cần phải cân nhắc đâu</p>
+<p>Chúng tôi sẽ tập trung vào ba tính năng chính - cập nhật vị trí người dùng, dịch vụ điều hướng bao gồm ETA, hiển thị bản đồ.</p>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li><strong>Sự chính xác</strong>: người dùng không nên nhận chỉ đường sai</li>
+<li><strong>Điều hướng mượt mà</strong>: Người dùng sẽ trải nghiệm kết xuất bản đồ mượt mà</li>
+<li><strong>Sử dụng dữ liệu và pin</strong>: Khách hàng nên sử dụng ít dữ liệu và pin nhất có thể. Quan trọng đối với thiết bị di động.</li>
+<li>Yêu cầu chung về tính khả dụng và khả năng mở rộng</li>
+</ul>
+<h3><strong>Bản đồ 101</strong></h3>
+<p>Trước khi bắt đầu thiết kế, có một số khái niệm liên quan đến bản đồ mà chúng ta nên hiểu.</p>
+<h4>Hệ thống định vị</h4>
+<p>Thế giới là một hình cầu, quay quanh trục của nó. Các vị trí được xác định theo vĩ độ (bạn ở bao xa về phía bắc/nam) và kinh độ (bạn ở bao xa về phía đông/tây):</p>
+<figure class="sd-figure"><img alt="partitioning-system" loading="lazy" src="assets/content/system-design/images/ch18/partitioning-system.png"/></figure>
+<h4>Chuyển từ 3D sang 2D</h4>
+<p>Quá trình dịch các điểm từ mặt phẳng 3D sang 2D được gọi là "chiếu bản đồ".</p>
+<p>Có nhiều cách khác nhau để làm điều đó và mỗi cách đều có ưu và nhược điểm. Hầu như tất cả đều bóp méo hình học thực tế.</p>
+<figure class="sd-figure"><img alt="map-projections" loading="lazy" src="assets/content/system-design/images/ch18/map-projections.png"/></figure>
+<p>Bản đồ của Google đã chọn một phiên bản sửa đổi của phép chiếu Mercator có tên là "Web Mercator".</p>
+<h4>Mã hóa địa lý</h4>
+<p>Mã hóa địa lý là quá trình chuyển đổi địa chỉ thành tọa độ địa lý. </p>
+<p>Quá trình ngược lại được gọi là "mã hóa địa lý ngược".</p>
+<p>Một cách để đạt được điều này là sử dụng phép nội suy - tận dụng dữ liệu từ các nguồn khác nhau (ví dụ: GIS-es) nơi mạng lưới đường phố được ánh xạ tới không gian tọa độ địa lý.</p>
+<h4>Geohashing</h4>
+<p>Geohashing là một hệ thống mã hóa mã hóa một khu vực địa lý thành một chuỗi các chữ cái và chữ số.</p>
+<p>Nó mô tả thế giới như một bề mặt phẳng và chia nó thành bốn góc phần tư một cách đệ quy:</p>
+<figure class="sd-figure"><img alt="geohashing" loading="lazy" src="assets/content/system-design/images/ch18/geohashing.png"/></figure>
+<h4>Hiển thị bản đồ</h4>
+<p>Việc hiển thị bản đồ diễn ra thông qua việc xếp lớp. Thay vì hiển thị toàn bộ bản đồ dưới dạng một hình ảnh tùy chỉnh lớn, thế giới được chia thành các ô nhỏ hơn.</p>
+<p>Khách hàng chỉ tải xuống các ô có liên quan và hiển thị chúng giống như ghép một bức tranh khảm lại với nhau.</p>
+<p>Có các ô khác nhau cho các mức thu phóng khác nhau. Khách hàng chọn các ô thích hợp dựa trên mức thu phóng của khách hàng.</p>
+<p>Ví dụ: thu nhỏ toàn bộ thế giới sẽ chỉ tải xuống một ô 256x256 duy nhất, đại diện cho cả thế giới.</p>
+<h4>Xử lý dữ liệu đường cho thuật toán điều hướng</h4>
+<p>Trong hầu hết các thuật toán định tuyến, các giao lộ được biểu diễn dưới dạng các nút và đường được biểu diễn dưới dạng các cạnh:</p>
+<figure class="sd-figure"><img alt="road-representation" loading="lazy" src="assets/content/system-design/images/ch18/road-representation.png"/></figure>
+<p>Hầu hết các thuật toán điều hướng đều sử dụng phiên bản sửa đổi của thuật toán Djikstra hoặc A*.</p>
+<p>Hiệu suất tìm đường rất nhạy cảm với kích thước của biểu đồ. Để làm việc ở quy mô lớn, chúng ta không thể biểu diễn toàn bộ thế giới dưới dạng biểu đồ và chạy thuật toán trên đó.</p>
+<p>Thay vào đó, chúng tôi sử dụng một kỹ thuật tương tự như xếp gạch - chúng tôi chia thế giới thành các biểu đồ ngày càng nhỏ hơn.</p>
+<p>Các ô định tuyến chứa các tham chiếu đến các ô lân cận và thuật toán có thể ghép một biểu đồ đường lớn hơn lại với nhau khi nó đi qua các ô được kết nối với nhau:</p>
+<figure class="sd-figure"><img alt="routing-tiles" loading="lazy" src="assets/content/system-design/images/ch18/routing-tiles.png"/></figure>
+<p>Kỹ thuật này cho phép chúng tôi giảm đáng kể băng thông bộ nhớ và chỉ tải các ô mà chúng tôi cần cho cặp nguồn/đích nhất định.</p>
+<p>Tuy nhiên, đối với các tuyến đường lớn hơn, việc ghép các ô định tuyến nhỏ, chi tiết lại với nhau vẫn sẽ tiêu tốn thời gian/bộ nhớ. Thay vào đó, có các ô định tuyến với mức độ chi tiết khác nhau và thuật toán sử dụng các ô có độ chi tiết phù hợp, dựa trên đích đến mà chúng ta hướng tới:</p>
+<figure class="sd-figure"><img alt="map-routing-hierarchical" loading="lazy" src="assets/content/system-design/images/ch18/map-routing-hierarchical.png"/></figure>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<p>Để lưu trữ, chúng ta cần lưu trữ:<br/>
+ * bản đồ thế giới - ước tính khoảng ~70pb dựa trên tất cả các ô chúng ta cần lưu trữ, nhưng tính đến việc nén các ô rất giống nhau (ví dụ: sa mạc rộng lớn)<br/>
+ * metadata - kích thước không đáng kể, vì vậy chúng tôi có thể bỏ qua nó khỏi tính toán<br/>
+ * Thông tin đường - được lưu dưới dạng ô định tuyến</p>
+<p>QPS ước tính cho các yêu cầu điều hướng - 1 tỷ DAU với mức sử dụng 35 phút mỗi tuần -&gt; 5 tỷ phút mỗi ngày. <br/>
+Giả sử các yêu cầu cập nhật gps được chia theo đợt, chúng tôi đạt được 200 nghìn QPS và 1 triệu QPS khi tải cao điểm</p>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<figure class="sd-figure"><img alt="high-level-design" loading="lazy" src="assets/content/system-design/images/ch18/high-level-design.png"/></figure>
+<h3><strong>Geolocation service</strong></h3>
+<figure class="sd-figure"><img alt="location-service" loading="lazy" src="assets/content/system-design/images/ch18/location-service.png"/></figure>
+<p>Nó chịu trách nhiệm ghi lại các cập nhật vị trí của người dùng:<br/>
+ * cập nhật vị trí được gửi mỗi <code>t</code> giây<br/>
+ * luồng dữ liệu vị trí có thể được sử dụng để cải thiện dịch vụ theo thời gian, ví dụ: cung cấp ETA chính xác hơn, giám sát dữ liệu giao thông, phát hiện đường bị đóng, phân tích hành vi của người dùng, v.v.</p>
+<p>Thay vì gửi các bản cập nhật vị trí đến máy chủ mọi lúc, chúng tôi có thể gửi các bản cập nhật theo nhóm ở phía client và gửi các bản cập nhật theo nhóm:</p>
+<figure class="sd-figure"><img alt="location-update-batches" loading="lazy" src="assets/content/system-design/images/ch18/location-update-batches.png"/></figure>
+<p>Bất chấp sự tối ưu hóa này, đối với một hệ thống có quy mô Google Maps, tải vẫn sẽ rất đáng kể. Do đó, chúng ta có thể tận dụng database được tối ưu hóa cho các tác vụ ghi nặng như Cassandra.</p>
+<p>Chúng tôi cũng có thể tận dụng Kafka để xử lý luồng cập nhật vị trí một cách hiệu quả, nhằm mục đích phân tích thêm.</p>
+<p>Ví dụ về tải trọng yêu cầu cập nhật vị trí:</p>
+<pre><code>POST /v1/locations
+Parameters
+  locs: JSON encoded array of (latitude, longitude, timestamp) tuples.
+</code></pre>
+<h3><strong>Routing service</strong></h3>
+<p>Component này có nhiệm vụ tìm đường đi nhanh giữa A và B trong thời gian hợp lý (độ trễ một chút cũng không sao). Lộ trình không cần phải nhanh nhất nhưng độ chính xác rất quan trọng.</p>
+<p>Tải trọng yêu cầu ví dụ:</p>
+<pre><code>GET /v1/nav?origin=1355+market+street,SF&amp;destination=Disneyland
+</code></pre>
+<p>Sample response:</p>
+<pre><code class="language-json">{
+  "distance": {"text":"0.2 mi", "value": 259},
+  "duration": {"text": "1 min", "value": 83},
+  "end_location": {"lat": 37.4038943, "Ing": -121.9410454},
+  "html_instructions": "Head &lt;b&gt;northeast&lt;/b&gt; on &lt;b&gt;Brandon St&lt;/b&gt; toward &lt;b&gt;Lumin Way&lt;/b&gt;&lt;div style=\"font-size:0.9em\"&gt;Restricted usage road&lt;/div&gt;",
+  "polyline": {"points": "_fhcFjbhgVuAwDsCal"},
+  "start_location": {"lat": 37.4027165, "lng": -121.9435809},
+  "geocoded_waypoints": [
+    {
+       "geocoder_status" : "OK",
+       "partial_match" : true,
+       "place_id" : "ChIJwZNMti1fawwRO2aVVVX2yKg",
+       "types" : [ "locality", "political" ]
+    },
+    {
+       "geocoder_status" : "OK",
+       "partial_match" : true,
+       "place_id" : "ChIJ3aPgQGtXawwRLYeiBMUi7bM",
+       "types" : [ "locality", "political" ]
+    }
+  ],
+  "travel_mode": "DRIVING"
+}
+</code></pre>
+<p>Những thay đổi về giao thông và định tuyến lại vẫn chưa được xem xét mà sẽ được giải quyết trong phần lặn sâu.</p>
+<h3><strong>Hiển thị bản đồ</strong></h3>
+<p>Việc giữ toàn bộ tập dữ liệu của các ô ánh xạ ở phía client là không khả thi vì nó có kích thước petabyte.</p>
+<p>Chúng cần được fetch theo yêu cầu từ máy chủ, dựa trên vị trí và mức thu phóng của khách hàng.</p>
+<p>Khi nào nên fetch các ô mới - trong khi người dùng đang phóng to/thu nhỏ và trong khi điều hướng, trong khi họ đang đi tới một ô mới.</p>
+<p>Các ô bản đồ nên được cung cấp cho khách hàng như thế nào?<br/>
+ * Chúng có thể được xây dựng linh hoạt, nhưng điều đó gây ra tải trọng lớn cho máy chủ và cũng khiến việc lưu vào cache trở nên khó khăn<br/>
+ * Các ô bản đồ được cung cấp tĩnh, dựa trên geohash mà khách hàng có thể tính toán. Chúng có thể được lưu trữ và phục vụ tĩnh từ CDN</p>
+<figure class="sd-figure"><img alt="static-map-tiles" loading="lazy" src="assets/content/system-design/images/ch18/static-map-tiles.png"/></figure>
+<p>CDN cho phép người dùng fetch các ô bản đồ từ các máy chủ điểm hiện diện (POP) gần người dùng nhất để giảm thiểu độ trễ:</p>
+<figure class="sd-figure"><img alt="cdn-vs-no-cdn" loading="lazy" src="assets/content/system-design/images/ch18/cdn-vs-no-cdn.png"/></figure>
+<p>Các tùy chọn cần xem xét để xác định các ô bản đồ:<br/>
+ * geohash cho ô bản đồ có thể được tính toán ở phía client. Nếu đúng như vậy, chúng tôi nên cẩn thận khi cam kết thực hiện kiểu tính toán ô bản đồ này trong thời gian dài vì việc buộc khách hàng cập nhật là điều khó khăn<br/>
+ * Ngoài ra, chúng tôi có thể có API đơn giản để tính toán các URL lát bản đồ thay mặt cho khách hàng với chi phí gọi API bổ sung</p>
+<figure class="sd-figure"><img alt="map-tile-url-calculation" loading="lazy" src="assets/content/system-design/images/ch18/map-tile-url-calculation.png"/></figure>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<h3><strong>Mô hình dữ liệu</strong></h3>
+<p>Hãy thảo luận về cách chúng tôi lưu trữ các loại dữ liệu khác nhau mà chúng tôi đang xử lý.</p>
+<h4>Ô định tuyến</h4>
+<p>Tập dữ liệu đường ban đầu được lấy từ nhiều nguồn khác nhau. Nó được cải thiện theo thời gian dựa trên dữ liệu cập nhật vị trí.</p>
+<p>Dữ liệu đường không có cấu trúc. Chúng tôi có một quy trình xử lý ngoại tuyến định kỳ, quy trình này sẽ chuyển đổi dữ liệu thô này thành các ô định tuyến dựa trên biểu đồ mà ứng dụng của chúng tôi cần.</p>
+<p>Thay vì lưu trữ các ô này trong database vì chúng tôi không cần bất kỳ tính năng database nào. Chúng ta có thể lưu trữ chúng trong object store S3, đồng thời lưu chúng vào cache một cách linh hoạt.</p>
+<p>Chúng ta cũng có thể tận dụng các thư viện để nén danh sách kề vào tệp nhị phân một cách hiệu quả.</p>
+<h4>Dữ liệu vị trí người dùng</h4>
+<p>Dữ liệu vị trí của người dùng rất hữu ích để cập nhật tình trạng giao thông và thực hiện tất cả các loại phân tích khác.</p>
+<p>Chúng ta có thể sử dụng Cassandra để lưu trữ loại dữ liệu này vì bản chất của nó là nặng về ghi.</p>
+<p>Hàng ví dụ:</p>
+<figure class="sd-figure"><img alt="user-location-data-row" loading="lazy" src="assets/content/system-design/images/ch18/user-location-data-torw.png"/></figure>
+<h4>database mã hóa địa lý</h4>
+<p>database này lưu trữ một cặp khóa-giá trị gồm các cặp vĩ độ/kinh độ và địa điểm.</p>
+<p>Chúng ta có thể sử dụng Redis để có tốc độ truy cập đọc nhanh vì chúng ta đọc thường xuyên và ghi không thường xuyên.</p>
+<h4>Hình ảnh được tính toán trước của bản đồ thế giới</h4>
+<p>Như chúng ta đã thảo luận, chúng ta sẽ tính toán trước các hình ảnh xếp lát bản đồ và lưu trữ chúng trong CDN.</p>
+<figure class="sd-figure"><img alt="precomputed-map-tile-image" loading="lazy" src="assets/content/system-design/images/ch18/precomputed-map-tile-image.png"/></figure>
+<h3><strong>Dịch vụ</strong></h3>
+<h4>Dịch vụ định vị</h4>
+<p>Hãy tập trung vào thiết kế database và cách lưu trữ chi tiết vị trí người dùng cho dịch vụ này.</p>
+<figure class="sd-figure"><img alt="location-service-diagram" loading="lazy" src="assets/content/system-design/images/ch18/location-service-diagram.png"/></figure>
+<p>Chúng tôi có thể sử dụng database NoSQL để hỗ trợ tải trọng ghi lớn khi cập nhật vị trí. Chúng tôi ưu tiên tính khả dụng hơn tính nhất quán vì dữ liệu vị trí của người dùng thường thay đổi và trở nên cũ kỹ khi có bản cập nhật mới.</p>
+<p>Chúng tôi sẽ chọn Cassandra làm lựa chọn database vì nó phù hợp với tất cả các yêu cầu của chúng tôi.</p>
+<p>Hàng ví dụ chúng tôi sẽ lưu trữ:</p>
+<figure class="sd-figure"><img alt="user-location-row-example" loading="lazy" src="assets/content/system-design/images/ch18/user-location-row-example.png"/></figure>
+<ul>
+<li><code>user_id</code> là khóa partition để truy cập nhanh tất cả các cập nhật vị trí cho một người dùng cụ thể</li>
+<li><code>timestamp</code> là khóa phân cụm để lưu trữ dữ liệu được sắp xếp theo thời điểm nhận được cập nhật vị trí</li>
+</ul>
+<p>Chúng tôi cũng tận dụng Kafka để truyền phát các cập nhật vị trí tới nhiều dịch vụ khác cần cập nhật vị trí cho nhiều mục đích khác nhau:</p>
+<figure class="sd-figure"><img alt="location-update-streaming" loading="lazy" src="assets/content/system-design/images/ch18/location-update-streaming.png"/></figure>
+<h4>Hiển thị bản đồ</h4>
+<p>Các ô bản đồ được lưu trữ ở nhiều mức thu phóng khác nhau. Ở mức thu phóng thấp nhất, toàn bộ thế giới được thể hiện bằng một ô 256x256 duy nhất.</p>
+<p>Khi mức thu phóng tăng lên, số ô bản đồ sẽ tăng gấp bốn lần:</p>
+<figure class="sd-figure"><img alt="zoom-level-increases" loading="lazy" src="assets/content/system-design/images/ch18/zoom-level-increases.png"/></figure>
+<p>Một cách tối ưu hóa mà chúng tôi có thể sử dụng là không gửi toàn bộ thông tin hình ảnh qua mạng mà thay vào đó biểu thị các ô dưới dạng vectơ (đường dẫn &amp; đa giác) và để Client hiển thị các ô một cách linh hoạt.</p>
+<p>Điều này sẽ tiết kiệm băng thông đáng kể.</p>
+<h4>Dịch vụ điều hướng</h4>
+<p>Dịch vụ này có nhiệm vụ tìm kiếm các tuyến đường nhanh nhất:</p>
+<figure class="sd-figure"><img alt="navigation-service" loading="lazy" src="assets/content/system-design/images/ch18/navigation-service.png"/></figure>
+<p>Chúng ta hãy đi qua từng thành phần trong hệ thống con này.</p>
+<p>Đầu tiên, chúng tôi có dịch vụ mã hóa địa lý phân giải địa chỉ thành vị trí của cặp vĩ độ/kinh độ.</p>
+<p>Yêu cầu ví dụ:</p>
+<pre><code>https://maps.googleapis.com/maps/API/geocode/json?address=1600+Amphitheatre+Parkway,+Mountain+View,+CA
+</code></pre>
+<p>Sample response:</p>
+<pre><code class="language-json">{
+   "results" : [
+      {
+         "formatted_address" : "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
+         "geometry" : {
+            "location" : {
+               "lat" : 37.4224764,
+               "lng" : -122.0842499
+            },
+            "location_type" : "ROOFTOP",
+            "viewport" : {
+               "northeast" : {
+                  "lat" : 37.4238253802915,
+                  "lng" : -122.0829009197085
+               },
+               "southwest" : {
+                  "lat" : 37.4211274197085,
+                  "lng" : -122.0855988802915
+               }
+            }
+         },
+         "place_id" : "ChIJ2eUgeAK6j4ARbn5u_wAGqWA",
+         "plus_code": {
+            "compound_code": "CWC8+W5 Mountain View, California, United States",
+            "global_code": "849VCWC8+W5"
+         },
+         "types" : [ "street_address" ]
+      }
+   ],
+   "status" : "OK"
+}
+</code></pre>
+<p>Dịch vụ lập kế hoạch tuyến đường tính toán tuyến đường được đề xuất, tối ưu hóa thời gian di chuyển tùy theo điều kiện giao thông hiện tại.</p>
+<p>Dịch vụ đường dẫn ngắn nhất chạy một biến thể của thuật toán A* dựa trên các ô định tuyến trong object store để tính toán đường dẫn tối ưu:<br/>
+ * Nó nhận các cặp nguồn/đích, chuyển đổi chúng thành các cặp vĩ độ/dài và lấy mã địa lý từ các cặp đó để lấy các ô định tuyến<br/>
+ * Thuật toán bắt đầu từ ô định tuyến ban đầu và bắt đầu duyệt qua nó cho đến khi tìm thấy đường dẫn đủ tốt tới ô đích</p>
+<figure class="sd-figure"><img alt="shortest-path-service" loading="lazy" src="assets/content/system-design/images/ch18/shortest-path-service.png"/></figure>
+<p>Dịch vụ ETA được người lập kế hoạch tuyến đường gọi để lấy thời gian ước tính dựa trên thuật toán học máy, dự đoán ETA dựa trên dữ liệu giao thông.</p>
+<p>Dịch vụ xếp hạng có trách nhiệm xếp hạng các đường dẫn khác nhau có thể dựa trên các bộ lọc do người dùng vượt qua, tức là các cờ để tránh đường thu phí hoặc đường cao tốc.</p>
+<p>Dịch vụ cập nhật cập nhật không đồng bộ một số database quan trọng để luôn cập nhật chúng.</p>
+<h4>Cải tiến - ETA thích ứng và định tuyến lại</h4>
+<p>Một cải tiến mà chúng tôi có thể thực hiện là cập nhật thích ứng các tuyến đường trên chuyến bay dựa trên dữ liệu giao thông mới có sẵn.</p>
+<p>Một cách để thực hiện điều này là lưu trữ những người dùng hiện đang điều hướng qua một tuyến đường trong database bằng cách lưu trữ tất cả các ô mà họ phải đi qua.</p>
+<p>Dữ liệu có thể trông như thế này:</p>
+<pre><code>user_1: r_1, r_2, r_3, …, r_k
+user_2: r_4, r_6, r_9, …, r_n
+user_3: r_2, r_8, r_9, …, r_m
+...
+user_n: r_2, r_10, r21,..., r_l
+</code></pre>
+<p>Nếu tai nạn giao thông xảy ra trên một ô nào đó, chúng tôi có thể xác định tất cả người dùng có đường đi qua ô đó và định tuyến lại cho họ.</p>
+<p>Để giảm số lượng ngăn xếp được lưu trữ trong database, thay vào đó, chúng ta có thể lưu trữ ngăn xếp định tuyến gốc và một số ngăn xếp định tuyến ở các mức độ phân giải khác nhau cho đến khi bao gồm cả ngăn xếp đích:</p>
+<pre><code>user_1, r_1, super(r_1), super(super(r_1)),...
+</code></pre>
+<figure class="sd-figure"><img alt="adaptive-eta-data-storage" loading="lazy" src="assets/content/system-design/images/ch18/adaptive-eta-data-storage.png"/></figure>
+<p>Khi sử dụng tính năng này, chúng tôi chỉ cần kiểm tra xem ô cuối cùng của người dùng có bao gồm ô tai nạn giao thông hay không để xem liệu người dùng có bị ảnh hưởng hay không.</p>
+<p>Chúng tôi cũng có thể theo dõi tất cả các tuyến đường có thể có cho người dùng điều hướng và thông báo cho họ nếu có tuyến đường lại nhanh hơn.</p>
+<h4>Giao thức phân phối</h4>
+<p>Chúng tôi có một số tùy chọn cho phép chúng tôi chủ động đẩy dữ liệu đến Client từ máy chủ:<br/>
+ * Push notification trên thiết bị di động không hoạt động vì tải trọng bị giới hạn và không có sẵn cho ứng dụng web<br/>
+ * WebSocket nói chung là một lựa chọn tốt hơn so với long polling vì nó có ít dấu vết điện toán hơn trên máy chủ<br/>
+ * Chúng tôi cũng có thể sử dụng các sự kiện do máy chủ gửi (SSE) nhưng dựa vào các ổ cắm web vì chúng hỗ trợ giao tiếp hai chiều, điều này có thể hữu ích, chẳng hạn như tính năng giao hàng chặng cuối</p>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Đây là thiết kế cuối cùng của chúng ta:</p>
+<figure class="sd-figure"><img alt="final-design" loading="lazy" src="assets/content/system-design/images/ch18/final-design.png"/></figure>
+<p>Một tính năng bổ sung mà chúng tôi có thể cung cấp là điều hướng nhiều điểm dừng có thể được bán cho các khách hàng doanh nghiệp như Uber hoặc Lyft để xác định đường đi tối ưu để ghé thăm một nhóm địa điểm.</p>
+

@@ -1,0 +1,115 @@
+<h2>Giới thiệu</h2>
+<p>Chương này đề cập đến thách thức trong việc thiết kế <strong>trình tạo ID duy nhất</strong> cho các hệ thống phân tán. Các khóa tăng tự động truyền thống không phù hợp trong môi trường phân tán do các thách thức về khả năng mở rộng và sync. Trọng tâm là tạo các ID số 64 bit duy nhất, có thể sắp xếp, đáp ứng các yêu cầu sau:<br/>
+- Phải có ID <strong>độc nhất</strong> Và <strong>đặt hàng theo ngày</strong>.<br/>
+- ID phải vừa với <strong>64 bit</strong>.<br/>
+- Hệ thống sẽ tạo ra <strong>hơn 10.000 ID mỗi giây</strong>.</p>
+<hr/>
+<h2>Bước 1: Tìm hiểu vấn đề</h2>
+<h3>Yêu cầu cơ bản</h3>
+<ul>
+<li>ID phải là duy nhất và phải là số và phải vừa với 64 bit.</li>
+<li>ID tăng theo thời gian nhưng không hoàn toàn theo <code>+1</code>.</li>
+<li>ID phải được sắp xếp theo ngày.</li>
+<li>Hệ thống phải xử lý thông lượng cao (10.000 ID/giây).</li>
+</ul>
+<hr/>
+<h2>Bước 2: Tùy chọn thiết kế cấp cao</h2>
+<h3>1. Sao chép đa chủ</h3>
+<ul>
+<li>
+<p><strong>Tiếp cận:</strong> Sử dụng database <code>auto_increment</code> với bước tăng dần (ví dụ: <code>+k</code> cho k máy chủ).</p>
+<p><p align="left"><br/>
+<img alt="Multi Master" loading="lazy" src="assets/content/system-design/images/ch07/multi-master.png" width="400"/><br/>
+</p></p>
+</li>
+<li>
+<p><strong>Nhược điểm:</strong></p>
+</li>
+<li>Khó mở rộng quy mô trên các trung tâm dữ liệu.</li>
+<li>ID không phải lúc nào cũng tăng theo thời gian.</li>
+<li>Vấn đề mở rộng quy mô khi máy chủ được thêm/xóa.</li>
+</ul>
+<h3>2. UUID (Mã định danh duy nhất toàn cầu)</h3>
+<ul>
+<li>
+<p><strong>Tiếp cận:</strong> </p>
+<ul>
+<li>Tạo mã định danh duy nhất 128 bit độc lập trên mỗi máy chủ bằng UUID.</li>
+<li>
+<p>UUID có thể được tạo độc lập mà không cần sự phối hợp giữa các máy chủ</p>
+<p><p align="left"><br/>
+<img alt="UUID generator" loading="lazy" src="assets/content/system-design/images/ch07/uuid.png" width="600"/><br/>
+</p></p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Thuận lợi:</strong></p>
+</li>
+<li>Không cần sự phối hợp giữa các máy chủ.</li>
+<li>Cân dễ dàng với các web server.</li>
+<li><strong>Nhược điểm:</strong></li>
+<li>Vượt quá yêu cầu 64-bit.</li>
+<li>ID không thể sắp xếp theo thời gian và có thể không phải là số.</li>
+</ul>
+<h3>3. Ticket Server</h3>
+<ul>
+<li>
+<p><strong>Tiếp cận:</strong> Sử dụng máy chủ database tập trung để tăng và gán ID.</p>
+<p><p align="left"><br/>
+<img alt="UUID generator" loading="lazy" src="assets/content/system-design/images/ch07/ticket-server.png" width="500"/><br/>
+</p></p>
+</li>
+<li>
+<p><strong>Thuận lợi:</strong></p>
+</li>
+<li>Đơn giản để thực hiện cho các hệ thống quy mô nhỏ.</li>
+<li>Tạo ID số.</li>
+<li><strong>Nhược điểm:</strong></li>
+<li>single point of failure.</li>
+<li>Những sync challenges trong thiết lập nhiều máy chủ.</li>
+</ul>
+<h3>4. Phương pháp tiếp cận Twitter Snowflake</h3>
+<ul>
+<li>
+<p><strong>Tiếp cận:</strong> </p>
+<p><div style="margin-left:3rem"><br/>
+<img alt="Snowflake approach" loading="lazy" src="assets/content/system-design/images/ch07/twitter-snowflake.png" width="500"/><br/>
+</div><br/>
+<div style="margin-left:3rem"><br/>
+<img alt="Snowflake ID breakdow" loading="lazy" src="assets/content/system-design/images/ch07/snowflake-id-breakdown.png" width="500"/><br/>
+</div></p>
+<ul>
+<li>Chia ID thành các phần để đảm bảo tính duy nhất và khả năng mở rộng.</li>
+<li><strong>Bit dấu (1 bit):</strong> Luôn luôn <code>0</code>, có khả năng phân biệt số có dấu và không dấu.</li>
+<li><strong>Dấu thời gian (41 bit):</strong> Mili giây kể từ một kỷ nguyên tùy chỉnh (mặc định của Twitter là <code>1288834974657</code>, tương đương với ngày 04 tháng 11 năm 2010, 01:42:54 UTC). Đảm bảo ID được sắp xếp theo thời gian.</li>
+<li><strong>ID trung tâm dữ liệu (5 bit):</strong> Xác định lên đến <code>2^5 = 32</code> các trung tâm dữ liệu.</li>
+<li><strong>ID máy (5 bit):</strong> Xác định lên đến <code>2^5 = 32</code> máy trong mỗi trung tâm dữ liệu.</li>
+<li><strong>Số thứ tự (12 bit):</strong> Theo dõi ID được tạo trên máy trong cùng một phần nghìn giây, hỗ trợ tối đa <code>2^12 = 4096</code> ID mỗi mili giây. Trình tự đặt lại thành <code>0</code> mỗi mili giây.</li>
+</ul>
+</li>
+<li>
+<p><strong>Thuận lợi:</strong></p>
+<ul>
+<li><strong>Khả năng mở rộng:</strong> Xử lý hơn 10.000 ID mỗi giây trên nhiều máy chủ.</li>
+<li><strong>Thứ tự thời gian:</strong> Đảm bảo ID có thể sắp xếp theo thời gian.</li>
+<li><strong>Phân quyền:</strong> Không có điểm thất bại duy nhất.</li>
+</ul>
+</li>
+</ul>
+<h2>Bước 4: Cân nhắc bổ sung</h2>
+<h3>1. sync đồng hồ</h3>
+<ul>
+<li><strong>Thử thách:</strong> Việc tạo ID giả định đồng hồ được sync trên các máy chủ.</li>
+<li><strong>Giải pháp:</strong> Sử dụng <strong>Giao thức thời gian mạng (NTP)</strong> để giảm thiểu sự trôi dạt.</li>
+</ul>
+<h3>2. Điều chỉnh độ dài phần</h3>
+<ul>
+<li>Điều chỉnh kích thước phần (ví dụ: ít bit chuỗi hơn, nhiều bit dấu thời gian hơn) dựa trên trường hợp sử dụng.</li>
+</ul>
+<h3>3. Tính sẵn sàng cao</h3>
+<ul>
+<li>Trình tạo ID có vai trò quan trọng và phải có khả năng chịu lỗi.</li>
+<li>Xem xét các cơ chế dự phòng và chuyển đổi dự phòng.</li>
+</ul>
+

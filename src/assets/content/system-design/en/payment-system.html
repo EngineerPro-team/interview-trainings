@@ -1,0 +1,257 @@
+<h2>Introduction</h2>
+<p>We'll design a <strong>payment system</strong> in this chapter, which underpins all of modern <strong>e-commerce</strong>.</p>
+<p>A <strong>payment system</strong> is used to settle financial transactions, transferring monetary value.</p>
+<hr />
+<h2>Step 1: Understand the Problem and Establish Design Scope</h2>
+<ul>
+<li>C: What kind of payment system are we building?</li>
+<li>I: A payment backend for an e-commerce system, similar to Amazon.com. It handles everything related to money movement.</li>
+<li>C: What payment options are supported - Credit cards, PayPal, bank cards, etc?</li>
+<li>I: The system should support all these options in real life. For the purposes of the interview, we can use credit card payments.</li>
+<li>C: Do we handle credit card processing ourselves?</li>
+<li>I: No, we use a third-party provider like Stripe, Braintree, Square, etc.</li>
+<li>C: Do we store credit card data in our system?</li>
+<li>I: Due to compliance reasons, we do not store credit card data directly in our systems. We rely on third-party payment processors.</li>
+<li>C: Is the application global? Do we need to support different currencies and international payments?</li>
+<li>I: The application is global, but we assume only one currency is used for the purposes of the interview.</li>
+<li>C: How many payment transactions per day do we support?</li>
+<li>I: 1mil transactions per day.</li>
+<li>C: Do we need to support the payout flow to eg payout to payers each month?</li>
+<li>I: Yes, we need to support that</li>
+<li>C: Is there anything else I should pay attention to?</li>
+<li>I: We need to support reconciliations to fix any inconsistencies in communicating with internal and external systems.</li>
+</ul>
+<h3><strong>Functional requirements</strong></h3>
+<ul>
+<li>Pay-in flow - payment system receives money from customers on behalf of merchants</li>
+<li>Pay-out flow - payment system sends money to sellers around the world</li>
+</ul>
+<h3><strong>Non-functional requirements</strong></h3>
+<ul>
+<li>Reliability and fault-tolerance. Failed payments need to be carefully handled</li>
+<li>A reconciliation between internal and external systems needs to be setup.</li>
+</ul>
+<h3><strong>Back-of-the-envelope estimation</strong></h3>
+<p>The system needs to process 1mil transactions per day, which is 10 transactions per second.</p>
+<p>This is not a high throughput for any database system, so it's not the focus of this interview.</p>
+<hr />
+<h2>Step 2: Propose High-Level Design and Get Buy-In</h2>
+<p>At a high-level, we have three actors, participating in money movement:</p>
+<figure class="sd-figure"><img alt="high-level-flow" src="assets/content/system-design/images/ch26/high-level-flow.png" / loading="lazy"></figure>
+<h3><strong>Pay-in flow</strong></h3>
+<p>Here's the high-level overview of the pay-in flow:</p>
+<figure class="sd-figure"><img alt="pay-in-flow-high-level" src="assets/content/system-design/images/ch26/payin-flow-high-level.png" / loading="lazy"></figure>
+<ul>
+<li>Payment service - accepts payment events and coordinates the payment process. It typically also does a risk check using a third-party provider for AML violations or criminal activity.</li>
+<li>Payment executor - executes a single payment order via the Payment Service Provider (PSP). Payment events may contain several payment orders.</li>
+<li>Payment service provider (PSP) - moves money from one account to another, eg from buyer's credit card account to e-commerce site's bank account.</li>
+<li>Card schemes - organizations that process credit card operations, eg Visa MasterCard, etc.</li>
+<li>Ledger - keeps financial record of all payment transactions.</li>
+<li>Wallet - keeps the account balance for all merchants.</li>
+</ul>
+<p>Here's an example pay-in flow:<br />
+ * user clicks "place order" and a payment event is sent to the payment service<br />
+ * payment service stores the event in its database<br />
+ * payment service calls the payment executor for all payment orders, part of that payment event<br />
+ * payment executor stores the payment order in its database<br />
+ * payment executor calls external PSP to process the credit card payment<br />
+ * After the payment executor processes the payment, the payment service updates the wallet to record how much money the seller has<br />
+ * wallet service stores updated balance information in its database<br />
+ * payment service calls the ledger to record all money movements</p>
+<h3><strong>APIs for payment service</strong></h3>
+<pre><code>POST /v1/payments
+{
+  &quot;buyer_info&quot;: {...},
+  &quot;checkout_id&quot;: &quot;some_id&quot;,
+  &quot;credit_card_info&quot;: {...},
+  &quot;payment_orders&quot;: [{...}, {...}, {...}]
+}
+</code></pre>
+<p>Example <code>payment_order</code>:</p>
+<pre><code>{
+  &quot;seller_account&quot;: &quot;SELLER_IBAN&quot;,
+  &quot;amount&quot;: &quot;3.15&quot;,
+  &quot;currency&quot;: &quot;USD&quot;,
+  &quot;payment_order_id&quot;: &quot;globally_unique_payment_id&quot;
+}
+</code></pre>
+<p>Caveats:<br />
+ * The <code>payment_order_id</code> is forwarded to the PSP to deduplicate payments, ie it is the idempotency key.<br />
+ * The amount field is <code>string</code> as <code>double</code> is not appropriate for representing monetary values.</p>
+<pre><code>GET /v1/payments/{:id}
+</code></pre>
+<p>This endpoint returns the execution status of a single payment, based on the <code>payment_order_id</code>.</p>
+<h3><strong>Payment service data model</strong></h3>
+<p>We need to maintain two tables - <code>payment_events</code> and <code>payment_orders</code>.</p>
+<p>For payments, performance is typically not an important factor. Strong consistency, however, is.</p>
+<p>Other considerations for choosing the database:<br />
+ * Strong market of DBAs to hire to administer the databaseS<br />
+ * Proven track-record where the database has been used by other big financial institutions<br />
+ * Richness of supporting tools<br />
+ * Traditional SQL over NoSQL/NewSQL for its ACID guarantees</p>
+<p>Here's what the <code>payment_events</code> table contains:<br />
+ * <code>checkout_id</code> - string, primary key<br />
+ * <code>buyer_info</code> - string (personal note - prob a foreign key to another table is more appropriate)<br />
+ * <code>seller_info</code> - string (personal note - same remark as above)<br />
+ * <code>credit_card_info</code> - depends on card provider<br />
+ * <code>is_payment_done</code> - boolean</p>
+<p>Here's what the <code>payment_orders</code> table contains:<br />
+ * <code>payment_order_id</code> - string, primary key<br />
+ * <code>buyer_account</code> - string<br />
+ * <code>amount</code> - string<br />
+ * <code>currency</code> - string<br />
+ * <code>checkout_id</code> - string, foreign key<br />
+ * <code>payment_order_status</code> - enum (<code>NOT_STARTED</code>, <code>EXECUTING</code>, <code>SUCCESS</code>, <code>FAILED</code>)<br />
+ * <code>ledger_updated</code> - boolean<br />
+ * <code>wallet_updated</code> - boolean</p>
+<p>Caveats:<br />
+ * there are many payment orders, linked to a given payment event<br />
+ * we don't need the <code>seller_info</code> for the pay-in flow. That's required on pay-out only<br />
+ * <code>ledger_updated</code> and <code>wallet_updated</code> are updated when the respective service is called to record the result of a payment<br />
+ * payment transitions are managed by a background job, which checks updates of in-flight payments and triggers an alert if a payment is not processed in a reasonable timeframe</p>
+<h3><strong>Double-entry ledger system</strong></h3>
+<p>The double-entry accounting mechanism is key to any payment system. It is a mechanism of tracking money movements by always applying money operations to two accounts, where one's account balance increases (credit) and the other decreases (debit):</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th>Account</th>
+<th>Debit</th>
+<th>Credit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>buyer</td>
+<td>$1</td>
+<td></td>
+</tr>
+<tr>
+<td>seller</td>
+<td></td>
+<td>$1</td>
+</tr>
+</tbody>
+</table>
+<p>Sum of all transaction entries is always zero. This mechanism provides end-to-end traceability of all money movements within the system.</p>
+<h3><strong>Hosted payment page</strong></h3>
+<p>To avoid storing credit card information and having to comply with various heavy regulations, most companies prefer utilizing a widget, provided by PSPs, which store and handle credit card payments for you:</p>
+<figure class="sd-figure"><img alt="hosted-payment-page" src="assets/content/system-design/images/ch26/hosted-payment-page.png" / loading="lazy"></figure>
+<h3><strong>Pay-out flow</strong></h3>
+<p>The components of the pay-out flow are very similar to the pay-in flow.</p>
+<p>Main differences:<br />
+ * money is moved from e-commerce site's bank account to merchant's bank account<br />
+ * we can utilize a third-party account payable provider such as Tipalti<br />
+ * There's a lot of bookkeeping and regulatory requirements to handle with regards to pay-outs as well</p>
+<hr />
+<h2>Step 3: Design Deep Dive</h2>
+<p>This section focuses on making the system faster, more robust and secure.</p>
+<h3><strong>PSP Integration</strong></h3>
+<p>If our system can directly connect to banks or card schemes, payment can be made without a PSP.<br />
+These kinds of connections are very rare and uncommon, typically done at large companies which can justify the investment.</p>
+<p>If we go down the traditional route, a PSP can be integrated in one of two ways:<br />
+ * Through API, if our payment system can collect payment information<br />
+ * Through a hosted payment page to avoid dealing with payment information regulations</p>
+<p>Here's how the hosted payment page workflow works:</p>
+<figure class="sd-figure"><img alt="hosted-payment-page-workflow" src="assets/content/system-design/images/ch26/hosted-payment-page-workflow.png" / loading="lazy"></figure>
+<ul>
+<li>User clicks "checkout" button in the browser</li>
+<li>Client calls the payment service with the payment order information</li>
+<li>After receiving payment order information, the payment service sends a payment registration request to the PSP.</li>
+<li>The PSP receives payment info such as currency, amount, expiration, etc, as well as a UUID for idempotency purposes. Typically the UUID of the payment order.</li>
+<li>The PSP returns a token back which uniquely identifies the payment registration. The token is stored in the payment service database.</li>
+<li>Once token is stored, the user is served with a PSP-hosted payment page. It is initialized using the token as well as a redirect URL for success/failure. </li>
+<li>User fills in payment details on the PSP page, PSP processes payment and returns the payment status</li>
+<li>User is now redirected back to the redirectURL. Example redirect url - <code>https://your-company.com/?tokenID=JIOUIQ123NSF&amp;payResult=X324FSa</code></li>
+<li>Asynchronously, the PSP calls our payment service via a webhook to inform our backend of the payment result</li>
+<li>Payment service records the payment result based on the webhook received</li>
+</ul>
+<h3><strong>Reconciliation</strong></h3>
+<p>The previous section explains the happy path of a payment. Unhappy paths are detected and reconciled using a background reconciliation process.</p>
+<p>Every night, the PSP sends a settlement file which our system uses to compare the external system's state against our internal system's state.</p>
+<figure class="sd-figure"><img alt="settlement-report" src="assets/content/system-design/images/ch26/settlement-report.png" / loading="lazy"></figure>
+<p>This process can also be used to detect internal inconsistencies between eg the ledger and the wallet services.</p>
+<p>Mismatches are handled manually by the finance team. Mismatches are handled as:<br />
+ * classifiable, hence, it is a known mismatch which can be adjusted using a standard procedure<br />
+ * classifiable, but can't be automated. Manually adjusted by the finance team<br />
+ * unclassifiable. Manually investigated and adjusted by the finance team</p>
+<h3><strong>Handling payment processing delays</strong></h3>
+<p>There are cases, where a payment can take hours to complete, although it typically takes seconds.</p>
+<p>This can happen due to:<br />
+ * a payment being flagged as high-risk and someone has to manually review it<br />
+ * credit card requires extra protection, eg 3D Secure Authentication, which requires extra details from card holder to complete</p>
+<p>These situations are handled by:<br />
+ * waiting for the PSP to send us a webhook when a payment is complete or polling its API if the PSP doesn't provide webhooks<br />
+ * showing a "pending" status to the user and giving them a page, where they can check-in for payment updates. We could also send them an email once their payment is complete</p>
+<h3><strong>Communication among internal services</strong></h3>
+<p>There are two types of communication patterns services use to communicate with one another - synchronous and asynchronous.</p>
+<p>Synchronous communication (ie HTTP) works well for small-scale systems, but suffers as scale increases:<br />
+ * low performance - request-response cycle is long as more services get involved in the call chain<br />
+ * poor failure isolation - if PSPs or any other service fails, user will not receive a response<br />
+ * tight coupling - sender needs to know the receiver<br />
+ * hard to scale - not easy to support sudden increase in traffic due to not having a buffer</p>
+<p>Asynchronous communication can be divided into two categories.</p>
+<p>Single receiver - multiple receivers subscribe to the same topic and messages are processed only once:</p>
+<figure class="sd-figure"><img alt="single-receiver" src="assets/content/system-design/images/ch26/single-receiver.png" / loading="lazy"></figure>
+<p>Multiple receivers - multiple receivers subscribe to the same topic, but messages are forwarded to all of them:</p>
+<figure class="sd-figure"><img alt="multiple-receiver" src="assets/content/system-design/images/ch26/multiple-receiver.png" / loading="lazy"></figure>
+<p>Latter model works well for our payment system as a payment can trigger multiple side effects, handled by different services.</p>
+<p>In a nutshell, synchronous communication is simpler but doesn't allow services to be autonomous. <br />
+Async communication trades simplicity and consistency for scalability and resilience.</p>
+<h3><strong>Handling failed payments</strong></h3>
+<p>Every payment system needs to address failed payments. Here are some of the mechanism we'll use to achieve that:<br />
+ * Tracking payment state - whenever a payment fails, we can determine whether to retry/refund based on the payment state.<br />
+ * Retry queue - payments which we'll retry are published to a retry queue<br />
+ * Dead-letter queue - payments which have terminally failed are pushed to a dead-letter queue, where the failed payment can be debugged and inspected.</p>
+<figure class="sd-figure"><img alt="failed-payments" src="assets/content/system-design/images/ch26/failed-payments.png" / loading="lazy"></figure>
+<h3><strong>Exactly-once delivery</strong></h3>
+<p>We need to ensure a payment gets processed exactly-once to avoid double-charging a customer.</p>
+<p>An operation is executed exactly-once if it is executed at-least-once and at-most-once at the same time.</p>
+<p>To achieve the at-least-once guarantee, we'll use a retry mechanism:</p>
+<figure class="sd-figure"><img alt="retry-mechanism" src="assets/content/system-design/images/ch26/retry-mechanism.png" / loading="lazy"></figure>
+<p>Here are some common strategies on deciding the retry intervals:<br />
+ * immediate retry - client immediately sends another request after failure<br />
+ * fixed intervals - wait a fixed amount of time before retrying a payment<br />
+ * incremental intervals - incrementally increase retry interval between each retry<br />
+ * exponential back-off - double retry interval between subsequent retries<br />
+ * cancel - client cancels the request. This happens when the error is terminal or retry threshold is reached</p>
+<p>As a rule of thumb, default to an exponential back-off retry strategy. A good practice is for the server to specify a retry interval using a <code>Retry-After</code> header.</p>
+<p>An issue with retries is that the server can potentially process a payment twice:<br />
+ * client clicks the "pay button" twice, hence, they are charged twice<br />
+ * payment is successfully processed by PSP, but not by downstream services (ledger, wallet). Retry causes the payment to be processed by the PSP again</p>
+<p>To address the double payment problem, we need to use an idempotency mechanism - a property that an operation applied multiple times is processed only once.</p>
+<p>From an API perspective, clients can make multiple calls which produce the same result. <br />
+Idempotency is managed by a special header in the request (eg <code>idempotency-key</code>), which is typically a UUID.</p>
+<figure class="sd-figure"><img alt="idempotency-example" src="assets/content/system-design/images/ch26/idempotency-example.png" / loading="lazy"></figure>
+<p>Idempotency can be achieved using the database's mechanism of adding unique key constraints:<br />
+ * server attempts to insert a new row in the database<br />
+ * the insertion fails due to a unique key constraint violation<br />
+ * server detects that error and instead returns the existing object back to the client</p>
+<p>Idempotency is also applied at the PSP side, using the nonce, which was previously discussed. PSPs will take care to not process payments with the same nonce twice.</p>
+<h3><strong>Consistency</strong></h3>
+<p>There are several stateful services called throughout a payment's lifecycle - PSP, ledger, wallet, payment service.</p>
+<p>Communication between any two services can fail. <br />
+We can ensure eventual data consistency between all services by implementing exactly-once processing and reconciliation.</p>
+<p>If we use replication, we'll have to deal with replication lag, which can lead to users observing inconsistent data between primary and replica databases.</p>
+<p>To mitigate that, we can serve all reads and writes from the primary database and only utilize replicas for redundancy and fail-over.<br />
+Alternatively, we can ensure replicas are always in-sync by utilizing a consensus algorithm such as Paxos or Raft.<br />
+We could also use a consensus-based distributed database such as YugabyteDB or CockroachDB.</p>
+<h3><strong>Payment security</strong></h3>
+<p>Here are some mechanisms we can use to ensure payment security:<br />
+ * Request/response eavesdropping - we can use HTTPS to secure all communication<br />
+ * Data tampering - enforce encryption and integrity monitoring<br />
+ * Man-in-the-middle attacks - use SSL \w certificate pinning<br />
+ * Data loss - replicate data across multiple regions and take data snapshots<br />
+ * DDoS attack - implement rate limiting and firewall<br />
+ * Card theft - use tokens instead of storing real card information in our system<br />
+ * PCI compliance - a security standard for organizations which handle branded credit cards<br />
+ * Fraud - address verification, card verification value (CVV), user behavior analysis, etc</p>
+<hr />
+<h2>Step 4: Wrap Up</h2>
+<p>Other talking points:<br />
+ * Monitoring and alerting<br />
+ * Debugging tools - we need tools which make it easy to understand why a payment has failed<br />
+ * Currency exchange - important when designing a payment system for international use<br />
+ * Geography - different regions might have different payment methods<br />
+ * Cash payment - very common in places like India and Brazil<br />
+ * Google/Apple Pay integration</p>
+

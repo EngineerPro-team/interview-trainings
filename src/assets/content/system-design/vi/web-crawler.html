@@ -1,0 +1,177 @@
+<h2>Giới thiệu</h2>
+<p><strong>web crawler</strong>, còn được gọi là spider hoặc robot, được sử dụng để khám phá và thu thập nội dung web, chẳng hạn như các trang web, hình ảnh và video. Chương này tập trung vào việc thiết kế một web crawler có thể mở rộng cho <strong>search engine indexing</strong>.</p>
+<h3>Ứng dụng của web crawler</h3>
+<ol>
+<li><strong>search engine indexing:</strong> Thu thập các trang web để tạo chỉ mục có thể tìm kiếm được (ví dụ: Googlebot).</li>
+<li><strong>Lưu trữ web:</strong> Bảo toàn dữ liệu web để sử dụng trong tương lai (ví dụ: Thư viện Quốc hội Hoa Kỳ).</li>
+<li><strong>Khai thác web:</strong> Trích xuất knowledge từ dữ liệu web (ví dụ: phân tích tài chính của báo cáo cổ đông).</li>
+<li><strong>Giám sát trang web:</strong> Phát hiện vi phạm bản quyền hoặc nhãn hiệu.</li>
+</ol>
+<h3>Thử thách thiết kế</h3>
+<p>web crawler tốt phải giải quyết:<br/>
+- <strong>Khả năng mở rộng:</strong> Xử lý hàng tỷ trang bằng cách sử dụng song song.<br/>
+- <strong>Độ bền:</strong> Quản lý HTML xấu, sự cố và liên kết độc hại.<br/>
+- <strong>Lịch sự:</strong> Tránh áp đảo các máy chủ với quá nhiều yêu cầu.<br/>
+- <strong>Khả năng mở rộng:</strong> Hỗ trợ các loại nội dung mới với những thay đổi tối thiểu.</p>
+<hr/>
+<h2>Bước 1: Tìm hiểu vấn đề</h2>
+<h3>Yêu cầu</h3>
+<ol>
+<li>Thu thập thông tin <strong>1 tỷ trang web mỗi tháng</strong> (400 trang/giây, cao nhất 800 QPS).</li>
+<li>Sưu tầm <strong>Nội dung chỉ có HTML</strong>.</li>
+<li>Theo dõi các trang mới và cập nhật.</li>
+<li>Bỏ qua nội dung trùng lặp.</li>
+<li>Lưu trữ dữ liệu được thu thập thông tin cho <strong>5 năm</strong>, yêu cầu ~30 PB dung lượng lưu trữ.</li>
+</ol>
+<hr/>
+<h2>Bước 2: Thiết kế cấp cao</h2>
+<h3>Components</h3>
+<p align="center">
+<img alt="Web Crawler Architecture" loading="lazy" src="assets/content/system-design/images/ch09/web-crawler-architecture.png" width="700"/>
+</p>
+<ol>
+<li>
+<p><strong>Seed URLs:</strong> Điểm bắt đầu cho web crawler.</p>
+<ul>
+<li>Cần chọn lọc làm điểm khởi đầu tốt mà web crawler có thể sử dụng để duyệt qua càng nhiều liên kết càng tốt.</li>
+<li>Có thể dựa trên địa phương dựa trên trang web phổ biến khác nhau hoặc dựa trên các chủ đề.</li>
+<li>Chiến lược: Phân loại theo địa phương hoặc chủ đề (ví dụ: thể thao, chăm sóc sức khỏe).</li>
+</ul>
+</li>
+<li>
+<p><strong>URL Frontier:</strong> Lưu trữ các URL sẽ được tải xuống.<br/>
+   - Được thực hiện như <strong>hàng đợi FIFO</strong>.</p>
+</li>
+<li>
+<p><strong>HTML Downloader:</strong> Tải xuống các trang web từ các URL được cung cấp bởi URL Frontier.</p>
+</li>
+<li>
+<p><strong>DNS Resolver:</strong> Chuyển đổi URL thành địa chỉ IP.</p>
+</li>
+<li>
+<p><strong>Content Parser:</strong> Xác thực và phân tích các trang web.<br/>
+   - Loại bỏ các trang không đúng định dạng.</p>
+</li>
+<li>
+<p><strong>Content Seen?:</strong> Kiểm tra nội dung trùng lặp bằng cách sử dụng so sánh hàm băm (so sánh giá trị hàm băm của hai trang web).</p>
+</li>
+<li>
+<p><strong>Content Storage:</strong> Lưu trữ các trang HTML trên đĩa (nội dung phổ biến trong bộ nhớ để giảm độ trễ).</p>
+</li>
+<li>
+<p><strong>URL Extractor:</strong> Trích xuất các liên kết mới từ các trang được phân tích cú pháp.</p>
+</li>
+<li>
+<p><strong>URL Filter:</strong> Loại trừ các URL bị liệt vào danh sách đen hoặc có lỗi.</p>
+</li>
+<li>
+<p><strong>URL Seen?</strong> Theo dõi các URL đã truy cập để tránh trùng lặp.</p>
+</li>
+<li>
+<p><strong>URL Storage:</strong> Stores crawled URLs.</p>
+</li>
+</ol>
+<hr/>
+<h3>Quy trình làm việc</h3>
+<ol>
+<li>Thêm vào <strong>Seed URLs</strong> đến URL Frontier.</li>
+<li><strong>HTML Downloader</strong> fetch URL và phân giải IP của chúng thông qua DNS Resolver.</li>
+<li><strong>Content Parser</strong> xác thực và chuyển nội dung đến "Content Seen?" thành phần.</li>
+<li>Nếu nội dung mới, hãy trích xuất các liên kết thông qua <strong>URL Extractor</strong>.</li>
+<li>Lọc và thêm các liên kết duy nhất vào URL Frontier.</li>
+</ol>
+<hr/>
+<h2>Bước 3: Đi sâu vào các thành phần chính</h2>
+<h3>DFS/BFS</h3>
+<ul>
+<li>Trang web có thể được coi là một biểu đồ có hướng trong đó các trang web là các nút và siêu liên kết (URL) là các cạnh.</li>
+<li>BFS thường được sử dụng để truyền tải đồ thị vì độ sâu có thể rất sâu do đó DFS không lý tưởng.</li>
+<li>BFS tiêu chuẩn không xem xét mức độ ưu tiên của URL, không phải mọi trang đều có mức độ chất lượng và tầm quan trọng như nhau.</li>
+</ul>
+<h3>URL Frontier</h3>
+<ul>
+<li>
+<p><strong>Lịch sự:</strong> </p>
+<ul>
+<li>Đảm bảo chỉ có một yêu cầu cho mỗi máy chủ tại một thời điểm. Thêm một thỏa thuận b/w hai nhiệm vụ tải xuống.</li>
+<li>Sử dụng ánh xạ từ tên máy chủ đến hàng đợi và luồng công việc (tải xuống).</li>
+<li>
+<p>Mỗi chuỗi trình tải xuống có một hàng đợi FIFO riêng và chỉ tải xuống các URL từ hàng đợi đó.</p>
+<figure class="sd-figure"><img alt="Politeness" loading="lazy" src="assets/content/system-design/images/ch09/politeness.png" width="500"/></figure>
+</li>
+<li>
+<p><strong>Queue Router:</strong> Đảm bảo rằng mỗi hàng đợi (b1, b2, … bn) chỉ chứa các URL từ cùng một máy chủ.</p>
+</li>
+<li><strong>Bảng ánh xạ:</strong> Nó ánh xạ từng máy chủ vào một hàng đợi.</li>
+<li><strong>Queue Selector:</strong> Mỗi luồng công việc được ánh xạ tới hàng đợi FIFO và nó chỉ tải xuống các URL từ hàng đợi đó. Logic lựa chọn hàng đợi được thực hiện bởi Queue Selector.</li>
+<li><strong>worker thread 1 đến N.</strong> Một luồng Worker tải xuống các trang web một cách tuần tự từ cùng một máy chủ. Có thể thêm độ trễ giữa hai tác vụ tải xuống.</li>
+</ul>
+</li>
+<li>
+<p><strong>Sự ưu tiên:</strong> </p>
+<ul>
+<li>
+<p>Chỉ định mức độ ưu tiên cao hơn cho các trang quan trọng (ví dụ: theo Xếp hạng trang hoặc tần suất cập nhật).</p>
+<figure class="sd-figure"><img alt="Politeness" loading="lazy" src="assets/content/system-design/images/ch09/prioritizer.png" width="500"/></figure>
+</li>
+<li>
+<p><strong>Ưu tiên:</strong> Nó lấy URL làm đầu vào và tính toán mức độ ưu tiên.</p>
+</li>
+<li><strong>Hàng đợi từ f1 đến fn:</strong> Mỗi hàng đợi có một mức độ ưu tiên được chỉ định. Hàng đợi có mức độ ưu tiên cao sẽ được chọn với xác suất cao hơn.</li>
+<li><strong>Queue Selector:</strong> Chọn ngẫu nhiên một hàng đợi có xu hướng thiên về hàng đợi có mức độ ưu tiên cao hơn.</li>
+<li><strong>Front Queue:</strong> quản lý mức độ ưu tiên</li>
+<li><strong>Back Queue:</strong> politeness</li>
+</ul>
+</li>
+<li>
+<p><strong>Độ tươi:</strong> Thu thập lại thông tin dựa trên lịch sử cập nhật hoặc tầm quan trọng.</p>
+</li>
+</ul>
+<h3>HTML Downloader</h3>
+<ul>
+<li><strong>Tuân thủ Robots.txt:</strong> Tôn trọng các quy tắc trong tệp robots.txt.</li>
+<li><strong>Tối ưu hóa hiệu suất:</strong><br/>
+  1. Thu thập thông tin phân tán bằng nhiều máy chủ.<br/>
+  2. Sử dụng <strong>Cache DNS</strong> để tránh việc tra cứu lặp đi lặp lại.<br/>
+  3. Phân phối máy chủ thu thập dữ liệu theo địa lý để tải xuống nhanh hơn.<br/>
+  4. Sử dụng thời gian chờ ngắn để tránh máy chủ chậm hoặc không phản hồi.</li>
+</ul>
+<h3>Độ bền</h3>
+<ol>
+<li><strong>consistent hashing:</strong> Phân phối tải giữa các máy chủ một cách hiệu quả.</li>
+<li><strong>Xử lý lỗi:</strong> Ngăn chặn sự cố hệ thống do ngoại lệ.</li>
+<li><strong>Xác thực dữ liệu:</strong> Đảm bảo tính toàn vẹn nội dung.</li>
+</ol>
+<h3>Khả năng mở rộng</h3>
+<ul>
+<li>Thêm mô-đun cho các loại nội dung mới (ví dụ: trình tải xuống PNG, màn hình web).</li>
+<li>
+<p>Ví dụ: Cắm module theo dõi nội dung web có vi phạm bản quyền hay không.</p>
+<figure class="sd-figure"><img alt="Politeness" loading="lazy" src="assets/content/system-design/images/ch09/extensibility.png" width="600"/></figure>
+</li>
+</ul>
+<h3>Tránh nội dung có vấn đề</h3>
+<ol>
+<li><strong>Nội dung trùng lặp:</strong> Phát hiện bằng cách sử dụng so sánh băm.</li>
+<li><strong>Spider trap:</strong> Tránh các vòng lặp vô hạn bằng các kỹ thuật như giới hạn độ dài URL.</li>
+<li><strong>Tiếng ồn dữ liệu:</strong> Lọc nội dung không liên quan như quảng cáo hoặc thư rác.</li>
+</ol>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<h3>Bài học chính</h3>
+<ol>
+<li>web crawler phải cân bằng giữa khả năng mở rộng, độ mạnh mẽ, politeness và khả năng mở rộng.</li>
+<li><strong>politeness</strong> ngăn chặn tình trạng quá tải của máy chủ, đồng thời <strong>priority</strong> đảm bảo các trang quan trọng được thu thập thông tin đầu tiên.</li>
+<li>Lưu trữ hiệu quả và xử lý lỗi là rất quan trọng để xử lý thu thập thông tin quy mô lớn.</li>
+</ol>
+<h3>Cân nhắc bổ sung</h3>
+<ul>
+<li><strong>Kết xuất phía máy chủ:</strong> Xử lý nội dung động được tạo bởi JavaScript hoặc AJAX.</li>
+<li><strong>Các biện pháp chống thư rác:</strong> Loại trừ các trang chất lượng thấp hoặc không liên quan.</li>
+<li><strong>database sharding:</strong> Mở rộng quy mô lớp dữ liệu bằng cách sử dụng replication và phân chia.</li>
+<li><strong>Scale theo chiều ngang:</strong> Sử dụng máy chủ stateless để mở rộng quy mô công việc thu thập thông tin một cách hiệu quả.</li>
+<li><strong>Phân tích:</strong> Thu thập và phân tích dữ liệu để hiểu rõ hơn.</li>
+</ul>
+
+
+

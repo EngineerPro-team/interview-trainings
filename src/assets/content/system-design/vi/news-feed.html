@@ -1,0 +1,128 @@
+<h2>Giới thiệu</h2>
+<p><strong>News feed system</strong> hiển thị danh sách các bài đăng được cập nhật liên tục (cập nhật trạng thái, ảnh, video và liên kết) từ connections của user. Ví dụ bao gồm Facebook news feed, Instagram feed và Twitter timeline. Chương này tìm hiểu thiết kế của một news feed system có thể scale.</p>
+<hr/>
+<h2>Bước 1: Tìm hiểu vấn đề</h2>
+<h3>Yêu cầu</h3>
+<ol>
+<li><strong>Nền tảng:</strong> Hệ thống hỗ trợ cả ứng dụng web và di động.</li>
+<li><strong>Features:</strong><br/>
+   - Người dùng có thể publish posts.<br/>
+   - Người dùng có thể xem bài đăng của friends trong news feed của họ.</li>
+<li><strong>Sắp xếp:</strong> news feed được sắp xếp trong <strong>reverse chronological order</strong> để đơn giản.</li>
+<li><strong>Scale:</strong><br/>
+   - Người dùng có thể có tới 5.000 friends.<br/>
+   - 10 triệu người dùng hoạt động hàng ngày (DAU).<br/>
+   - news feed có thể bao gồm văn bản, hình ảnh và video.</li>
+</ol>
+<hr/>
+<h2>Bước 2: Thiết kế cấp cao</h2>
+<h3>Tổng quan</h3>
+<p>Thiết kế bao gồm hai luồng chính:<br/>
+1. <strong>Feed publishing:</strong> Một người dùng xuất bản một bài đăng, bài đăng này được ghi vào database và được truyền bá đến news feed của friends họ.<br/>
+2. <strong>News feed building:</strong> Người dùng retrieve news feed của họ bằng cách tổng hợp các bài đăng từ friends theo reverse chronological order.</p>
+<hr/>
+<h3>News feed APIs</h3>
+<ol>
+<li>
+<p><strong>Post API:</strong><br/>
+   - <strong>Endpoint:</strong> <code>POST /v1/me/feed</code><br/>
+   - <strong>Parameters:</strong> <code>content</code> (text post) và <code>auth_token</code> (auth).</p>
+</li>
+<li>
+<p><strong>News Feed Retrieval API:</strong><br/>
+   - <strong>Endpoint:</strong> <code>GET /v1/me/feed</code><br/>
+   - <strong>Parameters:</strong> <code>auth_token</code> (auth).</p>
+</li>
+</ol>
+<hr/>
+<h3>Feed publishing</h3>
+<figure class="sd-figure"><img alt="Feed Publishing" loading="lazy" src="assets/content/system-design/images/ch11/feed-publishing.png" width="400"/></figure>
+<ol>
+<li><strong>User interaction:</strong> User publish post qua Post API.</li>
+<li><strong>Load balancer:</strong> Phân phối lưu lượng truy cập đến các web server.</li>
+<li><strong>web server:</strong> Authenticate requests và forward tới services.</li>
+<li><strong>Post Service:</strong> Lưu trữ bài viết trong database và cache.</li>
+<li><strong>Fanout Service:</strong> Quảng bá bài đăng tới news feed của friends trong cache.</li>
+<li><strong>Notification Service:</strong> Gửi thông báo cho friends.</li>
+</ol>
+<hr/>
+<h3>News feed building</h3>
+<figure class="sd-figure"><img alt="News Feed Building" loading="lazy" src="assets/content/system-design/images/ch11/news-feed-building.png" width="400"/></figure>
+<ol>
+<li><strong>User interaction:</strong> User request news feed qua retrieval API.</li>
+<li><strong>Load balancer:</strong> Phân phối lưu lượng truy cập đến các web server.</li>
+<li><strong>web server:</strong> Chuyển tiếp yêu cầu đến News Feed Service.</li>
+<li><strong>News Feed Service:</strong> fetch post IDs từ cache news feed và truy xuất chi tiết bài đăng đầy đủ từ database hoặc cache.</li>
+</ol>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<h3>Feed publishing deep dive</h3>
+<ol>
+<li>
+<p><strong>web server:</strong><br/>
+   - Xác thực người dùng bằng <code>auth_token</code>.<br/>
+   - Thực thi rate limiter để ngăn chặn thư rác.</p>
+</li>
+<li>
+<p><strong>Fanout Service:</strong><br/>
+   - <strong>Fanout on write:</strong> Push posts lên news feed của friends tại thời điểm viết bài.</p>
+<ul>
+<li><strong>Ưu điểm:</strong> Cập nhật theo thời gian thực, retrieve news feed nhanh.</li>
+<li><strong>Nhược điểm:</strong> Tốn nhiều tài nguyên cho người dùng có nhiều friends.</li>
+<li><strong>Fanout on read:</strong> Pull posts tại thời điểm đọc.</li>
+<li><strong>Ưu điểm:</strong> Hiệu quả cho người dùng không hoạt động.</li>
+<li><strong>Nhược điểm:</strong> retrieve news feed chậm hơn.</li>
+<li>
+<p><strong>Hybrid approach:</strong> Dùng push model cho hầu hết user và pull model cho người dùng có kết nối cao (ví dụ: người nổi tiếng).</p>
+<figure class="sd-figure"><img alt="Feed Publishing Deep Dive" loading="lazy" src="assets/content/system-design/images/ch11/feed-publishing-deep-dive.png" width="500"/></figure>
+</li>
+</ul>
+<p><strong>fanout service</strong> hoạt động như sau:</p>
+<ol>
+<li><strong>Fetch friend IDs:</strong> Truy xuất danh sách friends từ Graph Database.</li>
+<li><strong>Filter friends from cache:</strong> Truy cập cài đặt người dùng trong cache để loại trừ một số friends (ví dụ: friends bị tắt tiếng hoặc tùy chọn chia sẻ có chọn lọc).</li>
+<li><strong>Send to message queue:</strong> Gửi danh sách friends đã lọc cùng với ID bài đăng mới tới message queue để xử lý.</li>
+<li><strong>Fanout worker:</strong> Worker truy xuất dữ liệu từ message queue và cập nhật cache của news feed. Cache <code>&lt;post_id, user_id&gt;</code> ánh xạ thay vì full user và post objects để tiết kiệm bộ nhớ.</li>
+<li>
+<p><strong>Store in news feed cache:</strong> Thêm ID bài đăng mới vào cache news feed của friends. Giới hạn có thể định cấu hình đảm bảo rằng chỉ các bài đăng gần đây mới được lưu trữ, vì hầu hết người dùng tập trung vào nội dung mới nhất, giúp quản lý mức tiêu thụ cache.</p>
+<figure class="sd-figure"><img alt="Fanout Service" loading="lazy" src="assets/content/system-design/images/ch11/fanout-service.png" width="500"/></figure>
+</li>
+</ol>
+</li>
+</ol>
+<h2>News feed retrieval deep dive</h2>
+<h3>Kiến trúc cache</h3>
+<p>Cache được chia thành năm lớp:<br/>
+1. <strong>News feed cache:</strong> Lưu trữ ID bài đăng để truy xuất nhanh chóng.<br/>
+2. <strong>Content cache:</strong> Lưu trữ chi tiết bài đăng (bài đăng phổ biến trong hot cache).<br/>
+3. <strong>Social graph cache:</strong> Lưu trữ dữ liệu mối quan hệ người dùng.<br/>
+4. <strong>Action cache:</strong> Theo dõi hành động của người dùng (thích, trả lời, chia sẻ).<br/>
+5. <strong>Counter cache:</strong> Duy trì số lượt thích, trả lời, người theo dõi, v.v.</p>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch11/cache-architecture.png" alt="Cache Architecture" width="500" loading="lazy" /></figure>
+<hr/>
+<h2>Tối ưu hóa chính</h2>
+<h3>Scale</h3>
+<ol>
+<li><strong>Mở rộng quy mô database:</strong><br/>
+   - Scale theo chiều ngang và sharding.<br/>
+   - Sử dụng read replica cho các truy vấn có lưu lượng truy cập cao.</li>
+<li><strong>Cấp web stateless:</strong> Giữ cho web server không có trạng thái để cho phép mở rộng quy mô theo chiều ngang.</li>
+</ol>
+<h3>Cache</h3>
+<ol>
+<li>Lưu trữ dữ liệu thường xuyên truy cập vào bộ nhớ.</li>
+<li>Sử dụng các lớp cache để giảm độ trễ và tải database.</li>
+</ol>
+<h3>Độ tin cậy</h3>
+<ol>
+<li><strong>consistent hashing:</strong> Phân phối yêu cầu đồng đều trên các máy chủ.</li>
+<li><strong>message queue:</strong> Tách rời các thành phần hệ thống và lưu lượng cache.</li>
+</ol>
+<h3>Giám sát</h3>
+<ol>
+<li>Theo dõi các số liệu chính như QPS (QPS) và độ trễ.</li>
+<li>Theo dõi tốc độ truy cập cache và điều chỉnh cấu hình cho phù hợp.</li>
+</ol>
+
+
+

@@ -1,0 +1,231 @@
+<h2>Introduction</h2>
+<p>YouTube is a massive video streaming platform supporting video uploads, playback, and various interactions. This chapter focuses on designing a scalable video streaming system with the following core features:<br />
+- <strong>Fast video uploads</strong><br />
+- <strong>Smooth video streaming</strong><br />
+- <strong>Ability to change video quality</strong><br />
+- <strong>Low infrastructure cost</strong><br />
+- <strong>High availability and reliability</strong></p>
+<h3>Key Statistics (2020)</h3>
+<ul>
+<li><strong>2 billion monthly active users</strong></li>
+<li><strong>5 billion videos watched per day</strong></li>
+<li><strong>37% of mobile internet traffic comes from YouTube</strong></li>
+<li>Available in <strong>80 languages</strong></li>
+<li><strong>$15.1 billion ad revenue</strong> in 2019</li>
+</ul>
+<hr />
+<h2>Step 1: Understand the Problem and Scope</h2>
+<h3>Core Functionalities</h3>
+<ol>
+<li>Upload videos</li>
+<li>Watch videos</li>
+</ol>
+<h3>Supported Platforms</h3>
+<ul>
+<li>Mobile apps, web browsers, and smart TVs</li>
+</ul>
+<h3>Assumptions</h3>
+<ul>
+<li><strong>Daily Active Users (DAU):</strong> 5 million</li>
+<li><strong>Average Video Size:</strong> 300 MB</li>
+<li><strong>Upload Limits:</strong> Max 1 GB per video</li>
+<li><strong>Daily Storage Need:</strong> 150 TB</li>
+<li><strong>CDN Costs:</strong> 5 million * 5 videos * 0.3GB * $0.02 =  $150,000/day (using Amazon CloudFront)</li>
+</ul>
+<hr />
+<h2>Step 2: High-Level Design</h2>
+<h3>Components</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch14/high-level-design.png" alt="High Level Design" width="400" loading="lazy"></figure>
+
+<ol>
+<li><strong>Client:</strong> Devices like smartphones, computers, and TVs.</li>
+<li><strong>CDN (Content Delivery Network):</strong> Stores and streams videos.</li>
+<li><strong>API Servers:</strong> Handles all user interactions except video streaming (e.g., uploads, metadata updates).</li>
+<li><strong>Metadata Database:</strong> Stores video metadata (e.g., title, description, size).</li>
+<li><strong>Original Storage:</strong> Blob storage for uploaded videos.</li>
+<li><strong>Transcoding Servers:</strong> Convert videos into multiple resolutions and formats.</li>
+<li><strong>Transcoded Storage:</strong> Blob storage for transcoded videos.</li>
+</ol>
+<hr />
+<h3>Core Workflows</h3>
+<h4>1. Video Uploading Flow</h4>
+<ul>
+<li>
+<p><strong>Parallel Processes:</strong><br />
+  1. Upload video to original storage.<br />
+  2. Update video metadata in the database.</p>
+</li>
+<li>
+<p><strong>Video Upload (Steps):</strong></p>
+<p><div style="margin-left:3rem"><br />
+    <img src="assets/content/system-design/images/ch14/video-uploading-flow.png" alt="Video Upload Flow" width="500" loading="lazy"><br />
+</div></p>
+<ul>
+<li>[1] Videos are uploaded to blob storage. </li>
+<li>[2] Transcoding servers convert videos to multiple formats.</li>
+<li>[3] One trasncoding is complete, following two steps are exectued in parallel.<ul>
+<li>[3a] Transcoded videos are sent to transcoded storage.</li>
+<li>[3b] Transcoding completion events are queued in the completion queue. </li>
+</ul>
+</li>
+<li>[3a.1] Videos are distributed to the CDN. </li>
+<li>[3b.1] Completion handlers update metadata and inform users. </li>
+</ul>
+</li>
+<li>
+<p><strong>Metadata Upload (Steps):</strong></p>
+<p><div style="margin-left:3rem"><br />
+    <img src="assets/content/system-design/images/ch14/metadata-upload.png" alt="Metadata Upload" height="500" loading="lazy"><br />
+</div></p>
+<ul>
+<li>The client in parallel sends a request to update the video metadata </li>
+<li>The request contains video metadata, including file name, size, format, etc.</li>
+</ul>
+</li>
+</ul>
+<h4>2. Video Streaming Flow</h4>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch14/video-streaming-flow.png" alt="Video Streaming Flow" height="400" loading="lazy"></figure>
+
+<ul>
+<li>Videos are streamed directly from the CDN using edge servers to minimize latency.</li>
+<li>Some of te popular streaming protocols are MPEG_DASH, Apple HLS, Adobe HDS.</li>
+<li><em>Different streaming protocols support different video encodings and playback players.</em></li>
+</ul>
+<hr />
+<h2>Step 3: Design Deep Dive</h2>
+<h3>Video Transcoding</h3>
+<h4>Importance</h4>
+<ol>
+<li>Raw video consumes large amounts of storage space. It Reduces storage space.</li>
+<li>Ensures compatibility across devices and browsers.</li>
+<li>Adapts video quality to network conditions.</li>
+</ol>
+<h4>Components</h4>
+<ul>
+<li><strong>Container:</strong> Encapsulates video, audio, and metadata (e.g., MP4, AVI).</li>
+<li><strong>Codecs:</strong> Compression and Decompression algorithms (e.g., H.264, VP9).</li>
+</ul>
+<h4>Directed Acyclic Graph (DAG) Model</h4>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch14/dag-video-transcoding.png" alt="DAG Video Transcoding" width="600" loading="lazy"></figure>
+
+<ul>
+<li>Transcoding a video is computationally expensive and time-consuming.</li>
+<li>DAG Model defines tasks like encoding, thumbnail generation, and watermarking.</li>
+<li>
+<p>Allows high parallelism in video processing.</p>
+</li>
+<li>
+<p>The original video is split into video, audio, and metadata. </p>
+<ul>
+<li>Video encodings: Videos are converted to support different resolutions, codec, bitrates.</li>
+<li>Thumbnail: It can either be uploaded by a user or automatically generated bythe system.</li>
+<li>Watermark: Image overlay on top of your video contains identifying information about the video.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h3>Video Transcoding Architecture</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch14/video-transcoding-architecture.png" alt="Video Transcoding" width="600" loading="lazy"></figure>
+
+<ol>
+<li>
+<p><strong>Preprocessor:</strong> Splits videos into smaller chunks (GOP alignment). It has 4 responsibilities.</p>
+<p><div style="margin-left: 3em;"><br />
+    <img src="assets/content/system-design/images/ch14/dag-config.png" alt="DAG Config" width="500" loading="lazy"><br />
+</div></p>
+<ul>
+<li>Video splitting: Video stream is split or further split into smaller Group of Pictures (GOP) alignment.</li>
+<li>It split videos by GOP alignment for old clients.</li>
+<li>It generates DAG based on configuration files client programmers write. </li>
+<li>It stores GOPs and metadata in temporary storage in case the encoding fails, the system could use persisted data for retry operations.</li>
+</ul>
+</li>
+<li>
+<p><strong>DAG Scheduler:</strong> Organizes tasks into sequential or parallel stages.<br />
+    <div style="margin-left: 3em;"><br />
+        <img src="assets/content/system-design/images/ch14/dag-scheduler.png" alt="DAG Scheduler" width="500" loading="lazy"><br />
+    </div></p>
+<ul>
+<li>It splits a DAG graph into stages of tasks and puts them in the task queue in the resource manager. </li>
+<li>Stage 1: video, audio, and metadata.</li>
+<li>The video file is further split into two tasks in stage 2: video encoding and thumbnail. </li>
+</ul>
+</li>
+<li>
+<p><strong>Resource Manager:</strong> Responsible for managing the efficiency of resource allocation.It<br />
+contains 3 queues and a task scheduler.<br />
+    <div style="margin-left: 3em;"><br />
+        <img src="assets/content/system-design/images/ch14/resource-manager.png" alt="Resource Manager" width="700" loading="lazy"><br />
+    </div></p>
+<ul>
+<li>Task queue: priority queue that contains tasks to be executed.</li>
+<li>Worker queue: priority queue that contains worker utilization info.</li>
+<li>Running queue: contains  currently running tasks and workers running the tasks.</li>
+<li>Task scheduler: picks the optimal task/worker, and instructs the chosen task worker to execute the job.</li>
+</ul>
+</li>
+<li>
+<p><strong>Task Workers:</strong> Perform transcoding and other operations.<br />
+    <div style="margin-left: 3em;"><br />
+        <img src="assets/content/system-design/images/ch14/task-worker.png" alt="Task Worker" width="250" loading="lazy"><br />
+   </div></p>
+<ul>
+<li>Different task workers may run different tasks </li>
+</ul>
+</li>
+<li>
+<p><strong>Temporary Storage:</strong> Stores intermediate data for retries.</p>
+<ul>
+<li>The choice of storage system depends on factors like data type, data size, access frequency, data life span, etc. </li>
+</ul>
+</li>
+<li><strong>Output:</strong> Transcoded videos ready for distribution.</li>
+</ol>
+<hr />
+<h2>System Optimizations</h2>
+<h3>Speed Optimizations</h3>
+<ol>
+<li>
+<p><strong>Parallel Video Uploads:</strong> Split videos into smaller chunks for faster, resumable uploads.</p>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch14/video-split.png" alt="Video Split" width="600" loading="lazy"></figure>
+</li>
+<li>
+<p><strong>Distributed Upload Centers:</strong> Use CDNs as upload hubs close to users.</p>
+</li>
+<li>
+<p><strong>Parallel Processing:</strong> Decouple modules using message queues for high parallelism.</p>
+<p><img src="assets/content/system-design/images/ch14/message-queue1.png" alt="Message Queue" width="600" loading="lazy"><br />
+<img src="assets/content/system-design/images/ch14/message-queue2.png" alt="Message Queue" height="170" width="500" loading="lazy"></p>
+</li>
+</ol>
+<h3>Safety Optimizations</h3>
+<ol>
+<li>
+<p><strong>Pre-Signed URLs:</strong> Restrict video uploads to authorized users.</p>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch14/pres-signed-urls.png" alt="Pre Signed" width="500" loading="lazy"></figure>
+</li>
+<li>
+<p><strong>Protect Videos:</strong><br />
+   - <strong>DRM Systems</strong> (e.g., Apple FairPlay, Google Widevine).<br />
+   - <strong>AES Encryption.</strong><br />
+   - <strong>Watermarking.</strong></p>
+</li>
+</ol>
+<h3>Cost-Saving Optimizations</h3>
+<ol>
+<li>Serve only popular videos via CDN; less popular ones from high-capacity servers.</li>
+<li>Encode on-demand for rarely accessed videos.</li>
+<li>Regionalize video distribution based on popularity.</li>
+<li>Build custom CDNs and partner with ISPs to reduce bandwidth costs.</li>
+</ol>
+<hr />
+<h2>Error Handling</h2>
+<h3>Recoverable Errors</h3>
+<ul>
+<li>Retry failed uploads, transcoding, or resource allocation tasks.</li>
+</ul>
+<h3>Non-Recoverable Errors</h3>
+<ul>
+<li>Stop malformed video processing and return error codes.</li>
+</ul>
+

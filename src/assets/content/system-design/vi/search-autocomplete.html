@@ -1,0 +1,182 @@
+<h2>Giới thiệu</h2>
+<p>Tự động hoàn thành, còn được gọi là tìm kiếm trước kiểu chữ hoặc tìm kiếm gia tăng, cung cấp đề xuất theo thời gian thực cho người dùng khi họ nhập vào hộp tìm kiếm. Hệ thống phải cung cấp một cách hiệu quả các đề xuất phổ biến và có liên quan hàng đầu dựa trên dữ liệu truy vấn lịch sử.</p>
+<h3>Các tính năng chính</h3>
+<ul>
+<li>Đề xuất lên tới <strong>5 kết quả tự động hoàn thành</strong>.</li>
+<li>Dựa trên <strong>mức độ phổ biến của truy vấn</strong> (Tính thường xuyên).</li>
+<li>Chỉ hỗ trợ <strong>ký tự tiếng Anh viết thường</strong>.</li>
+<li>Thời gian phản hồi nhanh (&lt;100 ms) và có thể mở rộng.</li>
+</ul>
+<hr/>
+<h2>Bước 1: Tìm hiểu vấn đề</h2>
+<h3>Yêu cầu</h3>
+<ol>
+<li><strong>Đề xuất theo thời gian thực:</strong> Hiển thị các kết quả phù hợp có liên quan theo loại người dùng.</li>
+<li><strong>Kết quả hàng đầu:</strong> Trả về tối đa 5 kết quả được sắp xếp theo mức độ phổ biến.</li>
+<li><strong>Khả năng mở rộng:</strong> Xử lý <strong>10 triệu DAU</strong> với QPS cao nhất là <strong>48.000</strong>.</li>
+<li><strong>Tính sẵn sàng cao:</strong> Xử lý lỗi mà không làm hệ thống ngừng hoạt động.</li>
+<li><strong>Tăng trưởng dữ liệu:</strong> Hỗ trợ tăng trưởng lưu trữ hàng ngày của <strong>0,4GB</strong> cho dữ liệu truy vấn mới.</li>
+</ol>
+<hr/>
+<h2>Bước 2: Thiết kế cấp cao</h2>
+<p>Ở cấp độ cao, hệ thống được chia thành hai dịch vụ:<br/>
+1. <strong>Data collection service:</strong> <br/>
+    - Thu thập các truy vấn của người dùng và tổng hợp chúng để phân tích tần suất trong thời gian thực.<br/>
+    - Xử lý thời gian thực không thực tế đối với các tập dữ liệu lớn; tuy nhiên, đó là một điểm khởi đầu tốt</p>
+<ol start="2">
+<li><strong>Query service:</strong> Cung cấp các đề xuất top-k dựa trên thông tin đầu vào của người dùng.</li>
+</ol>
+<hr/>
+<h3>Data collection service</h3>
+<figure class="sd-figure"><img alt="Data Gathering" loading="lazy" src="assets/content/system-design/images/ch13/data-gathering.png" width="600"/></figure>
+<ul>
+<li>Tổng hợp dữ liệu truy vấn từ nhật ký phân tích và cập nhật bảng tần số.</li>
+<li>Xử lý dữ liệu lịch sử hàng tuần để xây dựng <strong>thử</strong> (cây tiền tố).</li>
+</ul>
+<h3>Query service</h3>
+<div style="margin-left:3rem">
+<img alt="Frequency Table" loading="lazy" src="assets/content/system-design/images/ch13/frequency-table.png" width="400"/>
+<img alt="Search Suggestions" loading="lazy" src="assets/content/system-design/images/ch13/basic-search-suggestions.png" width="360"/>
+</div>
+<ul>
+<li>Sử dụng bảng tần số từ Data collection service.</li>
+<li>Xử lý thông tin đầu vào của người dùng và truy xuất các đề xuất top-k từ bảng tần số bằng Trie.</li>
+<li>Được tối ưu hóa để tra cứu nhanh bằng cách sử dụng cache và cấu trúc dữ liệu hiệu quả.</li>
+<li>Ví dụ: khi người dùng nhập “tw” vào hộp tìm kiếm, 5 truy vấn tìm kiếm hàng đầu sau đây sẽ được hiển thị.</li>
+</ul>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<h3>Cấu trúc dữ liệu Trie</h3>
+<p>các <strong>thử</strong> là cấu trúc dữ liệu dạng cây được sử dụng để lưu trữ và truy xuất chuỗi truy vấn một cách hiệu quả.</p>
+<h4>Các tính năng chính</h4>
+<ol>
+<li><strong>Lưu trữ nhỏ gọn:</strong> Trình bày các tiền tố theo thứ bậc để giảm thiểu sự dư thừa.</li>
+<li>
+<p><strong>Thông tin tần số:</strong> Lưu trữ mức độ phổ biến của các truy vấn tại mỗi nút.</p>
+</li>
+<li>
+<p><strong>Các bước để có được top k truy vấn được tìm kiếm nhiều nhất</strong><br/>
+<br/>
+<figure class="sd-figure"><img alt="Trie Structure" loading="lazy" src="assets/content/system-design/images/ch13/trie-structure.png" width="500"/></figure>
+</p>
+<ul>
+<li>Tìm tiền tố</li>
+<li>Duyệt cây con từ nút tiền tố để lấy tất cả cây con hợp lệ</li>
+<li>Sắp xếp các em và đạt top k </li>
+</ul>
+</li>
+<li>
+<p><strong>Tối ưu hóa:</strong><br/>
+   - Lưu các truy vấn top-k tại mỗi nút để tăng tốc độ truy xuất và tránh phải duyệt qua toàn bộ trie.</p>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch13/cached-trie.png" alt="Cached Trie" width="600" loading="lazy" /></figure>
+</li>
+</ol>
+<ul>
+<li>Giới hạn độ dài tiền tố để giảm không gian tìm kiếm vì người dùng hiếm khi nhập truy vấn tìm kiếm dài (giả sử là 50).</li>
+</ul>
+<h4>Hoạt động Trie</h4>
+<ol>
+<li><strong>Tạo nên:</strong> <ul>
+<li>Được xây dựng hàng tuần bằng cách sử dụng dữ liệu truy vấn tổng hợp.</li>
+<li>Nguồn dữ liệu là từ Nhật ký/DB của Analytics.</li>
+</ul>
+</li>
+<li><strong>Cập nhật:</strong> Hiếm khi được cập nhật theo thời gian thực; cập nhật hàng tuần thay thế dữ liệu cũ.</li>
+<li>
+<p><strong>Xóa bỏ:</strong> <br/>
+<div style="margin-left:3rem"><br/>
+<img alt="Delete KV" loading="lazy" src="assets/content/system-design/images/ch13/delete-kv.png" width="500"/><br/>
+</div></p>
+<ul>
+<li>Bộ lọc loại bỏ các đề xuất không mong muốn hoặc có hại (ví dụ: lời nói căm thù).</li>
+<li>Việc có lớp bộ lọc giúp chúng ta linh hoạt loại bỏ kết quả dựa trên các quy tắc lọc khác nhau.</li>
+<li>Các đề xuất không mong muốn sẽ bị xóa khỏi database một cách không đồng bộ.</li>
+</ul>
+</li>
+</ol>
+<hr/>
+<h3>Luồng xử lý truy vấn</h3>
+<ol>
+<li><strong>Tìm kiếm tiền tố:</strong><br/>
+   - Xác định nút tiền tố tương ứng với đầu vào của người dùng.<br/>
+   - Duyệt cây con để thu thập các gợi ý hợp lệ.</li>
+<li><strong>Sắp xếp Top-k:</strong><br/>
+   - Lưu các đề xuất top-k tại mỗi nút để giảm thiểu chi phí sắp xếp.</li>
+<li><strong>Response Construction:</strong><br/>
+   - Xây dựng kết quả bằng cách sử dụng dữ liệu được lưu trong bộ nhớ cache để có thời gian phản hồi nhanh.</li>
+</ol>
+<hr/>
+<h3>Tối ưu hóa</h3>
+<ol>
+<li><strong>Cache tại mỗi nút:</strong><br/>
+   - Lưu trữ các truy vấn top-k để tránh việc truyền tải dư thừa.</li>
+<li><strong>Giới hạn độ dài tiền tố:</strong><br/>
+   - Giới hạn độ dài tiền tố ở một giá trị nhỏ (ví dụ: 50 ký tự) để tra cứu nhanh hơn.</li>
+<li><strong>Yêu cầu AJAX:</strong><br/>
+   - Sử dụng các yêu cầu không đồng bộ nhẹ để phản hồi theo thời gian thực.</li>
+<li><strong>Cache của trình duyệt:</strong><br/>
+   - Lưu kết quả tự động hoàn thành vào cache của trình duyệt cho các cụm từ được tìm kiếm thường xuyên.</li>
+</ol>
+<hr/>
+<h3>Đường ống thu thập dữ liệu</h3>
+<p>Trong thiết kế cấp cao, bất cứ khi nào người dùng nhập truy vấn tìm kiếm, dữ liệu sẽ được cập nhật theo thời gian thực. Cách tiếp cận này không thực tế.<br/>
+- Người dùng có thể nhập hàng tỷ truy vấn mỗi ngày. Việc cập nhật trie trên mọi truy vấn là không khả thi.<br/>
+- Các đề xuất hàng đầu có thể không thay đổi nhiều khi trie được xây dựng.</p>
+<h4>Thiết kế cập nhật</h4>
+<figure class="sd-figure"><img alt="Updated Data Gathering Flow" loading="lazy" src="assets/content/system-design/images/ch13/data-gathering-flow.png" width="600"/></figure>
+<ol>
+<li><strong>Nhật ký phân tích:</strong><br/>
+   - Lưu trữ dữ liệu truy vấn thô dưới dạng nhật ký để tổng hợp hàng tuần.<br/>
+   - Nhật ký chỉ được thêm vào và không được lập chỉ mục</li>
+<li><strong>Bộ tổng hợp:</strong><br/>
+   - Xử lý nhật ký thành bảng tần số, phù hợp cho việc xây dựng trie.<br/>
+   - Đối với các ứng dụng thời gian thực như Twitter, tổng hợp dữ liệu trong khoảng thời gian ngắn hơn.<br/>
+   - Đối với các trường hợp khác, việc tổng hợp dữ liệu ít thường xuyên hơn, chẳng hạn mỗi tuần một lần là đủ.</li>
+<li><strong>Worker:</strong><br/>
+   - Máy chủ không đồng bộ xây dựng lại trie và lưu trữ nó trong persistent storage.</li>
+<li><strong>Tùy chọn lưu trữ:</strong><ul>
+<li><strong>Trie Cache</strong>: Trie Cache là một hệ thống cache phân tán giúp lưu giữ trie trong bộ nhớ để đọc nhanh.</li>
+<li><strong>Trie DB</strong> <ol>
+<li><strong>Kho lưu trữ tài liệu (ví dụ: MongoDB)</strong>: Vì một trie mới được xây dựng hàng tuần nên chúng tôi có thể chụp ảnh nhanh nó, tuần tự hóa nó và lưu trữ dữ liệu được tuần tự hóa trong database như MongoDB</li>
+<li><strong>Key-value storage:</strong> <ul>
+<li>Ánh xạ tiền tố vào dữ liệu nút để truy cập nhanh.</li>
+<li>Mỗi tiền tố trong trie được ánh xạ tới một khóa trong bảng băm.</li>
+<li>
+<p>Dữ liệu trên mỗi nút trie được ánh xạ tới một giá trị trong bảng băm.</p>
+<figure class="sd-figure"><img alt="Trie DB" loading="lazy" src="assets/content/system-design/images/ch13/trie-db.png" width="600"/></figure>
+</li>
+</ul>
+</li>
+</ol>
+</li>
+</ul>
+</li>
+</ol>
+<h3>Khả năng mở rộng</h3>
+<ol>
+<li><strong>sharding:</strong><br/>
+   - Phân phối các nút trie trên các máy chủ dựa trên phạm vi tiền tố (ví dụ: <code>a-m</code>, <code>n-z</code>).<br/>
+   - Phân đoạn tiếp theo trong các tiền tố để cân bằng sự phân bố không đồng đều (ví dụ: <code>aa-ag</code>, <code>ah-an</code>).</li>
+<li><strong>Load balancer:</strong><br/>
+<br/>
+<figure class="sd-figure"><img alt="sharding" loading="lazy" src="assets/content/system-design/images/ch13/sharding.png" width="400"/></figure>
+</li>
+</ol>
+<ul>
+<li>Sử dụng trình quản lý bản đồ phân đoạn để định tuyến các yêu cầu đến máy chủ thích hợp.</li>
+</ul>
+<hr/>
+<h2>Bước 4: Tính năng nâng cao</h2>
+<h3>Hỗ trợ đa ngôn ngữ</h3>
+<ol>
+<li><strong>Ký tự Unicode:</strong> Sử dụng Unicode để hỗ trợ các ngôn ngữ không phải tiếng Anh.</li>
+<li><strong>Số lần thử theo quốc gia cụ thể:</strong> Xây dựng các lần thử riêng biệt cho các quốc gia hoặc khu vực khác nhau.</li>
+</ol>
+<h3>Truy vấn thịnh hành</h3>
+<ul>
+<li>Xử lý các sự kiện thời gian thực bằng cách cập nhật động các nút trie hoặc đánh giá cao hơn các truy vấn gần đây.</li>
+</ul>
+
+
+
+

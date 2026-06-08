@@ -5,6 +5,7 @@
   // GitHub Pages serves project repos at /<repo>/. build_pages.py injects
   // window.EP_BASE_PATH; everything else defaults to "" (root deploy).
   const BASE_PATH = (typeof window !== "undefined" && window.EP_BASE_PATH) || "";
+  const SD_URL_SLUG = "system-design-material";
 
   function stripBasePath(p) {
     if (!BASE_PATH) return p || "";
@@ -208,7 +209,7 @@
   //  #home, #courses, #book, #resources, #mentors, #stories, #podcast, #partners, #faq, #contact
   //  (#home-roadmap and #home-format are anchor scrolls into the home page)
   const TOP_ROUTES = [
-    "home", "courses", "book", "mock", "resources",
+    "home", "courses", "book", "system-design", "mock", "resources",
     "mentors", "stories", "podcast", "partners", "faq", "terms", "contact",
   ];
 
@@ -245,11 +246,22 @@
     let m;
     if ((m = path.match(/^\/courses\/([^/]+)\/?$/))) return { route: "course", slug: m[1] };
     if ((m = path.match(/^\/stories\/([^/]+)\/?$/))) return { route: "story", slug: m[1] };
+    if ((m = path.match(new RegExp(`^/${SD_URL_SLUG}/([^/]+)/?$`)))) {
+      return { route: "sd-chapter", slug: m[1] };
+    }
+    // Legacy URL → same route; bootRoute() will replaceState to the new path.
+    if ((m = path.match(/^\/system-design\/([^/]+)\/?$/))) {
+      return { route: "sd-chapter", slug: m[1], legacySdUrl: true };
+    }
+    if (/^\/system-design\/?$/.test(path)) {
+      return { route: "system-design", slug: null, legacySdUrl: true };
+    }
     if ((m = path.match(/^\/resources\/([\w-]+)\/?$/)) && RESOURCES_ANCHORS[m[1]]) {
       return { route: "resources", slug: null, scrollTo: RESOURCES_ANCHORS[m[1]] };
     }
-    if ((m = path.match(/^\/(courses|book|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)\/?$/))) {
-      return { route: m[1], slug: null };
+    if ((m = path.match(new RegExp(`^/(courses|book|${SD_URL_SLUG}|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/?$`)))) {
+      const route = m[1] === SD_URL_SLUG ? "system-design" : m[1];
+      return { route, slug: null };
     }
     if ((m = path.match(/^\/(roadmap|format)\/?$/))) {
       return { route: "home", slug: null, scrollTo: HOME_ANCHORS[m[1]] };
@@ -260,6 +272,7 @@
     const [head, ...rest] = raw.split("/");
     if (head === "course" && rest.length) return { route: "course", slug: rest.join("/") };
     if (head === "story" && rest.length) return { route: "story", slug: rest.join("/") };
+    if (head === "sd-chapter" && rest.length) return { route: "sd-chapter", slug: rest.join("/") };
     if (TOP_ROUTES.includes(head)) return { route: head, slug: null };
     if (HOME_ANCHORS[head]) return { route: "home", slug: null, scrollTo: HOME_ANCHORS[head] };
     return { route: "home", slug: null };
@@ -272,11 +285,16 @@
     if (route === "home" || !route) p = "/";
     else if (route === "course" && slug) p = `/courses/${slug}/`;
     else if (route === "story"  && slug) p = `/stories/${slug}/`;
+    else if (route === "system-design") p = `/${SD_URL_SLUG}/`;
+    else if (route === "sd-chapter" && slug) p = `/${SD_URL_SLUG}/${slug}/`;
     else p = `/${route}/`;
     return BASE_PATH ? BASE_PATH + (p === "/" ? "/" : p) : p;
   }
 
-  function showRoute({ route, slug, scrollTo }) {
+  function showRoute({ route, slug, scrollTo, legacySdUrl }) {
+    if (legacySdUrl) {
+      history.replaceState(null, "", pathFor(route, slug));
+    }
     // Remove the prerender-time style that forces one route visible — once
     // JS hydrates we let `.route[hidden]` CSS do the work as usual.
     const preStyle = document.getElementById("prerenderShowRoute");
@@ -288,7 +306,8 @@
       const active =
         a.dataset.route === route ||
         (route === "course" && a.dataset.route === "courses") ||
-        (route === "story" && a.dataset.route === "stories");
+        (route === "story" && a.dataset.route === "stories") ||
+        (route === "sd-chapter" && a.dataset.route === "system-design");
       a.classList.toggle("is-active", active);
     });
 
@@ -299,6 +318,9 @@
     }
     if (route === "story") {
       renderStoryDetail(slug);
+    }
+    if (route === "sd-chapter") {
+      renderSdChapter(slug);
     }
     if (scrollTo) {
       // Deep links like /roadmap or /format land on the home page and need
@@ -363,6 +385,19 @@
         title = SUFFIX;
         desc = "";
       }
+    } else if (route === "sd-chapter") {
+      const ch = (window.SYSTEM_DESIGN && window.SYSTEM_DESIGN.chapters || [])
+        .find((x) => x.slug === slug);
+      const chTitle = ch ? (en && ch.titleEn ? ch.titleEn : ch.title) : "";
+      const chN = ch ? ch.n : "";
+      title = chTitle ? `${chTitle} · ${SUFFIX}` : SUFFIX;
+      if (chTitle && chN) {
+        desc = en
+          ? `Ch. ${chN}: ${chTitle} — System Design Interview notes (VI & EN). Compiled by EngineerPro. Source: liquidslr/system-design-notes.`
+          : `Chương ${chN}: ${chTitle} — ghi chú System Design Interview (VI & EN). Tổng hợp EngineerPro. Nguồn: liquidslr/system-design-notes.`;
+      } else {
+        desc = "";
+      }
     } else {
       const label = labelFor(route);
       title = route === "home"
@@ -378,6 +413,7 @@
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
+        "system-design": en ? "23 System Design Interview case studies — read chapter by chapter (VI & EN). Compiled by EngineerPro. Source: liquidslr/system-design-notes." : "23 case study System Design Interview — đọc từng chương (VI & EN). Tổng hợp & dịch EngineerPro. Nguồn: liquidslr/system-design-notes.",
         resources: en ? "Free interview resources from EngineerPro — HR phone screen checklist, programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech và playlist review CV.",
         mentors:   en ? `${nMentors} mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…` : `${nMentors} mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…`,
         stories:   en ? `${nStories}+ EngineerPro students landed offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…` : `${nStories}+ học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…`,
@@ -432,10 +468,18 @@
       const s = (window.STORIES || []).find((x) => x.slug === slug);
       return s ? (s.originalTitle || s.title) : t("nav.stories");
     }
+    if (name === "sd-chapter") {
+      const en = currentLang === "en";
+      const ch = (window.SYSTEM_DESIGN && window.SYSTEM_DESIGN.chapters || [])
+        .find((x) => x.slug === slug);
+      if (!ch) return t("nav.systemDesign");
+      return en && ch.titleEn ? ch.titleEn : ch.title;
+    }
     return (
       {
         courses:   t("nav.courses"),
         book:      t("nav.book"),
+        "system-design": t("nav.systemDesign"),
         resources: t("nav.resources"),
         mentors:   t("nav.mentors"),
         stories:   t("nav.stories"),
@@ -495,6 +539,7 @@
       const [head, ...rest] = raw.split("/");
       if (head === "course" && rest.length) target = { route: "course", slug: rest.join("/") };
       else if (head === "story" && rest.length) target = { route: "story", slug: rest.join("/") };
+      else if (head === "sd-chapter" && rest.length) target = { route: "sd-chapter", slug: rest.join("/") };
       else target = { route: head, slug: null };
     } else if (rawHref.startsWith("/") && !rawHref.startsWith("//")) {
       // Real path-based link e.g. /courses/foo/ — let parseHash classify it.
@@ -578,6 +623,65 @@
   function initials(name) {
     const parts = name.trim().split(/\s+/);
     return ((parts[0]?.[0] || "") + (parts[parts.length - 1]?.[0] || "")).toUpperCase();
+  }
+
+  function bookAuthorAvatar(author, size = 96) {
+    if (author.photo) {
+      return el("span", { class: "book-author-card__avatar book-author-card__avatar--photo" }, [
+        el("img", {
+          src: asset(author.photo),
+          alt: author.name,
+          loading: "lazy",
+          width: String(size),
+          height: String(size),
+        }),
+      ]);
+    }
+    const [c1, c2] = colorFor(author.name);
+    const avatar = el("span", { class: "book-author-card__avatar" }, initials(author.name));
+    avatar.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+    return avatar;
+  }
+
+  function bookAuthorCard(author) {
+    const en = currentLang === "en";
+    const role = en && author.roleEn ? author.roleEn : author.role;
+    const actions = [
+      el("a", {
+        class: "book-author-card__btn book-author-card__btn--linkedin",
+        href: author.linkedin,
+        target: "_blank",
+        rel: "noopener",
+      }, [
+        el("span", { class: "book-author-card__btn-icon", "aria-hidden": "true" }, "in"),
+        t("book.author.linkedin"),
+      ]),
+    ];
+    if (author.portfolio) {
+      actions.push(
+        el("a", {
+          class: "book-author-card__btn book-author-card__btn--portfolio",
+          href: author.portfolio,
+          target: "_blank",
+          rel: "noopener",
+        }, [
+          el("span", { class: "book-author-card__btn-icon", "aria-hidden": "true" }, "🌐"),
+          t("book.author.portfolio"),
+        ])
+      );
+    }
+    return el("article", { class: "book-author-card" }, [
+      bookAuthorAvatar(author),
+      el("div", { class: "book-author-card__body" }, [
+        el("h3", { class: "book-author-card__name" }, author.name),
+        el("p", { class: "book-author-card__role" }, role),
+        el("p", { class: "book-author-card__org" }, [
+          `${t("book.author.cofounder")} `,
+          el("strong", {}, "EngineerPro"),
+        ]),
+        el("div", { class: "book-author-card__actions" }, actions),
+      ]),
+    ]);
   }
 
   // ===================== COURSE LISTING =====================
@@ -942,24 +1046,7 @@
     const authorsEl = document.getElementById("bookAuthors");
     if (authorsEl) {
       authorsEl.innerHTML = "";
-      book.authors.forEach((a) => {
-        const [c1, c2] = colorFor(a.name);
-        const avatar = el("span", { class: "book-author__avatar" }, initials(a.name));
-        avatar.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
-        const row = el("a", {
-          class: "book-author",
-          href: a.linkedin,
-          target: "_blank",
-          rel: "noopener",
-        }, [
-          avatar,
-          el("span", { class: "book-author__meta" }, [
-            el("span", { class: "book-author__name" }, a.name),
-            el("span", { class: "book-author__role" }, a.role),
-          ]),
-        ]);
-        authorsEl.appendChild(row);
-      });
+      book.authors.forEach((a) => authorsEl.appendChild(bookAuthorCard(a)));
     }
 
     [["bookReadEn", book.urlEn], ["bookReadEn2", book.urlEn], ["bookReadVi", book.urlVi]].forEach(
@@ -1026,6 +1113,168 @@
         chEl.appendChild(grp);
       });
     }
+  }
+
+  // ===================== SYSTEM DESIGN =====================
+  const sdChapterCache = new Map();
+  let sdChapterRequest = 0;
+
+  function sdLang() {
+    return currentLang === "en" ? "en" : "vi";
+  }
+
+  function getSdChapter(slug) {
+    return (window.SYSTEM_DESIGN && window.SYSTEM_DESIGN.chapters || [])
+      .find((x) => x.slug === slug);
+  }
+
+  async function loadSdChapterBody(slug, lang) {
+    const key = `${lang}:${slug}`;
+    if (sdChapterCache.has(key)) return sdChapterCache.get(key);
+    const url = asset(`assets/content/system-design/${lang}/${slug}.html`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`chapter ${slug} (${lang}) not found`);
+    const html = await res.text();
+    sdChapterCache.set(key, html);
+    return html;
+  }
+
+  function sdChapterFooterHtml() {
+    const sd = window.SYSTEM_DESIGN || {};
+    const en = currentLang === "en";
+    const credit = en && sd.creditEn ? sd.creditEn : (sd.credit || "");
+    const refNote = t("sd.chapter.refNote");
+    const course1 = pathFor("course", "khoa-hoc-system-design-interview-big-tech");
+    const course2 = pathFor("course", "system-design-interview-level-2");
+    return `
+      <footer class="sd-chapter-foot">
+        ${credit ? `<p class="muted sd-chapter-credit">${escapeText(credit)}</p>` : ""}
+        ${refNote ? `<p class="muted sd-chapter-ref">${escapeText(refNote)}</p>` : ""}
+        <div class="sd-chapter-promo">
+          <p class="sd-chapter-promo__lead">${escapeText(t("sd.chapter.promo.lead"))}</p>
+          <div class="sd-chapter-promo__cta">
+            <a class="btn btn--ghost" href="${escapeText(course1)}" data-href="#course/khoa-hoc-system-design-interview-big-tech">${escapeText(t("sd.cta.l1"))}</a>
+            <a class="btn btn--ghost" href="${escapeText(course2)}" data-href="#course/system-design-interview-level-2">${escapeText(t("sd.cta.l2"))}</a>
+            <a class="btn btn--primary" href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">${escapeText(t("sd.chapter.promo.fanpage"))}</a>
+          </div>
+        </div>
+      </footer>
+    `;
+  }
+
+  function renderSystemDesign() {
+    const sd = window.SYSTEM_DESIGN;
+    if (!sd) return;
+    const en = currentLang === "en";
+
+    const titleEl = document.getElementById("sdTitle");
+    if (titleEl) titleEl.textContent = en && sd.titleEn ? sd.titleEn : sd.title;
+
+    const introEl = document.getElementById("sdIntro");
+    if (introEl) introEl.textContent = en && sd.introEn ? sd.introEn : sd.intro;
+
+    const creditEl = document.getElementById("sdCredit");
+    if (creditEl) {
+      creditEl.textContent = en && sd.creditEn ? sd.creditEn : (sd.credit || "");
+    }
+
+    const attrEl = document.getElementById("sdAttribution");
+    if (attrEl) {
+      attrEl.textContent = en && sd.attributionEn ? sd.attributionEn : sd.attribution;
+    }
+
+    const authorsEl = document.getElementById("sdAuthors");
+    if (authorsEl) {
+      authorsEl.innerHTML = "";
+      (sd.authors || []).forEach((a) => authorsEl.appendChild(bookAuthorCard(a)));
+    }
+
+    const chEl = document.getElementById("sdChapters");
+    if (!chEl) return;
+    chEl.innerHTML = "";
+
+    const itemsWrap = el("div", { class: "book-group__items" });
+    (sd.chapters || []).forEach((c) => {
+      const title = en && c.titleEn ? c.titleEn : c.title;
+      const href = `${BASE_PATH}/${SD_URL_SLUG}/${c.slug}/`;
+      const attrs = {
+        class: "book-chapter" + (c.available ? "" : " book-chapter--soon"),
+        href: c.available ? href : "#",
+        title: `${c.n}. ${title}`,
+      };
+      if (c.available) {
+        attrs["data-href"] = `#sd-chapter/${c.slug}`;
+      } else {
+        attrs["aria-disabled"] = "true";
+      }
+      const children = [
+        el("span", { class: "book-chapter__n" }, String(c.n)),
+        el("span", { class: "book-chapter__title" }, title),
+      ];
+      if (!c.available) {
+        children.push(el("span", { class: "sd-soon-badge" }, t("sd.chapter.badgeSoon")));
+      }
+      itemsWrap.appendChild(el("a", attrs, children));
+    });
+    chEl.appendChild(itemsWrap);
+  }
+
+  function renderSdChapter(slug) {
+    const wrap = document.getElementById("sdChapterArticle");
+    if (!wrap) return;
+    const ch = getSdChapter(slug);
+    const en = currentLang === "en";
+    const title = ch ? (en && ch.titleEn ? ch.titleEn : ch.title) : "";
+
+    if (!ch) {
+      wrap.innerHTML = en
+        ? "<h1>Chapter not found</h1><p><a data-href=\"#system-design\" href=\"" + pathFor("system-design") + "\">Back to list</a></p>"
+        : "<h1>Không tìm thấy chương</h1><p><a data-href=\"#system-design\" href=\"" + pathFor("system-design") + "\">Về danh sách</a></p>";
+      return;
+    }
+
+    if (!ch.available) {
+      wrap.innerHTML = `
+        <header class="article__head">
+          <span class="badge">${escapeText(t("sd.chapter.badgeSoon"))}</span>
+          <h1>${escapeText(title)}</h1>
+        </header>
+        <div class="article__body"><p>${t("sd.chapter.comingSoon")}</p></div>
+      `;
+      return;
+    }
+
+    const reqId = ++sdChapterRequest;
+    wrap.innerHTML = `
+      <header class="article__head">
+        <span class="badge">Ch. ${escapeText(String(ch.n))}</span>
+        <h1>${escapeText(title)}</h1>
+      </header>
+      <div class="article__body"><p class="muted">${escapeText(t("sd.chapter.loading"))}</p></div>
+    `;
+
+    loadSdChapterBody(slug, sdLang())
+      .then((html) => {
+        if (reqId !== sdChapterRequest) return;
+        const body = buttonifyContactLinks(rewriteAssetUrls(sanitizeHtml(html)));
+        wrap.innerHTML = `
+          <header class="article__head">
+            <span class="badge">Ch. ${escapeText(String(ch.n))}</span>
+            <h1>${escapeText(title)}</h1>
+          </header>
+          <div class="article__body">${body}</div>
+          ${sdChapterFooterHtml()}
+        `;
+      })
+      .catch(() => {
+        if (reqId !== sdChapterRequest) return;
+        wrap.innerHTML = `
+          <header class="article__head">
+            <h1>${escapeText(title)}</h1>
+          </header>
+          <div class="article__body"><p>${t("sd.chapter.error")}</p></div>
+        `;
+      });
   }
 
   // ===================== FAQ =====================
@@ -2650,6 +2899,7 @@
     if (typeof renderMentors === "function") renderMentors();
     if (typeof renderPodcasts === "function") renderPodcasts();
     if (typeof renderBook === "function") renderBook();
+    if (typeof renderSystemDesign === "function") renderSystemDesign();
     if (typeof renderFAQ === "function") renderFAQ();
     if (typeof renderRoadmap === "function") renderRoadmap();
     if (typeof renderPartners === "function") renderPartners();
@@ -2668,6 +2918,7 @@
     const h = parseHash();
     if (h.route === "course") renderCourseDetail(h.slug);
     if (h.route === "story") renderStoryDetail(h.slug);
+    if (h.route === "sd-chapter") renderSdChapter(h.slug);
     // Refresh SEO tags (title/description/canonical) for the current route
     if (typeof updateSeoForRoute === "function") updateSeoForRoute(h.route, h.slug);
   };
@@ -2731,6 +2982,7 @@
   renderMentors();
   renderPodcasts();
   renderBook();
+  renderSystemDesign();
   renderFAQ();
   initResourcesPanels();
   initHrChecklist();

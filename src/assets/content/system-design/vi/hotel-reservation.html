@@ -1,0 +1,321 @@
+<h2>Giới thiệu</h2>
+<p>Trong chương này, chúng tôi đang thiết kế <strong>hệ thống đặt phòng khách sạn</strong>, tương tự như Marriott International.</p>
+<p>Áp dụng cho các loại hệ thống khác - Airbnb, đặt vé máy bay, đặt vé xem phim.</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<p>Trước khi đi sâu vào thiết kế hệ thống, chúng ta nên hỏi người phỏng vấn những câu hỏi để làm rõ phạm vi:<br/>
+ - C: Quy mô của hệ thống là gì?<br/>
+ - I: Chúng tôi đang xây dựng một trang web cho chuỗi khách sạn với 5000 khách sạn và 1 triệu phòng<br/>
+ - C: Khách hàng thanh toán khi đặt phòng hay khi đến khách sạn?<br/>
+ - I: Họ thanh toán đầy đủ khi đặt phòng.<br/>
+ - C: Khách hàng có đặt phòng khách sạn chỉ qua website không? Chúng tôi có phải hỗ trợ các tùy chọn đặt chỗ khác như gọi điện thoại không?<br/>
+ - I: Họ chỉ đặt chỗ qua trang web hoặc ứng dụng.<br/>
+ - C: Khách hàng có thể hủy đặt chỗ được không?<br/>
+ - I: Vâng<br/>
+ - C: Những điều khác cần xem xét?<br/>
+ - I: Có, chúng tôi cho phép đặt trước quá 10%. Khách sạn sẽ bán được nhiều phòng hơn thực tế. Các khách sạn làm điều này với dự đoán rằng khách hàng sẽ hủy đặt phòng.<br/>
+ - C: Vì không có nhiều thời gian nên chúng ta sẽ tập trung vào - hiển thị trang liên quan đến khách sạn, trang chi tiết phòng khách sạn, đặt phòng, bảng quản trị, hỗ trợ đặt phòng vượt mức.<br/>
+ - I: Nghe hay đấy.<br/>
+ - I: Còn một điều nữa - giá khách sạn luôn thay đổi. Giả sử giá phòng khách sạn thay đổi hàng ngày.<br/>
+ - C: Được rồi.</p>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li>Hỗ trợ tính đồng thời cao - có thể có rất nhiều khách hàng cố gắng đặt cùng một khách sạn trong mùa cao điểm.</li>
+<li>Độ trễ vừa phải - lý tưởng là có độ trễ thấp khi người dùng đặt chỗ trước, nhưng có thể chấp nhận được nếu hệ thống mất vài giây để xử lý.</li>
+</ul>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<ul>
+<li>Tổng cộng 5000 khách sạn và 1 triệu phòng</li>
+<li>Giả sử 70% số phòng đã được sử dụng và thời gian lưu trú trung bình là 3 ngày</li>
+<li>Số lượt đặt chỗ ước tính hàng ngày - 1 triệu * 0,7 / 3 = ~240k lượt đặt chỗ mỗi ngày</li>
+<li>Đặt chỗ mỗi giây - 240k / 10^5 giây trong một ngày = ~3. TPS đặt phòng trung bình thấp.</li>
+</ul>
+<p>Hãy ước tính QPS. Nếu chúng tôi giả định rằng có ba bước để đến trang đặt chỗ và có tỷ lệ chuyển đổi là 10% trên mỗi trang,<br/>
+Chúng ta ước tính nếu có 3 lượt đặt phòng thì phải có 30 lượt xem trang đặt phòng và 300 lượt xem trang chi tiết phòng khách sạn.</p>
+<figure class="sd-figure"><img alt="qps-estimation" loading="lazy" src="assets/content/system-design/images/ch22/qps-estimation.png"/></figure>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<p>Chúng ta sẽ khám phá - Thiết kế API, Mô hình dữ liệu, thiết kế cấp cao.</p>
+<h3><strong>Thiết kế API</strong></h3>
+<p>Thiết kế API này tập trung vào các endpoint cốt lõi (sử dụng các phương pháp RESTful), chúng tôi sẽ cần để hỗ trợ hệ thống đặt phòng khách sạn.</p>
+<p>Một hệ thống hoàn chỉnh sẽ yêu cầu API mở rộng hơn với khả năng hỗ trợ tìm kiếm phòng dựa trên nhiều tiêu chí, nhưng chúng tôi sẽ không tập trung vào điều đó trong phần này.<br/>
+Lý do là chúng không có thách thức về mặt kỹ thuật nên nằm ngoài phạm vi.</p>
+<p><strong>API liên quan đến khách sạn</strong><br/>
+ - <code>GET /v1/hotels/{id}</code> - nhận thông tin chi tiết về một khách sạn<br/>
+ - <code>POST /v1/hotels</code> - thêm một khách sạn mới. Chỉ có sẵn cho ops<br/>
+ - <code>PUT /v1/hotels/{id}</code> - cập nhật thông tin khách sạn. Chỉ có sẵn cho ops<br/>
+ - <code>DELETE /v1/hotels/{id}</code> - xóa một khách sạn. API chỉ khả dụng cho các hoạt động</p>
+<p><strong>API liên quan đến phòng</strong><br/>
+ - <code>GET /v1/hotels/{id}/rooms/{id}</code> - nhận thông tin chi tiết về một căn phòng<br/>
+ - <code>POST /v1/hotels/{id}/rooms</code> - Thêm một phòng. Chỉ có sẵn cho ops<br/>
+ - <code>PUT /v1/hotels/{id}/rooms/{id}</code> - Cập nhật thông tin phòng. Chỉ có sẵn cho ops<br/>
+ - <code>DELETE /v1/hotels/{id}/rooms/{id}</code> - Xóa một phòng. Chỉ có sẵn cho ops</p>
+<p><strong>API liên quan đến đặt chỗ</strong><br/>
+ - <code>GET /v1/reservations</code> - lấy lịch sử đặt chỗ của người dùng hiện tại<br/>
+ - <code>GET /v1/reservations/{id}</code> - nhận thông tin chi tiết về đặt phòng<br/>
+ - <code>POST /v1/reservations</code> - đặt chỗ mới<br/>
+ - <code>DELETE /v1/reservations/{id}</code> - hủy đặt chỗ</p>
+<p>Dưới đây là một ví dụ về yêu cầu đặt chỗ:</p>
+<pre><code>{
+  "startDate":"2021-04-28",
+  "endDate":"2021-04-30",
+  "hotelID":"245",
+  "roomID":"U12354673389",
+  "reservationID":"13422445"
+}
+</code></pre>
+<p>Lưu ý rằng <code>reservationID</code> là một idempotency key để tránh đặt phòng đôi. Chi tiết giải thích trong <a href="#concurrency-issues">phần đồng thời</a></p>
+<h3><strong>Mô hình dữ liệu</strong></h3>
+<p>Trước khi chúng ta chọn sử dụng database nào, hãy xem xét các kiểu truy cập của chúng ta.</p>
+<p>Chúng tôi cần hỗ trợ các truy vấn sau:<br/>
+ - Xem thông tin chi tiết về một khách sạn<br/>
+ - Tìm các loại phòng có sẵn trong một phạm vi ngày<br/>
+ - Ghi lại đặt phòng<br/>
+ - Tra cứu đặt phòng hoặc lịch sử đặt phòng trong quá khứ</p>
+<p>Từ ước tính của chúng tôi, chúng tôi biết quy mô của hệ thống không lớn, nhưng chúng tôi cần chuẩn bị cho sự gia tăng lưu lượng truy cập.</p>
+<p>Với kiến thức này, chúng ta sẽ chọn database quan hệ vì:<br/>
+ - DB quan hệ hoạt động tốt với các hệ thống đọc nhiều và ít ghi nhiều.<br/>
+ - database NoSQL thường được tối ưu hóa cho việc ghi, nhưng chúng tôi biết rằng chúng tôi sẽ không có nhiều database vì chỉ một phần nhỏ người dùng truy cập trang web đặt trước.<br/>
+ - database quan hệ cung cấp đảm bảo ACID. Những điều này rất quan trọng đối với một hệ thống vì nếu không có chúng, chúng ta sẽ không thể ngăn chặn các vấn đề như số dư âm, sạc kép, v.v.<br/>
+ - Các DB quan hệ có thể dễ dàng mô hình hóa dữ liệu vì cấu trúc rất rõ ràng.</p>
+<p>Đây là thiết kế lược đồ của chúng ta:</p>
+<figure class="sd-figure"><img alt="schema-design" loading="lazy" src="assets/content/system-design/images/ch22/schema-design.png"/></figure>
+<p>Hầu hết các lĩnh vực đều tự giải thích. Lĩnh vực duy nhất đáng nói đến là <code>status</code> trường đại diện cho máy trạng thái của một phòng nhất định:</p>
+<figure class="sd-figure"><img alt="status-state-machine" loading="lazy" src="assets/content/system-design/images/ch22/status-state-machine.png"/></figure>
+<p>Mô hình dữ liệu này hoạt động tốt với hệ thống như Airbnb, nhưng không hoạt động tốt với các khách sạn nơi người dùng không đặt một phòng cụ thể mà chỉ đặt một loại phòng.<br/>
+Họ đặt trước một loại phòng và số phòng được chọn tại thời điểm đặt phòng.</p>
+<p>Nhược điểm này sẽ được khắc phục trong <a href="#improved-data-model">Mô hình dữ liệu được cải tiến</a> phần.</p>
+<h3><strong>Thiết kế cấp cao</strong></h3>
+<p>Chúng tôi đã chọn kiến trúc vi dịch vụ cho thiết kế này. Nó đã trở nên phổ biến trong những năm gần đây:</p>
+<figure class="sd-figure"><img alt="high-level-design" loading="lazy" src="assets/content/system-design/images/ch22/high-level-design.png"/></figure>
+<ul>
+<li><strong>Người dùng</strong>: đặt phòng khách sạn trên điện thoại hoặc máy tính</li>
+<li><strong>Quản trị viên</strong>: thực hiện các chức năng quản trị như hoàn tiền/hủy thanh toán, v.v.</li>
+<li><strong>CDN</strong>: lưu trữ các tài nguyên tĩnh như gói JS, hình ảnh, video, v.v.</li>
+<li><strong>Cổng API công cộng</strong>: dịch vụ được quản lý hoàn toàn hỗ trợ rate limiter, xác thực, v.v.</li>
+<li><strong>API nội bộ</strong>: chỉ người có thẩm quyền mới nhìn thấy được. Thường được bảo vệ bởi VPN.</li>
+<li><strong>Hotel service</strong>: cung cấp thông tin chi tiết về khách sạn và phòng. Dữ liệu phòng và khách sạn là dữ liệu tĩnh nên có thể được lưu vào cache một cách linh hoạt.</li>
+<li><strong>Giá dịch vụ</strong>: cung cấp giá phòng cho các ngày khác nhau trong tương lai. Một lưu ý thú vị về tên miền này là giá cả phụ thuộc vào mức độ kín chỗ của khách sạn vào một ngày nhất định.</li>
+<li><strong>Reservation service</strong>: tiếp nhận yêu cầu đặt phòng và đặt phòng khách sạn. Đồng thời theo dõi tình trạng phòng trống khi đặt phòng được thực hiện/hủy bỏ.</li>
+<li><strong>Payment service</strong>: xử lý thanh toán và cập nhật trạng thái đặt phòng khi thành công.</li>
+<li><strong>Hotel management service</strong>: chỉ dành cho người có thẩm quyền. Cho phép một số chức năng quản trị nhất định để quản lý và xem đặt phòng, khách sạn, v.v.</li>
+</ul>
+<p>Giao tiếp giữa các dịch vụ có thể được hỗ trợ thông qua khung RPC, chẳng hạn như gRPC.</p>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<p>Hãy đi sâu hơn vào:<br/>
+ - Cải thiện mô hình dữ liệu<br/>
+ - Vấn đề đồng thời<br/>
+ - Khả năng mở rộng<br/>
+ - Giải quyết sự không nhất quán dữ liệu trong microservice</p>
+<h3><strong>Mô hình dữ liệu được cải tiến</strong></h3>
+<p>Như đã đề cập trong phần trước, chúng tôi cần sửa đổi API và lược đồ của mình để cho phép đặt một loại phòng so với một loại phòng cụ thể.</p>
+<p>Đối với API đặt trước, chúng tôi không còn đặt trước nữa <code>roomID</code>, nhưng chúng tôi dành một <code>roomTypeID</code>:</p>
+<pre><code>POST /v1/reservations
+{
+  "startDate":"2021-04-28",
+  "endDate":"2021-04-30",
+  "hotelID":"245",
+  "roomTypeID":"12354673389",
+  "roomCount":"3",
+  "reservationID":"13422445"
+}
+</code></pre>
+<p>Đây là lược đồ được cập nhật:</p>
+<figure class="sd-figure"><img alt="updated-schema" loading="lazy" src="assets/content/system-design/images/ch22/updated-schema.png"/></figure>
+<ul>
+<li><strong>phòng</strong>: chứa thông tin về phòng</li>
+<li><strong>room_type_rate</strong>: chứa thông tin về giá của một loại phòng nhất định</li>
+<li><strong>sự đặt chỗ</strong>: ghi lại dữ liệu đặt phòng của khách</li>
+<li><strong>phòng_loại_kho</strong>: lưu trữ dữ liệu kiểm kê về phòng khách sạn. </li>
+</ul>
+<p>Chúng ta hãy nhìn vào <code>room_type_inventory</code> cột vì bảng đó thú vị hơn:<br/>
+ - <strong>khách sạn_id</strong>: mã số khách sạn<br/>
+ - <strong>phòng_loại_id</strong>: id của loại phòng<br/>
+ - <strong>ngày</strong>: một ngày duy nhất<br/>
+ - <strong>tổng_hàng tồn kho</strong>: tổng số phòng trừ đi số phòng tạm cất khỏi kho.<br/>
+ - <strong>tổng_reserved</strong>: tổng số phòng đã đặt (hotel_id, room_type_id, date)</p>
+<p>Có nhiều cách khác để thiết kế bảng này, nhưng việc có một phòng cho mỗi (hotel_id, room_type_id, date) sẽ dễ dàng hơn <br/>
+quản lý đặt phòng và truy vấn dễ dàng hơn.</p>
+<p>Các hàng trong bảng được điền trước bằng công việc CRON hàng ngày.</p>
+<p>Dữ liệu mẫu:<br/>
+| khách sạn_id | phòng_type_id | ngày | tổng_hàng tồn kho | tổng_reserved |<br/>
+|----------|--------------|-------------|--------------------------------|-------|<br/>
+| 211 | 1001 | 2021-06-01 | 100 | 80 |<br/>
+| 211 | 1001 | 2021-06-02 | 100 | 82 |<br/>
+| 211 | 1001 | 2021-06-03 | 100 | 86 |<br/>
+| 211 | 1001 |... |... |                |<br/>
+| 211 | 1001 | 2023-05-31 | 100 | 0 |<br/>
+| 211 | 1002 | 2021-06-01 | 200 | 16 |<br/>
+| 2210 | 101 | 2021-06-01 | 30 | 23 |<br/>
+| 2210 | 101 | 2021-06-02 | 30 | 25 |</p>
+<p>Truy vấn SQL mẫu để kiểm tra availability của một loại phòng:</p>
+<pre><code>SELECT date, total_inventory, total_reserved
+FROM room_type_inventory
+WHERE room_type_id = ${roomTypeId} AND hotel_id = ${hotelId}
+AND date between ${startDate} and ${endDate}
+</code></pre>
+<p>Cách kiểm tra tình trạng phòng trống của một số phòng cụ thể bằng dữ liệu đó (lưu ý rằng chúng tôi hỗ trợ đặt trước vượt mức):</p>
+<pre><code>if (total_reserved + ${numberOfRoomsToReserve}) &lt;= 110% * total_inventory
+</code></pre>
+<p>Bây giờ hãy thực hiện một số ước tính về dung lượng lưu trữ.<br/>
+ - Chúng tôi có 5000 khách sạn.<br/>
+ - Mỗi khách sạn có 20 loại phòng.<br/>
+ - 5000 * 20 * 2 (năm) * 365 (ngày) = 73 triệu hàng</p>
+<p>73 triệu hàng không phải là nhiều dữ liệu và một máy chủ database có thể xử lý được.<br/>
+Tuy nhiên, điều hợp lý là thiết lập read replication (có thể trên các vùng khác nhau) để mang lại tính sẵn sàng cao.</p>
+<p>Câu hỏi tiếp theo - nếu dữ liệu đặt trước quá lớn đối với một database, bạn sẽ làm gì?<br/>
+ - Chỉ lưu trữ dữ liệu đặt phòng hiện tại và tương lai. Lịch sử đặt chỗ có thể được chuyển vào cold storage.<br/>
+ - Phân chia database - chúng ta có thể phân chia dữ liệu của mình bằng cách <code>hash(hotel_id) % servers_cnt</code> vì chúng tôi luôn chọn <code>hotel_id</code> trong các truy vấn của chúng tôi.</p>
+<h3><strong>Các vấn đề tương tranh</strong></h3>
+<p>Một vấn đề quan trọng khác cần giải quyết là đặt phòng trùng lặp.</p>
+<p>Có hai vấn đề cần giải quyết:<br/>
+ - Cùng một người dùng nhấp vào "sách" hai lần<br/>
+ - Nhiều người dùng cố gắng đặt phòng cùng một lúc</p>
+<p>Đây là hình dung của vấn đề đầu tiên:</p>
+<figure class="sd-figure"><img alt="double-booking-single-user" loading="lazy" src="assets/content/system-design/images/ch22/double-booking-single-user.png"/></figure>
+<p>Có hai cách tiếp cận để giải quyết vấn đề này:<br/>
+ - Xử lý phía khách hàng - giao diện người dùng có thể vô hiệu hóa nút sách sau khi nhấp vào. Tuy nhiên, nếu người dùng tắt javascript, họ sẽ không thấy nút chuyển sang màu xám.<br/>
+ - Idempotent API - Thêm idempotency key vào API, cho phép người dùng thực hiện một hành động một lần, bất kể endpoint được gọi bao nhiêu lần:</p>
+<figure class="sd-figure"><img alt="idempotency" loading="lazy" src="assets/content/system-design/images/ch22/idempotency.png"/></figure>
+<p>Đây là cách luồng này hoạt động:<br/>
+ - Lệnh đặt chỗ được tạo khi bạn đang trong quá trình điền thông tin chi tiết và đặt chỗ. Thứ tự đặt chỗ được tạo bằng cách sử dụng mã định danh duy nhất trên toàn cầu.<br/>
+ - Gửi đặt chỗ 1 bằng cách sử dụng <code>reservation_id</code> được tạo ở bước trước.<br/>
+ - Nếu nhấp vào "hoàn tất đặt phòng" lần thứ hai, cũng tương tự <code>reservation_id</code> được gửi và phần phụ trợ phát hiện rằng đây là đặt chỗ trùng lặp.<br/>
+ - Tránh sự trùng lặp bằng cách thực hiện <code>reservation_id</code> cột có một ràng buộc duy nhất, ngăn chặn nhiều bản ghi có id đó được lưu trữ trong DB.</p>
+<figure class="sd-figure"><img alt="unique-constraint-violation" loading="lazy" src="assets/content/system-design/images/ch22/unique-constraint-violation.png"/></figure>
+<p>Điều gì sẽ xảy ra nếu có nhiều người dùng thực hiện cùng một lượt đặt chỗ?</p>
+<figure class="sd-figure"><img alt="double-booking-multiple-users" loading="lazy" src="assets/content/system-design/images/ch22/double-booking-multiple-users.png"/></figure>
+<ul>
+<li>Giả sử mức cô lập giao dịch không thể tuần tự hóa được</li>
+<li>Người dùng 1 và 2 cố gắng đặt cùng một phòng vào cùng một thời điểm.</li>
+<li>Giao dịch 1 kiểm tra xem có đủ phòng không - có</li>
+<li>Giao dịch 2 kiểm tra xem có đủ phòng không - có</li>
+<li>Giao dịch 2 giữ phòng và cập nhật tình trạng tồn phòng</li>
+<li>Giao dịch 1 cũng giữ phòng vì vẫn thấy có 99 <code>total_reserved</code> phòng trong số 100.</li>
+<li>Cả hai giao dịch đều thực hiện thành công các thay đổi</li>
+</ul>
+<p>Vấn đề này có thể được giải quyết bằng cách sử dụng một số dạng cơ chế khóa:<br/>
+ - Khóa bi quan<br/>
+ - Khóa lạc quan<br/>
+ - Hạn chế về database</p>
+<p>Đây là SQL chúng tôi sử dụng để đặt phòng:</p>
+<pre><code class="language-sql"># step 1: check room inventory
+SELECT date, total_inventory, total_reserved
+FROM room_type_inventory
+WHERE room_type_id = ${roomTypeId} AND hotel_id = ${hotelId}
+AND date between ${startDate} and ${endDate}
+
+# For every entry returned from step 1
+if((total_reserved + ${numberOfRoomsToReserve}) &gt; 110% * total_inventory) {
+  Rollback
+}
+
+# step 2: reserve rooms
+UPDATE room_type_inventory
+SET total_reserved = total_reserved + ${numberOfRoomsToReserve}
+WHERE room_type_id = ${roomTypeId}
+AND date between ${startDate} and ${endDate}
+
+Commit
+</code></pre>
+<h4>Phương án 1: Khóa bi quan</h4>
+<p>Khóa bi quan ngăn chặn các cập nhật đồng thời bằng cách khóa một bản ghi trong khi nó đang được cập nhật.</p>
+<p>Điều này có thể được thực hiện trong MySQL bằng cách sử dụng <code>SELECT... FOR UPDATE</code> truy vấn, khóa các hàng được truy vấn chọn cho đến khi giao dịch được thực hiện.</p>
+<figure class="sd-figure"><img alt="pessimistic-locking" loading="lazy" src="assets/content/system-design/images/ch22/pessimistic-locking.png"/></figure>
+<p>Ưu điểm:<br/>
+ - Ngăn chặn các ứng dụng cập nhật dữ liệu đang bị thay đổi<br/>
+ - Dễ dàng thực hiện và tránh xung đột bằng cách tuần tự hóa các bản cập nhật. Hữu ích khi có sự tranh chấp dữ liệu nặng nề.</p>
+<p>Nhược điểm:<br/>
+ - Deadlocks có thể xảy ra khi nhiều tài nguyên bị khóa.<br/>
+ - Cách tiếp cận này không thể mở rộng - nếu giao dịch bị khóa quá lâu, điều này sẽ ảnh hưởng đến tất cả các giao dịch khác đang cố gắng truy cập tài nguyên.<br/>
+ - Tác động rất nghiêm trọng khi truy vấn chọn nhiều tài nguyên và giao dịch tồn tại lâu dài.</p>
+<p>Tác giả không khuyến nghị phương pháp này do các vấn đề về khả năng mở rộng của nó.</p>
+<h4>Cách 2: Khóa lạc quan</h4>
+<p>Khóa lạc quan cho phép nhiều người dùng cố gắng cập nhật bản ghi cùng một lúc.</p>
+<p>Có hai cách phổ biến để triển khai nó - số phiên bản và dấu thời gian. Số phiên bản được khuyến nghị vì đồng hồ máy chủ có thể không chính xác.</p>
+<figure class="sd-figure"><img alt="optimistic-locking" loading="lazy" src="assets/content/system-design/images/ch22/optimistic-locking.png"/></figure>
+<ul>
+<li>Một cái mới <code>version</code> cột được thêm vào bảng database</li>
+<li>Trước khi người dùng sửa đổi hàng database, số phiên bản sẽ được đọc</li>
+<li>Khi người dùng cập nhật hàng, số phiên bản sẽ tăng thêm 1 và được ghi lại vào database</li>
+<li>Xác thực database sẽ ngăn việc chèn nếu số phiên bản mới không vượt quá số phiên bản trước</li>
+</ul>
+<p>Khóa lạc quan thường nhanh hơn khóa bi quan vì chúng tôi không khóa database. <br/>
+Tuy nhiên, hiệu suất của nó có xu hướng giảm khi tính đồng thời cao, vì điều đó dẫn đến nhiều nhược điểm.</p>
+<p>Ưu điểm:<br/>
+ - Nó ngăn chặn các ứng dụng chỉnh sửa dữ liệu cũ<br/>
+ - Chúng tôi không cần phải có khóa trong database<br/>
+ - Tùy chọn ưa thích khi mức độ tranh chấp dữ liệu thấp, tức là hiếm khi xảy ra xung đột cập nhật</p>
+<p>Nhược điểm:<br/>
+ - Hiệu suất kém khi xung đột dữ liệu cao</p>
+<p>Khóa lạc quan là một lựa chọn tốt cho hệ thống của chúng tôi vì QPS đặt trước không quá cao.</p>
+<h4>Tùy chọn 3: Ràng buộc database</h4>
+<p>Cách tiếp cận này rất giống với khóa lạc quan, nhưng các rào chắn được triển khai bằng cách sử dụng ràng buộc database:</p>
+<pre><code>CONSTRAINT `check_room_count` CHECK((`total_inventory - total_reserved` &gt;= 0))
+</code></pre>
+<figure class="sd-figure"><img alt="database-constraint" loading="lazy" src="assets/content/system-design/images/ch22/database-constraint.png"/></figure>
+<p>Ưu điểm:<br/>
+ - Dễ thực hiện<br/>
+ - Hoạt động tốt khi tranh chấp dữ liệu nhỏ</p>
+<p>Nhược điểm:<br/>
+ - Tương tự như khóa lạc quan, hoạt động kém khi xung đột dữ liệu cao<br/>
+ - Các ràng buộc về database không thể dễ dàng kiểm soát phiên bản như mã ứng dụng<br/>
+ - Không phải tất cả các database đều hỗ trợ các ràng buộc</p>
+<p>Đây là một lựa chọn tốt khác cho hệ thống đặt phòng khách sạn do tính dễ thực hiện của nó.</p>
+<h3><strong>Khả năng mở rộng</strong></h3>
+<p>Thông thường, tải trọng của hệ thống đặt phòng khách sạn không cao. </p>
+<p>Tuy nhiên, người phỏng vấn có thể hỏi bạn cách xử lý tình huống khi hệ thống được áp dụng cho một trang web du lịch phổ biến, lớn hơn như booking.com<br/>
+Trong trường hợp đó, QPS có thể lớn hơn 1000 lần.</p>
+<p>Khi xảy ra tình huống như vậy, điều quan trọng là phải hiểu điểm nghẽn của chúng ta nằm ở đâu. Tất cả các dịch vụ đều không có trạng thái, vì vậy chúng có thể dễ dàng mở rộng quy mô thông qua replication.</p>
+<p>Tuy nhiên, database có trạng thái rõ ràng và không rõ ràng về cách nó có thể được mở rộng quy mô.</p>
+<p>Một cách để mở rộng quy mô là triển khai phân đoạn database - chúng tôi có thể chia dữ liệu trên nhiều database, trong đó mỗi database chứa một phần dữ liệu.</p>
+<p>Chúng ta có thể phân đoạn dựa trên <code>hotel_id</code> vì tất cả các truy vấn đều lọc dựa trên nó. <br/>
+Giả sử, QPS là 30.000, sau khi chia database thành 16 phân đoạn, mỗi phân đoạn xử lý 1875 QPS, nằm trong khả năng tải của một cụm MySQL.</p>
+<figure class="sd-figure"><img alt="database-sharding" loading="lazy" src="assets/content/system-design/images/ch22/database-sharding.png"/></figure>
+<p>Chúng tôi cũng có thể sử dụng cache để kiểm kê phòng và đặt phòng thông qua Redis. Chúng tôi có thể đặt TTL để dữ liệu cũ có thể hết hạn trong những ngày đã qua.</p>
+<figure class="sd-figure"><img alt="inventory-cache" loading="lazy" src="assets/content/system-design/images/ch22/inventory-cache.png"/></figure>
+<p>Cách chúng tôi lưu trữ hàng tồn kho dựa trên <code>hotel_id</code>, <code>room_type_id</code> Và <code>date</code>:</p>
+<pre><code>key: hotelID_roomTypeID_{date}
+value: the number of available rooms for the given hotel ID, room type ID and date.
+</code></pre>
+<p>Tính nhất quán của dữ liệu diễn ra không đồng bộ và được quản lý bằng cách sử dụng cơ chế phát trực tuyến CDC - các thay đổi database được đọc và áp dụng cho một hệ thống riêng biệt.<br/>
+Debezium là một tùy chọn phổ biến để sync database changes với Redis.</p>
+<p>Sử dụng cơ chế như vậy, có khả năng cache và database không nhất quán trong một thời gian.<br/>
+Điều này ổn trong trường hợp của chúng tôi vì database sẽ ngăn chúng tôi thực hiện đặt chỗ không hợp lệ.</p>
+<p>Điều này sẽ gây ra một số vấn đề trên giao diện người dùng vì người dùng sẽ phải làm mới trang để thấy rằng "không còn phòng nữa", <br/>
+nhưng đó là điều có thể xảy ra bất kể vấn đề này là gì nếu một người do dự rất nhiều trước khi đặt chỗ.</p>
+<p>Ưu điểm của cache:<br/>
+ - Giảm tải database<br/>
+ - Hiệu suất cao, vì Redis quản lý dữ liệu trong bộ nhớ</p>
+<p>Nhược điểm của cache:<br/>
+ - Việc duy trì tính nhất quán của dữ liệu giữa cache và DB là điều khó khăn. Chúng ta cần xem xét sự không nhất quán ảnh hưởng như thế nào đến trải nghiệm người dùng.</p>
+<h3><strong>Tính nhất quán dữ liệu giữa các dịch vụ</strong></h3>
+<p>Ứng dụng nguyên khối cho phép chúng tôi sử dụng database quan hệ dùng chung để đảm bảo tính nhất quán của dữ liệu.</p>
+<p>Trong thiết kế vi dịch vụ của mình, chúng tôi đã chọn phương pháp kết hợp trong đó một số dịch vụ riêng biệt, <br/>
+nhưng các API đặt trước và kiểm kê được xử lý bởi cùng một dịch vụ đối với các API đặt trước và kiểm kê.</p>
+<p>Điều này được thực hiện vì chúng tôi muốn tận dụng các đảm bảo ACID của database quan hệ để đảm bảo tính nhất quán.</p>
+<p>Tuy nhiên, người phỏng vấn có thể phản đối cách tiếp cận này vì đây không phải là kiến trúc vi dịch vụ thuần túy, trong đó mỗi dịch vụ có một database chuyên dụng:</p>
+<figure class="sd-figure"><img alt="microservices-vs-monolith" loading="lazy" src="assets/content/system-design/images/ch22/microservices-vs-monolith.png"/></figure>
+<p>Điều này có thể dẫn đến các vấn đề về tính nhất quán. Trong máy chủ nguyên khối, chúng ta có thể tận dụng khả năng giao dịch của DB quan hệ để triển khai các hoạt động nguyên tử:</p>
+<figure class="sd-figure"><img alt="atomicity-monolith" loading="lazy" src="assets/content/system-design/images/ch22/atomicity-monolith.png"/></figure>
+<p>Tuy nhiên, sẽ khó khăn hơn để đảm bảo tính nguyên tử này khi hoạt động trải rộng trên nhiều dịch vụ:</p>
+<figure class="sd-figure"><img alt="microservice-non-atomic-operation" loading="lazy" src="assets/content/system-design/images/ch22/microservice-non-atomic-operation.png"/></figure>
+<p>Có một số kỹ thuật nổi tiếng để xử lý những dữ liệu không nhất quán này:<br/>
+ - <strong>Cam kết hai pha</strong>: một giao thức database đảm bảo cam kết giao dịch nguyên tử trên nhiều nút. <br/>
+   Tuy nhiên, nó không hoạt động hiệu quả vì độ trễ của một nút duy nhất sẽ dẫn đến tất cả các nút chặn hoạt động.<br/>
+ - <strong>saga</strong>: một chuỗi các giao dịch cục bộ, trong đó các giao dịch bù được kích hoạt nếu bất kỳ bước nào trong quy trình làm việc không thành công. Đây là một cách tiếp cận nhất quán cuối cùng.</p>
+<p>Điều đáng lưu ý là việc giải quyết sự không nhất quán về dữ liệu trên các vi dịch vụ là một vấn đề đầy thách thức, làm tăng độ phức tạp của hệ thống.<br/>
+Bạn nên cân nhắc xem liệu chi phí đó có xứng đáng hay không, dựa trên cách tiếp cận thực tế hơn của chúng tôi trong việc đóng gói các hoạt động phụ thuộc trong cùng một database quan hệ.</p>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Chúng tôi đã trình bày một thiết kế cho một hệ thống đặt phòng khách sạn.</p>
+<p>Đây là những bước chúng tôi đã trải qua:<br/>
+ - Thu thập các yêu cầu và thực hiện các phép tính tổng thể để hiểu quy mô của hệ thống<br/>
+ - Chúng tôi đã trình bày Thiết kế API, Mô hình dữ liệu và kiến trúc hệ thống trong thiết kế cấp cao<br/>
+ - Khi tìm hiểu sâu, chúng tôi đã khám phá các thiết kế lược đồ database thay thế khi các yêu cầu thay đổi<br/>
+ - Chúng tôi đã thảo luận về các điều kiện của cuộc đua và các giải pháp được đề xuất - khóa bi quan/lạc quan, các hạn chế về database<br/>
+ - Các cách để mở rộng hệ thống thông qua database sharding và cache<br/>
+ - Cuối cùng, chúng tôi đã giải quyết cách xử lý các vấn đề về tính nhất quán của dữ liệu trên nhiều vi dịch vụ</p>
+
+

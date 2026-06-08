@@ -443,8 +443,21 @@ window.SITE_DATA = {
     title: "Coding DSA Interview At Big Tech",
     subtitle: "with Full Solutions",
     authors: [
-      { name: "Phạm Ngọc Lâm", role: "ex-Senior SWE @ TikTok · Grab", linkedin: "https://www.linkedin.com/in/lam0895/" },
-      { name: "Lê Quang Hoà",  role: "ex-Tech Lead @ TikTok",         linkedin: "https://www.linkedin.com/in/harry-le-quang-hoa-32210066/" },
+      {
+        name: "Phạm Ngọc Lâm",
+        role: "ex-Senior Software Engineer @ TikTok · Grab",
+        roleEn: "ex-Senior Software Engineer @ TikTok · Grab",
+        photo: "assets/img/mentors/lam-pham.jpg",
+        linkedin: "https://www.linkedin.com/in/lam0895/",
+        portfolio: "https://lampn95.github.io/",
+      },
+      {
+        name: "Lê Quang Hoà",
+        role: "ex-Tech Lead @ TikTok",
+        roleEn: "ex-Tech Lead @ TikTok",
+        photo: "assets/img/mentors/harry-le-quang-hoa.jpg",
+        linkedin: "https://www.linkedin.com/in/harry-le-quang-hoa-32210066/",
+      },
     ],
     year: 2026,
     url:   "https://engineerpro-team.github.io/coding-book/",

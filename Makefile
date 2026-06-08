@@ -12,7 +12,7 @@ PORT      := 8001
 # Override with: make PYTHON=python3 crawl
 PYTHON   ?= python3.11
 
-.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks help
+.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks build-system-design translate-system-design review-system-design sd-all help
 
 help:
 	@echo "EngineerPro rebuild — available targets:"
@@ -145,6 +145,25 @@ serve:
 	@cd $(LOCAL_DIR) && python3 -m http.server $(PORT)
 
 dev: local-build serve
+
+build-system-design:
+	@echo "→ Building EN chapters from system-design-notes source ..."
+	@$(PYTHON) scripts/build_system_design.py
+
+translate-system-design:
+	@echo "→ Translating EN → VI chapter HTML ..."
+	@$(PYTHON) scripts/translate_system_design.py
+
+review-system-design:
+	@echo "→ Reviewing VI terminology ..."
+	@$(PYTHON) scripts/review_system_design.py
+
+sd-all: build-system-design translate-system-design
+	@$(PYTHON) scripts/fix_system_design_html.py
+	@$(PYTHON) scripts/review_system_design.py
+	@$(PYTHON) scripts/review_system_design.py
+	@$(PYTHON) scripts/review_system_design.py
+	@echo "✓ System Design content pipeline done (local only — do not push without approval)"
 
 clean:
 	@rm -rf $(DOCS_DIR) $(LOCAL_DIR)

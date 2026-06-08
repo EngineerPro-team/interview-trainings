@@ -1,0 +1,379 @@
+<h2>Giới thiệu</h2>
+<p><strong>Nền tảng thanh toán</strong> thường có <strong>dịch vụ ví</strong>, nơi họ cho phép khách hàng lưu trữ tiền trong ứng dụng để họ có thể rút tiền sau này.</p>
+<p>Bạn cũng có thể sử dụng nó để thanh toán hàng hóa và dịch vụ hoặc chuyển tiền cho những người dùng khác sử dụng <strong>ví kỹ thuật số</strong> dịch vụ. Điều đó có thể nhanh hơn và rẻ hơn so với thực hiện thông qua các kênh thanh toán thông thường.</p>
+<figure class="sd-figure"><img alt="digital-wallet" loading="lazy" src="assets/content/system-design/images/ch27/digital-wallet.png"/></figure>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<ul>
+<li>C: Chúng ta có nên chỉ tập trung vào việc chuyển tiền giữa các ví kỹ thuật số không? Chúng ta có nên hỗ trợ bất kỳ hoạt động nào khác không?</li>
+<li>I: Bây giờ hãy tập trung vào việc chuyển tiền giữa các ví kỹ thuật số.</li>
+<li>C: Hệ thống cần hỗ trợ bao nhiêu giao dịch mỗi giây?</li>
+<li>I: Giả sử 1 triệu TPS</li>
+<li>C: Ví kỹ thuật số có yêu cầu nghiêm ngặt về tính chính xác. Chúng ta có thể cho rằng đảm bảo giao dịch là đủ không?</li>
+<li>I: Nghe hay đấy</li>
+<li>C: Chúng ta có cần chứng minh tính đúng không?</li>
+<li>I: Chúng ta có thể làm điều đó thông qua việc đối chiếu, nhưng điều đó chỉ phát hiện ra những khác biệt thay vì chỉ cho chúng ta thấy nguyên nhân sâu xa của chúng. Thay vào đó, chúng tôi muốn có thể phát lại dữ liệu từ đầu để xây dựng lại lịch sử.</li>
+<li>C: Chúng ta có thể giả sử yêu cầu về tính khả dụng là 99,99% không?</li>
+<li>I: Vâng</li>
+<li>C: Chúng ta có cần xem xét đến ngoại hối không?</li>
+<li>I: Không, nó nằm ngoài phạm vi</li>
+</ul>
+<p>Tóm lại đây là những gì chúng tôi phải hỗ trợ:<br/>
+ * Hỗ trợ chuyển số dư giữa hai tài khoản<br/>
+ * Hỗ trợ 1 triệu TPS<br/>
+ * Độ tin cậy là 99,99%<br/>
+ * Hỗ trợ giao dịch<br/>
+ * Hỗ trợ khả năng tái tạo</p>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<p>database quan hệ truyền thống, được cung cấp trên đám mây có thể hỗ trợ ~1000 TPS.</p>
+<p>Để đạt được 1 triệu TPS, chúng tôi cần 1000 nút database. Nhưng nếu mỗi lần chuyển có hai chặng thì chúng tôi thực sự cần hỗ trợ 2 triệu TPS.</p>
+<p>Một trong những mục tiêu thiết kế của chúng tôi là tăng TPS mà một nút duy nhất có thể xử lý để chúng tôi có thể có ít nút database hơn.</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th>TPS trên mỗi nút</th>
+<th>Số nút</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100</td>
+<td>20.000</td>
+</tr>
+<tr>
+<td>1.000</td>
+<td>2.000</td>
+</tr>
+<tr>
+<td>10.000</td>
+<td>200</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<h3><strong>Thiết kế API</strong></h3>
+<p>Chúng tôi chỉ cần hỗ trợ một endpoint cho cuộc phỏng vấn này:</p>
+<pre><code>POST /v1/wallet/balance_transfer - transfers balance from one wallet to another
+</code></pre>
+<p>Request parameters - from_account, to_account, số tiền (chuỗi để không mất độ chính xác), tiền tệ, id giao dịch (idempotency key).</p>
+<p>Sample response:</p>
+<pre><code>{
+    "status": "success"
+    "transaction_id": "01589980-2664-11ec-9621-0242ac130002"
+}
+</code></pre>
+<h3><strong>Giải pháp sharding trong bộ nhớ</strong></h3>
+<p>Ứng dụng ví của chúng tôi duy trì số dư tài khoản cho mọi tài khoản người dùng.</p>
+<p>Một cấu trúc dữ liệu tốt để thể hiện điều này là một <code>map&lt;user_id, balance&gt;</code>, có thể được triển khai bằng cách sử dụng cửa hàng Redis trong bộ nhớ.</p>
+<p>Vì một nút redis không thể chịu được 1mil TPS nên chúng tôi cần partition cụm redis của mình thành nhiều nút.</p>
+<p>Ví dụ thuật toán partition:</p>
+<pre><code>String accountID = "A";
+Int partitionNumber = 7;
+Int myPartition = accountID.hashCode() % partitionNumber;
+</code></pre>
+<p>ZooKeeper có thể được dùng để lưu số lượng partition và địa chỉ của các node Redis vì đây là configuration store có high availability. </p>
+<p>Cuối cùng, dịch vụ ví là một dịch vụ phi trạng thái chịu trách nhiệm thực hiện các hoạt động chuyển tiền. Nó có thể dễ dàng mở rộng theo chiều ngang:</p>
+<figure class="sd-figure"><img alt="wallet-service" loading="lazy" src="assets/content/system-design/images/ch27/wallet-service.png"/></figure>
+<p>Mặc dù giải pháp này giải quyết được những lo ngại về khả năng mở rộng nhưng nó không cho phép chúng tôi thực hiện chuyển số dư một cách nguyên tử.</p>
+<h3><strong>Giao dịch phân tán</strong></h3>
+<p>Một cách tiếp cận để xử lý các giao dịch là sử dụng giao thức cam kết hai giai đoạn trên database quan hệ tiêu chuẩn, được phân chia:</p>
+<figure class="sd-figure"><img alt="distributed-transactions-relational-dbs" loading="lazy" src="assets/content/system-design/images/ch27/distributed-transactions-relational-dbs.png"/></figure>
+<p>Đây là cách hoạt động của giao thức cam kết hai pha (2PC):</p>
+<figure class="sd-figure"><img alt="2pc-protocol" loading="lazy" src="assets/content/system-design/images/ch27/2pc-protocol.png"/></figure>
+<ul>
+<li>Coordinator (dịch vụ ví) thực hiện các thao tác đọc và ghi trên nhiều database như bình thường</li>
+<li>Khi ứng dụng đã sẵn sàng thực hiện giao dịch, Coordinator sẽ yêu cầu tất cả database chuẩn bị giao dịch đó</li>
+<li>Nếu tất cả database trả lời là "có", thì Coordinator sẽ yêu cầu database thực hiện giao dịch.</li>
+<li>Ngược lại, tất cả database sẽ được yêu cầu hủy giao dịch</li>
+</ul>
+<p>Nhược điểm của phương pháp 2PC:<br/>
+ * Không hoạt động do tranh chấp khóa<br/>
+ * Coordinator là một điểm thất bại duy nhất</p>
+<h3><strong>Giao dịch phân tán sử dụng Thử-Xác nhận/Hủy (TC/C)</strong></h3>
+<p>TC/C là một biến thể của giao thức 2PC, hoạt động với các giao dịch bù:<br/>
+ * Coordinator yêu cầu tất cả database dự trữ tài nguyên cho giao dịch<br/>
+ * Coordinator thu thập câu trả lời từ DB - nếu có, DB được yêu cầu thử xác nhận. Nếu không, DB được yêu cầu thử hủy.</p>
+<p>Một điểm khác biệt quan trọng giữa TC/C và 2PC là 2PC thực hiện một giao dịch duy nhất, trong khi ở TC/C, có hai giao dịch độc lập.</p>
+<p>Đây là cách TC/C hoạt động theo từng giai đoạn:</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th>Giai đoạn</th>
+<th>Hoạt động</th>
+<th>A</th>
+<th>C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Thử</td>
+<td>Thay đổi số dư: -$1</td>
+<td>không làm gì cả</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Xác nhận</td>
+<td>không làm gì cả</td>
+<td>Thay đổi số dư: +$1</td>
+</tr>
+<tr>
+<td></td>
+<td>Hủy bỏ</td>
+<td>Thay đổi số dư: +$1</td>
+<td>Không làm gì cả</td>
+</tr>
+</tbody>
+</table>
+<p>Giai đoạn 1 - thử:</p>
+<figure class="sd-figure"><img alt="try-phase" loading="lazy" src="assets/content/system-design/images/ch27/try-phase.png"/></figure>
+<ul>
+<li>Coordinator bắt đầu giao dịch cục bộ trong DB của A để giảm số dư của A đi 1$</li>
+<li>DB của C được cung cấp lệnh NOP, lệnh này không làm gì cả</li>
+</ul>
+<p>Giai đoạn 2a - xác nhận:</p>
+<figure class="sd-figure"><img alt="confirm-phase" loading="lazy" src="assets/content/system-design/images/ch27/confirm-phase.png"/></figure>
+<ul>
+<li>nếu cả hai DB trả lời là "có", giai đoạn xác nhận sẽ bắt đầu.</li>
+<li>DB của A nhận được NOP, trong khi DB của C được hướng dẫn tăng số dư của C thêm 1$ (giao dịch cục bộ)</li>
+</ul>
+<p>Giai đoạn 2b - hủy bỏ:</p>
+<figure class="sd-figure"><img alt="cancel-phase" loading="lazy" src="assets/content/system-design/images/ch27/cancel-phase.png"/></figure>
+<ul>
+<li>Nếu bất kỳ thao tác nào trong giai đoạn 1 không thành công thì giai đoạn hủy sẽ bắt đầu.</li>
+<li>DB của A được hướng dẫn tăng số dư của A thêm 1$, DB của C nhận được NOP</li>
+</ul>
+<p>Đây là so sánh giữa 2PC và TC/C:</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th></th>
+<th>Giai đoạn đầu tiên</th>
+<th>Giai đoạn thứ hai: thành công</th>
+<th>Giai đoạn thứ hai: thất bại</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2PC</td>
+<td>giao dịch vẫn chưa được thực hiện</td>
+<td>Cam kết/Hủy tất cả các giao dịch</td>
+<td>Hủy tất cả các giao dịch</td>
+</tr>
+<tr>
+<td>TC/C</td>
+<td>Tất cả các giao dịch đã hoàn tất - đã cam kết hoặc bị hủy</td>
+<td>Thực hiện các giao dịch mới nếu cần</td>
+<td>Đảo ngược giao dịch đã được cam kết</td>
+</tr>
+</tbody>
+</table>
+<p>TC/C còn được gọi là giao dịch phân phối bằng bồi thường. Hoạt động cấp cao được xử lý trong logic nghiệp vụ.</p>
+<p>Các tính chất khác của TC/C:<br/>
+ * database bất khả tri, miễn là database hỗ trợ các giao dịch<br/>
+ * Chi tiết và độ phức tạp của các giao dịch phân tán cần được xử lý trong logic nghiệp vụ</p>
+<h3><strong>Chế độ lỗi TC/C</strong></h3>
+<p>Nếu Coordinator chết giữa chuyến bay, nó cần khôi phục trạng thái trung gian. <br/>
+Điều đó có thể được thực hiện bằng cách duy trì các bảng trạng thái pha, được cập nhật nguyên tử trong các phân đoạn database:</p>
+<figure class="sd-figure"><img alt="phase-status-tables" loading="lazy" src="assets/content/system-design/images/ch27/phase-status-tables.png"/></figure>
+<p>Bảng đó chứa gì:<br/>
+ * ID và nội dung của giao dịch phân phối<br/>
+ * trạng thái của giai đoạn thử - chưa gửi, đã gửi, đã nhận phản hồi<br/>
+ * tên giai đoạn thứ hai - xác nhận hoặc hủy bỏ<br/>
+ * tình trạng của giai đoạn thứ hai<br/>
+ * cờ không theo thứ tự (sẽ giải thích sau)</p>
+<p>Một lưu ý khi sử dụng TC/C là có một thời điểm ngắn trong đó các trạng thái tài khoản không nhất quán với nhau trong khi giao dịch phân tán đang diễn ra:</p>
+<figure class="sd-figure"><img alt="unbalanced-state" loading="lazy" src="assets/content/system-design/images/ch27/unbalanced-state.png"/></figure>
+<p>Điều này ổn miễn là chúng tôi luôn phục hồi từ trạng thái này và người dùng không thể sử dụng trạng thái trung gian để ví dụ như chi tiêu. <br/>
+Điều này được đảm bảo bằng cách luôn thực hiện các khoản khấu trừ trước khi bổ sung.</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th>Hãy thử lựa chọn giai đoạn</th>
+<th>Tài khoản A</th>
+<th>Tài khoản C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lựa chọn 1</td>
+<td>-$1</td>
+<td>KHÔNG</td>
+</tr>
+<tr>
+<td>Lựa chọn 2 (không hợp lệ)</td>
+<td>KHÔNG</td>
+<td>+$1</td>
+</tr>
+<tr>
+<td>Lựa chọn 3 (không hợp lệ)</td>
+<td>-$1</td>
+<td>+$1</td>
+</tr>
+</tbody>
+</table>
+<p>Lưu ý rằng lựa chọn 3 từ bảng trên không hợp lệ vì chúng tôi không thể đảm bảo việc thực hiện giao dịch nguyên tử trên các database khác nhau mà không dựa vào 2PC.</p>
+<p>Một trường hợp cần xử lý không đúng thứ tự thực thi:</p>
+<figure class="sd-figure"><img alt="out-of-order-execution" loading="lazy" src="assets/content/system-design/images/ch27/out-of-order-execution.png"/></figure>
+<p>Có thể database nhận được thao tác hủy trước khi nhận được lần thử. Trường hợp cạnh này có thể được xử lý bằng cách thêm cờ không đúng thứ tự vào bảng trạng thái pha của chúng tôi.<br/>
+Khi chúng tôi nhận được thao tác thử, trước tiên chúng tôi kiểm tra xem cờ không theo thứ tự có được đặt hay không và nếu có thì sẽ trả về lỗi.</p>
+<h3><strong>Giao dịch phân phối bằng Saga</strong></h3>
+<p>Một cách tiếp cận phổ biến khác là sử dụng Sagas - một tiêu chuẩn để thực hiện các giao dịch phân tán với kiến trúc microservice.</p>
+<p>Đây là cách nó hoạt động:<br/>
+ * tất cả các hoạt động được sắp xếp theo một trình tự. Tất cả các hoạt động đều độc lập trong database riêng của họ.<br/>
+ * các thao tác được thực hiện từ đầu đến cuối<br/>
+ * khi một thao tác thất bại, toàn bộ quá trình bắt đầu quay trở lại từ đầu với các thao tác bù</p>
+<figure class="sd-figure"><img alt="saga" loading="lazy" src="assets/content/system-design/images/ch27/saga.png"/></figure>
+<p>Làm thế nào để chúng ta phối hợp quy trình làm việc? Có hai cách tiếp cận chúng ta có thể thực hiện:<br/>
+ * Biên đạo - tất cả các dịch vụ liên quan đến câu chuyện đều đăng ký các sự kiện liên quan và tham gia vào câu chuyện<br/>
+ * Điều phối - một Coordinator duy nhất hướng dẫn tất cả các dịch vụ thực hiện công việc của họ theo đúng thứ tự</p>
+<p>Thách thức của việc sử dụng vũ đạo là logic nghiệp vụ được chia thành nhiều dịch vụ, giao tiếp không đồng bộ.<br/>
+Phương pháp điều phối xử lý tốt độ phức tạp, vì vậy đây thường là phương pháp được ưa thích trong hệ thống ví kỹ thuật số.</p>
+<p>Đây là so sánh giữa TC/C và Saga:</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th></th>
+<th>TC/C</th>
+<th>saga</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hành động bù đắp</td>
+<td>Đang trong giai đoạn Hủy</td>
+<td>Đang trong giai đoạn khôi phục</td>
+</tr>
+<tr>
+<td>Phối hợp trung tâm</td>
+<td>Đúng</td>
+<td>Có (chế độ phối hợp)</td>
+</tr>
+<tr>
+<td>Lệnh thực hiện thao tác</td>
+<td>bất kì</td>
+<td>tuyến tính</td>
+</tr>
+<tr>
+<td>Khả năng thực hiện song song</td>
+<td>Đúng</td>
+<td>Không (thực thi tuyến tính)</td>
+</tr>
+<tr>
+<td>Có thể thấy trạng thái không nhất quán một phần</td>
+<td>Đúng</td>
+<td>Đúng</td>
+</tr>
+<tr>
+<td>Logic ứng dụng hoặc database</td>
+<td>Ứng dụng</td>
+<td>Ứng dụng</td>
+</tr>
+</tbody>
+</table>
+<p>Sự khác biệt chính là TC/C có thể song song hóa, do đó quyết định của chúng tôi dựa trên yêu cầu về độ trễ - nếu cần đạt được độ trễ thấp, chúng tôi nên sử dụng phương pháp TC/C.</p>
+<p>Bất kể cách tiếp cận nào chúng tôi thực hiện, chúng tôi vẫn cần hỗ trợ kiểm tra và phát lại lịch sử để khôi phục từ trạng thái không thành công.</p>
+<h3><strong>Event sourcing</strong></h3>
+<p>Trong thực tế, ứng dụng ví kỹ thuật số có thể được kiểm tra và chúng tôi phải trả lời một số câu hỏi nhất định:<br/>
+ * Chúng tôi có biết số dư tài khoản tại bất kỳ thời điểm nào không?<br/>
+ * Làm sao chúng ta biết số dư lịch sử và số dư hiện tại là chính xác?<br/>
+ * Làm cách nào để chứng minh logic hệ thống là chính xác sau khi thay đổi mã?</p>
+<p>event sourcing là một kỹ thuật giúp chúng tôi trả lời những câu hỏi này.</p>
+<p>Nó bao gồm bốn khái niệm:<br/>
+ * lệnh - hành động dự định từ thế giới thực, ví dụ: chuyển 1$ từ tài khoản A sang B. Cần phải có global ordering, do đó chúng được đưa vào hàng đợi FIFO.<br/>
+   * Các lệnh, không giống như các sự kiện, có thể thất bại và có một số ngẫu nhiên do IO hoặc trạng thái không hợp lệ.<br/>
+   * lệnh có thể tạo ra 0 hoặc nhiều sự kiện<br/>
+   * việc tạo sự kiện có thể chứa tính ngẫu nhiên như IO bên ngoài. Điều này sẽ được xem xét lại sau<br/>
+ * sự kiện - sự kiện lịch sử về các sự kiện xảy ra trong hệ thống, ví dụ: "đã chuyển 1$ từ A sang B".<br/>
+   * không giống như lệnh, sự kiện là sự kiện đã xảy ra trong hệ thống của chúng tôi<br/>
+   * Tương tự như các lệnh, chúng cần được sắp xếp theo thứ tự, do đó chúng được xếp vào hàng đợi FIFO<br/>
+ * trạng thái - những gì đã thay đổi do một sự kiện. Ví dụ: key-value store giữa tài khoản và số dư của chúng.<br/>
+ * máy trạng thái - thúc đẩy quá trình event sourcing. Nó chủ yếu xác nhận các lệnh và áp dụng các sự kiện để cập nhật trạng thái hệ thống.<br/>
+   * máy trạng thái phải mang tính xác định, do đó, nó không nên đọc IO bên ngoài hoặc dựa vào tính ngẫu nhiên. </p>
+<figure class="sd-figure"><img alt="event-sourcing" loading="lazy" src="assets/content/system-design/images/ch27/event-sourcing.png"/></figure>
+<p>Đây là một cái nhìn năng động về event sourcing:</p>
+<figure class="sd-figure"><img alt="dynamic-event-sourcing" loading="lazy" src="assets/content/system-design/images/ch27/dynamic-event-sourcing.png"/></figure>
+<p>Đối với dịch vụ ví của chúng tôi, các lệnh là yêu cầu chuyển số dư. Chúng ta có thể đặt chúng vào hàng đợi FIFO, chẳng hạn như Kafka:</p>
+<figure class="sd-figure"><img alt="command-queue" loading="lazy" src="assets/content/system-design/images/ch27/command-queue.png"/></figure>
+<p>Đây là hình ảnh đầy đủ:</p>
+<figure class="sd-figure"><img alt="wallet-service-state-machine" loading="lazy" src="assets/content/system-design/images/ch27/wallet-service-state-macghine.png"/></figure>
+<ul>
+<li>máy trạng thái đọc lệnh từ hàng đợi lệnh</li>
+<li>trạng thái cân bằng được đọc từ database</li>
+<li>lệnh được xác nhận. Nếu hợp lệ, hai sự kiện cho mỗi tài khoản sẽ được tạo</li>
+<li>sự kiện tiếp theo được đọc và áp dụng bằng cách cập nhật số dư (trạng thái) trong database</li>
+</ul>
+<p>Ưu điểm chính của event sourcing là khả năng tái tạo. Trong thiết kế này, tất cả các hoạt động cập nhật trạng thái được lưu dưới dạng lịch sử bất biến của mọi thay đổi số dư.</p>
+<p>Số dư lịch sử luôn có thể được xây dựng lại bằng cách phát lại các sự kiện từ đầu. <br/>
+Vì danh sách sự kiện là bất biến và máy trạng thái có tính xác định nên chúng tôi đảm bảo sẽ thành công trong việc phát lại bất kỳ trạng thái trung gian nào.</p>
+<figure class="sd-figure"><img alt="historical-states" loading="lazy" src="assets/content/system-design/images/ch27/historical-states.png"/></figure>
+<p>Tất cả các câu hỏi liên quan đến kiểm toán được nêu ở đầu phần này có thể được giải quyết bằng cách dựa vào event sourcing:<br/>
+ * Chúng tôi có biết số dư tài khoản tại bất kỳ thời điểm nào không? - các sự kiện có thể được phát lại từ đầu cho đến thời điểm mà chúng ta quan tâm<br/>
+ * Làm sao chúng ta biết số dư lịch sử và số dư hiện tại là chính xác? - tính đúng đắn có thể được xác minh bằng cách tính toán lại tất cả các sự kiện ngay từ đầu<br/>
+ * Làm cách nào để chứng minh logic hệ thống là chính xác sau khi thay đổi mã? - chúng tôi có thể chạy các phiên bản mã khác nhau đối với các sự kiện và xác minh kết quả của chúng giống hệt nhau</p>
+<p>Việc trả lời các truy vấn của khách hàng về số dư của họ có thể được giải quyết bằng kiến trúc CQRS - có thể có nhiều máy trạng thái chỉ đọc chịu trách nhiệm truy vấn trạng thái lịch sử, dựa trên danh sách sự kiện bất biến:</p>
+<figure class="sd-figure"><img alt="cqrs-architecture" loading="lazy" src="assets/content/system-design/images/ch27/cqrs-architecture.png"/></figure>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<p>Trong phần này, chúng ta sẽ khám phá một số cách tối ưu hóa hiệu suất vì chúng tôi vẫn phải mở rộng quy mô lên 1 triệu TPS.</p>
+<h3><strong>Event sourcing hiệu suất cao</strong></h3>
+<p>Tối ưu hóa đầu tiên chúng ta sẽ khám phá là lưu các lệnh và sự kiện vào kho lưu trữ đĩa cục bộ thay vì lưu trữ bên ngoài như Kafka.</p>
+<p>Điều này tránh được độ trễ mạng và hơn nữa, vì chúng tôi chỉ thực hiện các phần bổ sung nên thao tác đó thường nhanh đối với ổ cứng.</p>
+<p>Tối ưu hóa tiếp theo là lưu các lệnh và sự kiện gần đây vào bộ nhớ để tiết kiệm thời gian tải lại chúng từ đĩa.</p>
+<p>Ở mức độ thấp, chúng ta có thể đạt được những tối ưu hóa nói trên bằng cách tận dụng lệnh có tên mmap, lệnh này lưu trữ dữ liệu trong đĩa cục bộ cũng như lưu vào cache:</p>
+<figure class="sd-figure"><img alt="mmap-optimization" loading="lazy" src="assets/content/system-design/images/ch27/mmap-optimization.png"/></figure>
+<p>Tối ưu hóa tiếp theo mà chúng ta có thể thực hiện là lưu trữ trạng thái trong hệ thống tệp cục bộ bằng cách sử dụng SQLite - database quan hệ cục bộ dựa trên tệp. RocksDB cũng là một lựa chọn tốt khác.</p>
+<p>Vì mục đích của chúng tôi, chúng tôi sẽ chọn RocksDB vì nó sử dụng cây hợp nhất có cấu trúc nhật ký (LSM), được tối ưu hóa cho các hoạt động ghi.<br/>
+Hiệu suất đọc được tối ưu hóa thông qua cache.</p>
+<figure class="sd-figure"><img alt="rocks-db-approach" loading="lazy" src="assets/content/system-design/images/ch27/rocks-db-approach.png"/></figure>
+<p>Để tối ưu hóa khả năng tái tạo, chúng tôi có thể lưu ảnh chụp nhanh vào đĩa theo định kỳ để không phải tái tạo lại một trạng thái nhất định ngay từ đầu mỗi lần. Chúng tôi có thể lưu trữ ảnh chụp nhanh dưới dạng tệp nhị phân lớn trong distributed file storage, ví dụ: HDFS:</p>
+<figure class="sd-figure"><img alt="snapshot-approach" loading="lazy" src="assets/content/system-design/images/ch27/snapshot-approach.png"/></figure>
+<h3><strong>Event sourcing hiệu suất cao đáng tin cậy</strong></h3>
+<p>Tất cả những tối ưu hóa được thực hiện cho đến nay đều rất tuyệt vời nhưng chúng khiến dịch vụ của chúng tôi trở nên có trạng thái. Chúng ta cần giới thiệu một số replication nhằm mục đích đảm bảo độ tin cậy.</p>
+<p>Trước khi làm điều đó, chúng ta nên phân tích loại dữ liệu nào cần độ tin cậy cao trong hệ thống của mình:<br/>
+ * trạng thái và ảnh chụp nhanh luôn có thể được tạo lại bằng cách replay chúng từ event log. Do đó, chúng ta chỉ cần đảm bảo độ tin cậy của danh sách sự kiện.<br/>
+ * người ta có thể nghĩ rằng chúng ta luôn có thể tạo lại danh sách sự kiện từ danh sách lệnh, nhưng điều đó không đúng vì các lệnh không mang tính quyết định.<br/>
+ * kết luận là chúng ta chỉ cần đảm bảo độ tin cậy cao cho danh sách sự kiện</p>
+<p>Để đạt được độ tin cậy cao cho các sự kiện, chúng ta cần replicate log trên nhiều node. Chúng tôi cần đảm bảo:<br/>
+ * rằng không có mất dữ liệu<br/>
+ * thứ tự tương đối của dữ liệu trong tệp nhật ký vẫn giữ nguyên trên các replica</p>
+<p>Để đạt được điều này, chúng ta có thể sử dụng thuật toán đồng thuận, chẳng hạn như Raft.</p>
+<p>Với Raft, có một leader chủ động và các follower thụ động. Nếu leader chết, một follower sẽ tiếp quản. <br/>
+Miễn là hơn một nửa số nút hoạt động, hệ thống sẽ tiếp tục chạy.</p>
+<figure class="sd-figure"><img alt="raft-replication" loading="lazy" src="assets/content/system-design/images/ch27/raft-replication.png"/></figure>
+<p>Với cách tiếp cận này, tất cả các nút đều cập nhật trạng thái dựa trên danh sách sự kiện. Raft đảm bảo leader và follower có cùng danh sách sự kiện.</p>
+<h3><strong>Event sourcing phân tán</strong></h3>
+<p>Cho đến nay, chúng tôi đã thiết kế được một hệ thống có hiệu suất nút đơn cao và đáng tin cậy.</p>
+<p>Một số hạn chế chúng ta phải khắc phục:<br/>
+ * Sức chứa của một Raft group có hạn. Tại một thời điểm nào đó, chúng ta cần phân chia dữ liệu và thực hiện các giao dịch phân tán<br/>
+ * Trong kiến trúc CQRS, luồng request/phản hồi chậm. Khách hàng sẽ cần polling định kỳ hệ thống để biết khi nào ví được cập nhật</p>
+<p>Polling không diễn ra theo thời gian thực, do đó người dùng có thể mất một chút thời gian để thấy bản cập nhật số dư. Ngoài ra, polling quá thường xuyên có thể làm quá tải các Query service:</p>
+<figure class="sd-figure"><img alt="polling-approach" loading="lazy" src="assets/content/system-design/images/ch27/polling-approach.png"/></figure>
+<p>Để giảm thiểu tải hệ thống, chúng tôi có thể giới thiệu một reverse proxy thay mặt người dùng gửi command và poll response:</p>
+<figure class="sd-figure"><img alt="reverse-proxy" loading="lazy" src="assets/content/system-design/images/ch27/reverse-proxy.png"/></figure>
+<p>Điều này giúp giảm tải hệ thống vì chúng tôi có thể fetch dữ liệu cho nhiều người dùng bằng một yêu cầu duy nhất nhưng vẫn không giải quyết được yêu cầu nhận theo thời gian thực.</p>
+<p>Một thay đổi cuối cùng mà chúng tôi có thể thực hiện là làm cho máy ở trạng thái chỉ đọc đẩy phản hồi trở lại proxy ngược khi nó khả dụng. Điều này có thể mang lại cho người dùng cảm giác rằng các cập nhật diễn ra theo thời gian thực:</p>
+<figure class="sd-figure"><img alt="push-state-machines" loading="lazy" src="assets/content/system-design/images/ch27/push-state-machines.png"/></figure>
+<p>Cuối cùng, để mở rộng hệ thống hơn nữa, chúng tôi có thể chia hệ thống thành nhiều Raft group, trong đó chúng tôi triển khai các giao dịch phân tán trên chúng bằng cách sử dụng bộ điều phối thông qua TC/C hoặc Sagas:</p>
+<figure class="sd-figure"><img alt="sharded-raft-groups" loading="lazy" src="assets/content/system-design/images/ch27/sharded-raft-groups.png"/></figure>
+<p>Dưới đây là ví dụ về vòng đời của yêu cầu chuyển số dư trong hệ thống cuối cùng của chúng ta:<br/>
+ * Người dùng A gửi giao dịch phân tán đến Coordinator Saga bằng hai thao tác - <code>A-1</code> Và <code>C+1</code>.<br/>
+ * Coordinator Saga tạo một bản ghi trong bảng trạng thái giai đoạn để theo dõi trạng thái giao dịch<br/>
+ * Coordinator xác định partition nào cần gửi lệnh tới.<br/>
+ * Raft leader của partition 1 nhận lệnh <code>A-1</code>, xác thực nó, chuyển đổi nó thành một sự kiện và replicate nó qua các node khác trong Raft group<br/>
+ * Kết quả sự kiện được sync với máy trạng thái đọc, máy này sẽ gửi phản hồi trở lại Coordinator<br/>
+ * Coordinator tạo một bản ghi cho biết thao tác đã thành công và tiến hành thao tác tiếp theo - <code>C+1</code><br/>
+ * Thao tác tiếp theo được thực hiện tương tự như thao tác đầu tiên - partition được xác định, lệnh được gửi, thực thi, máy đọc trạng thái sẽ gửi lại phản hồi<br/>
+ * Coordinator tạo một bản ghi cho biết thao tác 2 cũng đã thành công và cuối cùng thông báo kết quả cho khách hàng</p>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Đây là sự phát triển trong thiết kế của chúng ta:<br/>
+ * Chúng tôi bắt đầu từ giải pháp sử dụng Redis trong bộ nhớ. Vấn đề với cách tiếp cận này là nó không có khả năng lưu trữ lâu dài.<br/>
+ * Chúng tôi đã chuyển sang sử dụng database quan hệ, trên hết là chúng tôi thực hiện các giao dịch phân tán bằng cách sử dụng 2PC, TC/C hoặc câu chuyện phân tán.<br/>
+ * Tiếp theo, chúng tôi đã giới thiệu event sourcing để giúp mọi hoạt động có thể được kiểm tra<br/>
+ * Chúng tôi đã bắt đầu bằng cách lưu trữ dữ liệu vào bộ nhớ ngoài bằng database bên ngoài và hàng đợi, nhưng cách đó không hiệu quả<br/>
+ * Chúng tôi đã tiến hành lưu trữ dữ liệu trong local file storage, tận dụng hiệu suất của các hoạt động chỉ gắn thêm. Chúng tôi cũng sử dụng cache để tối ưu hóa đường dẫn đọc<br/>
+ * Cách tiếp cận trước đó, mặc dù có hiệu quả nhưng không bền vững. Do đó, chúng tôi đã giới thiệu sự đồng thuận của Raft với tính năng nhân rộng để tránh các single point of failure<br/>
+ * Chúng tôi cũng đã áp dụng CQRS với proxy ngược để thay mặt người dùng quản lý vòng đời của giao dịch<br/>
+ * Cuối cùng, chúng tôi đã partition dữ liệu của mình thành nhiều Raft group, được sắp xếp bằng cơ chế giao dịch phân tán - TC/C hoặc saga phân tán</p>

@@ -47,7 +47,16 @@ SRC = os.path.join(ROOT, "src")
 DOCS = os.path.join(ROOT, os.environ.get("EP_OUT", "docs"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, RESOURCES_ALIASES, SITE_NAME, OG_IMAGE  # noqa: E402
+from site_config import (  # noqa: E402
+    BASE_URL,
+    BASE_PATH,
+    SITE_BASE,
+    TOP_ROUTES,
+    RESOURCES_ALIASES,
+    SITE_NAME,
+    OG_IMAGE,
+    SYSTEM_DESIGN_URL_SLUG,
+)
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -64,6 +73,32 @@ def load_data_object(filename: str, var_name: str) -> dict:
         raw = f.read()
     m = re.search(rf"window\.{var_name}\s*=\s*(\{{.*\}})\s*;", raw, re.S)
     return json.loads(m.group(1)) if m else {}
+
+
+def load_sd_chapters() -> list[dict]:
+    """Parse chapter rows from system-design-data.js (JS object literal, not strict JSON)."""
+    path = os.path.join(SRC, "assets", "system-design-data.js")
+    with open(path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    chapters: list[dict] = []
+    for line in raw.splitlines():
+        if "slug:" not in line:
+            continue
+        n_m = re.search(r"n:\s*(\d+)", line)
+        slug_m = re.search(r'slug:\s*"([^"]+)"', line)
+        title_m = re.search(r'title:\s*"([^"]*)"', line)
+        title_en_m = re.search(r'titleEn:\s*"([^"]*)"', line)
+        avail_m = re.search(r"available:\s*(true|false)", line)
+        if not (n_m and slug_m and title_m and title_en_m and avail_m):
+            continue
+        chapters.append({
+            "n": int(n_m.group(1)),
+            "slug": slug_m.group(1),
+            "title": title_m.group(1),
+            "titleEn": title_en_m.group(1),
+            "available": avail_m.group(1) == "true",
+        })
+    return chapters
 
 
 def attr(s: str) -> str:
@@ -309,7 +344,7 @@ def fix_asset_paths(template: str) -> str:
     # 3. Internal route links
     if BASE_PATH:
         out = re.sub(
-            r'href="/(courses|book|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/"',
+            r'href="/(courses|book|system-design-material|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/"',
             rf'href="{BASE_PATH}/\1/"',
             out,
         )
@@ -427,7 +462,48 @@ def show_route_style(template: str, route: str) -> str:
 # preview card. Paths are relative to site root (will be absolutised).
 ROUTE_OG_IMAGES = {
     "mock": "/assets/img/mock-interview-cover.jpg",
+    SYSTEM_DESIGN_URL_SLUG: "/assets/img/system-design-cover.png",
 }
+
+SD_AUTHORS = [
+    {"name": "Phạm Ngọc Lâm", "url": "https://www.linkedin.com/in/lam0895/"},
+    {"name": "Lê Quang Hoà", "url": "https://www.linkedin.com/in/harry-le-quang-hoa-32210066/"},
+]
+
+SD_SOURCE_NOTE = "Nguồn: liquidslr/system-design-notes"
+
+
+def sd_author_schema() -> list[dict]:
+    return [{"@type": "Person", "name": a["name"], "url": a["url"]} for a in SD_AUTHORS]
+
+
+def sd_chapter_description(ch: dict) -> str:
+    n = ch.get("n", "")
+    title_vi = ch.get("title", "")
+    return truncate(
+        f"Chương {n}: {title_vi} — ghi chú System Design Interview (VI & EN). "
+        f"Tổng hợp EngineerPro. {SD_SOURCE_NOTE}.",
+        160,
+    )
+
+
+def sd_chapter_intro_snippet(slug: str, limit: int = 320) -> str:
+    """First plain-text paragraph from VI chapter HTML for prerender/SEO."""
+    path = os.path.join(SRC, "assets", "content", "system-design", "vi", f"{slug}.html")
+    if not os.path.isfile(path):
+        return ""
+    with open(path, encoding="utf-8") as f:
+        raw = f.read()
+    m = re.search(r"<p[^>]*>(.*?)</p>", raw, re.DOTALL | re.IGNORECASE)
+    source = m.group(1) if m else raw
+    plain = re.sub(r"<[^>]+>", " ", source)
+    plain = re.sub(r"\s+", " ", plain).strip()
+    if not plain:
+        return ""
+    if len(plain) <= limit:
+        return plain
+    cut = plain[: limit - 1].rsplit(" ", 1)[0]
+    return cut + "…"
 
 
 def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
@@ -619,12 +695,146 @@ def build_story_detail(template: str, s: dict) -> str:
     return out
 
 
+def build_system_design_listing(template: str, title_vi: str, title_en: str,
+                                description: str) -> str:
+    chapters = [c for c in load_sd_chapters() if c.get("available")]
+    canonical = f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/"
+    title = f"{title_vi} · {SITE_NAME} — Luyện phỏng vấn Big Tech"
+    og_image = SITE_BASE + ROUTE_OG_IMAGES.get(SYSTEM_DESIGN_URL_SLUG, OG_IMAGE)
+
+    out = patch_head(
+        template, title=title, description=description,
+        canonical=canonical, og_image=og_image,
+        og_title=f"{title_vi} · {SITE_NAME}",
+        og_image_alt=f"{title_vi} — {SITE_NAME}",
+    )
+
+    item_list = {
+        "@type": "ItemList",
+        "@id": canonical + "#chapters",
+        "name": f"{title_vi} — System Design case studies",
+        "description": description,
+        "numberOfItems": len(chapters),
+        "itemListOrder": "https://schema.org/ItemListOrderAscending",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": c["n"],
+                "name": c["title"],
+                "url": f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/{c['slug']}/",
+            }
+            for c in chapters
+        ],
+    }
+    extra = [
+        {
+            "@type": "CollectionPage",
+            "@id": canonical,
+            "url": canonical,
+            "name": f"{title_vi} · {SITE_NAME}",
+            "description": description,
+            "isPartOf": {"@id": f"{SITE_BASE}/#website"},
+            "inLanguage": "vi",
+            "author": sd_author_schema(),
+            "publisher": {"@id": f"{SITE_BASE}/#org"},
+            "hasPart": {"@id": canonical + "#chapters"},
+        },
+        item_list,
+        {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_BASE + "/"},
+                {"@type": "ListItem", "position": 2, "name": title_vi, "item": canonical},
+            ],
+        },
+    ]
+    out = patch_jsonld(out, extra)
+
+    links = ""
+    for c in chapters:
+        href = f"{attr(BASE_PATH)}/{SYSTEM_DESIGN_URL_SLUG}/{c['slug']}/"
+        links += (
+            f'    <a class="book-chapter" href="{href}" '
+            f'data-href="#sd-chapter/{c["slug"]}">'
+            f'<span class="book-chapter__n">{text(str(c["n"]))}</span>'
+            f'<span class="book-chapter__title">{text(c["title"])}</span>'
+            f"</a>\n"
+        )
+    snippet = (
+        f'  <div class="book-group__items sd-prerender-chapters" aria-label="System Design chapters">\n'
+        f"{links}"
+        f"  </div>"
+    )
+    out = inject_into_mount(out, "sdChapters", snippet)
+    out = show_route_style(out, "system-design")
+    out = inject_boot_script(out)
+    return out
+
+
+def build_sd_chapter(template: str, ch: dict) -> str:
+    title_vi = ch.get("title", "")
+    title_en = ch.get("titleEn") or title_vi
+    n = ch.get("n", "")
+    slug = ch["slug"]
+
+    title = f"{title_vi} · {SITE_NAME} — System Design"
+    description = sd_chapter_description(ch)
+    canonical = f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/{slug}/"
+    intro = sd_chapter_intro_snippet(slug)
+
+    og_image = SITE_BASE + OG_IMAGE
+    out = patch_head(
+        template, title=title, description=description,
+        canonical=canonical, og_image=og_image, og_title=title_vi,
+        og_type="article",
+    )
+
+    extra = [{
+        "@type": "Article",
+        "@id": canonical + "#article",
+        "headline": title_vi,
+        "alternativeHeadline": title_en,
+        "description": description,
+        "url": canonical,
+        "author": sd_author_schema(),
+        "publisher": {"@id": f"{SITE_BASE}/#org"},
+        "isPartOf": {"@id": f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/#chapters"},
+        "inLanguage": "vi",
+    }, {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE_BASE + "/"},
+            {"@type": "ListItem", "position": 2, "name": "System design material", "item": f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/"},
+            {"@type": "ListItem", "position": 3, "name": title_vi, "item": canonical},
+        ],
+    }]
+    out = patch_jsonld(out, extra)
+
+    intro_html = f'<p class="article__lede">{text(intro)}</p>' if intro else ""
+    snippet = (
+        f'  <header class="article__head">'
+        f'    <span class="badge">Ch. {text(str(n))}</span>'
+        f'    <h1>{text(title_vi)}</h1>'
+        f'    <p class="muted"><a href="{attr(BASE_PATH)}/{SYSTEM_DESIGN_URL_SLUG}/" data-href="#system-design">← System design material</a></p>'
+        f'  </header>\n'
+        f'  {intro_html}'
+    )
+    out = inject_into_mount(out, "sdChapterArticle", snippet)
+    out = show_route_style(out, "sd-chapter")
+    out = inject_boot_script(out)
+    return out
+
+
 # ---------- per-route descriptions for top routes ---------------------------
 
 ROUTE_DESCRIPTIONS_VI = {
     "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
-    "book":      "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-    "mock":      "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
+    "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
+    SYSTEM_DESIGN_URL_SLUG: (
+        "23 case study System Design Interview — đọc từng chương (VI & EN). "
+        "Tổng hợp & dịch EngineerPro. Nguồn: liquidslr/system-design-notes."
+    ),
+    "mock":          "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
     "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech, playlist review CV.",
     "mentors":   "17 mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",
     "stories":   "94+ học viên EngineerPro đã nhận offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",
@@ -703,7 +913,10 @@ def main() -> int:
     # 1. Top routes
     for slug, vi, en in TOP_ROUTES:
         desc = ROUTE_DESCRIPTIONS_VI[slug]
-        html_out = build_top_route(template, slug, vi, en, desc)
+        if slug == SYSTEM_DESIGN_URL_SLUG:
+            html_out = build_system_design_listing(template, vi, en, desc)
+        else:
+            html_out = build_top_route(template, slug, vi, en, desc)
         write(os.path.join(DOCS, slug, "index.html"), html_out)
         pages += 1
 
@@ -733,6 +946,14 @@ def main() -> int:
     for s in stories:
         html_out = build_story_detail(template, s)
         write(os.path.join(DOCS, "stories", s["slug"], "index.html"), html_out)
+        pages += 1
+
+    # 3b. System Design chapter pages (available chapters only)
+    for ch in load_sd_chapters():
+        if not ch.get("available"):
+            continue
+        html_out = build_sd_chapter(template, ch)
+        write(os.path.join(DOCS, SYSTEM_DESIGN_URL_SLUG, ch["slug"], "index.html"), html_out)
         pages += 1
 
     # 4. Home anchor shortcuts: /roadmap and /format land on the home page
@@ -801,10 +1022,16 @@ def main() -> int:
     # over time (GH Pages can't issue real HTTP 301s).
     legacy_redirects = {
         "/pages/dieu-khoan-dich-vu":  "/terms/",
+        "/system-design": f"/{SYSTEM_DESIGN_URL_SLUG}/",
         # Add more legacy paths here as we discover them:
         # "/blogs/faqs":              "/faq/",
         # "/pages/lien-he":           "/contact/",
     }
+    for ch in load_sd_chapters():
+        if ch.get("available"):
+            legacy_redirects[f"/system-design/{ch['slug']}"] = (
+                f"/{SYSTEM_DESIGN_URL_SLUG}/{ch['slug']}/"
+            )
     for old_path, new_path in legacy_redirects.items():
         rel_dir = old_path.strip("/")
         target_url = f"{SITE_BASE}{new_path}"

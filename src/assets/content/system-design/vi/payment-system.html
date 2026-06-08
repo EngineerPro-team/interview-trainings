@@ -1,0 +1,257 @@
+<h2>Giới thiệu</h2>
+<p>Chúng tôi sẽ thiết kế <strong>hệ thống thanh toán</strong> trong chương này, nó củng cố tất cả các phương pháp hiện đại <strong>thương mại điện tử</strong>.</p>
+<p><strong>hệ thống thanh toán</strong> được dùng để giải quyết các giao dịch tài chính, chuyển giao giá trị tiền tệ.</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<ul>
+<li>C: Chúng ta đang xây dựng loại hệ thống thanh toán nào?</li>
+<li>I: Phần phụ trợ thanh toán cho hệ thống thương mại điện tử, tương tự như Amazon.com. Nó xử lý mọi thứ liên quan đến chuyển động tiền.</li>
+<li>C: Những tùy chọn thanh toán nào được hỗ trợ - Thẻ tín dụng, PayPal, thẻ ngân hàng, v.v.?</li>
+<li>I: Hệ thống sẽ hỗ trợ tất cả các tùy chọn này trong đời thực. Với mục đích của cuộc phỏng vấn, chúng tôi có thể sử dụng thanh toán bằng thẻ tín dụng.</li>
+<li>C: Chúng tôi có tự xử lý việc xử lý thẻ tín dụng không?</li>
+<li>I: Không, chúng tôi sử dụng nhà cung cấp bên thứ ba như Stripe, Braintree, Square, v.v.</li>
+<li>C: Chúng tôi có lưu trữ dữ liệu thẻ tín dụng trong hệ thống của mình không?</li>
+<li>I: Vì lý do tuân thủ, chúng tôi không lưu trữ dữ liệu thẻ tín dụng trực tiếp trong hệ thống của mình. Chúng tôi dựa vào bộ xử lý thanh toán của bên thứ ba.</li>
+<li>C: Ứng dụng có mang tính toàn cầu không? Chúng tôi có cần hỗ trợ các loại tiền tệ và thanh toán quốc tế khác nhau không?</li>
+<li>I: Ứng dụng này mang tính toàn cầu, nhưng chúng tôi giả định chỉ có một loại tiền tệ được sử dụng cho mục đích phỏng vấn.</li>
+<li>C: Chúng tôi hỗ trợ bao nhiêu giao dịch thanh toán mỗi ngày?</li>
+<li>I: 1 triệu giao dịch mỗi ngày.</li>
+<li>C: Chúng tôi có cần hỗ trợ luồng thanh toán như thanh toán cho người trả tiền mỗi tháng không?</li>
+<li>I: Vâng, chúng tôi cần hỗ trợ điều đó</li>
+<li>C: Còn điều gì khác mà tôi nên chú ý không?</li>
+<li>I: Chúng ta cần hỗ trợ việc đối chiếu để khắc phục những mâu thuẫn trong giao tiếp với hệ thống nội bộ và bên ngoài.</li>
+</ul>
+<h3><strong>Yêu cầu chức năng</strong></h3>
+<ul>
+<li>Pay-in flow — hệ thống thanh toán nhận tiền từ client thay mặt cho người bán</li>
+<li>Pay-out flow — hệ thống thanh toán gửi tiền cho người bán trên toàn thế giới</li>
+</ul>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li>Độ tin cậy và khả năng chịu lỗi. Thanh toán không thành công cần được xử lý cẩn thận</li>
+<li>Cần thiết lập reconciliation (đối soát) giữa hệ thống nội bộ và bên ngoài.</li>
+</ul>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<p>Hệ thống cần xử lý 1 triệu giao dịch mỗi ngày, tức là 10 giao dịch mỗi giây.</p>
+<p>Đây không phải là thông lượng cao đối với bất kỳ hệ thống database nào, vì vậy nó không phải là trọng tâm của cuộc phỏng vấn này.</p>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<p>Ở cấp độ cao, chúng ta có ba tác nhân tham gia vào luồng chuyển tiền:</p>
+<figure class="sd-figure"><img alt="high-level-flow" loading="lazy" src="assets/content/system-design/images/ch26/high-level-flow.png"/></figure>
+<h3><strong>Pay-in flow</strong></h3>
+<p>Dưới đây là tổng quan cấp cao về luồng thanh toán:</p>
+<figure class="sd-figure"><img alt="pay-in-flow-high-level" loading="lazy" src="assets/content/system-design/images/ch26/payin-flow-high-level.png"/></figure>
+<ul>
+<li>Payment service - chấp nhận các sự kiện thanh toán và điều phối quá trình thanh toán. Nó thường thực hiện kiểm tra rủi ro bằng cách sử dụng nhà cung cấp bên thứ ba để phát hiện các vi phạm AML hoặc hoạt động tội phạm.</li>
+<li>Người thực hiện thanh toán - thực hiện một lệnh thanh toán duy nhất thông qua Nhà cung cấp Payment service (PSP). Sự kiện thanh toán có thể chứa nhiều lệnh thanh toán.</li>
+<li>Nhà cung cấp Payment service (PSP) - chuyển tiền từ tài khoản này sang tài khoản khác, ví dụ từ tài khoản thẻ tín dụng của người mua sang tài khoản ngân hàng của trang thương mại điện tử.</li>
+<li>Các chương trình thẻ - các tổ chức xử lý các hoạt động thẻ tín dụng, ví dụ như Visa MasterCard, v.v.</li>
+<li>Sổ cái - lưu giữ hồ sơ tài chính của tất cả các giao dịch thanh toán.</li>
+<li>Ví - giữ số dư tài khoản cho tất cả người bán.</li>
+</ul>
+<p>Dưới đây là một ví dụ về luồng thanh toán:<br/>
+ * người dùng nhấp vào "đặt hàng" và sự kiện thanh toán được gửi đến Payment service<br/>
+ * Payment service lưu trữ sự kiện trong database của nó<br/>
+ * Payment service gọi cho người thực hiện thanh toán cho tất cả các lệnh thanh toán, một phần của sự kiện thanh toán đó<br/>
+ * người thực hiện thanh toán lưu trữ lệnh thanh toán trong database của nó<br/>
+ * người thực hiện thanh toán gọi PSP bên ngoài để xử lý thanh toán bằng thẻ tín dụng<br/>
+ * Sau khi người thực hiện thanh toán xử lý thanh toán, Payment service sẽ cập nhật ví để ghi lại số tiền người bán có<br/>
+ * dịch vụ ví lưu trữ thông tin số dư cập nhật trong database của nó<br/>
+ * Payment service gọi sổ cái để ghi lại mọi chuyển động của tiền</p>
+<h3><strong>API cho Payment service</strong></h3>
+<pre><code>POST /v1/payments
+{
+  "buyer_info": {...},
+  "checkout_id": "some_id",
+  "credit_card_info": {...},
+  "payment_orders": [{...}, {...}, {...}]
+}
+</code></pre>
+<p>Ví dụ <code>payment_order</code>:</p>
+<pre><code>{
+  "seller_account": "SELLER_IBAN",
+  "amount": "3.15",
+  "currency": "USD",
+  "payment_order_id": "globally_unique_payment_id"
+}
+</code></pre>
+<p>Hãy cẩn thận:<br/>
+ * <code>payment_order_id</code> được chuyển tiếp đến PSP để loại bỏ các khoản thanh toán trùng lặp — đây là <strong>idempotency key</strong>.<br/>
+ * Trường số lượng là <code>string</code> vì <code>double</code> không phù hợp để thể hiện giá trị tiền tệ.</p>
+<pre><code>GET /v1/payments/{:id}
+</code></pre>
+<p>endpoint này trả về trạng thái thực hiện của một khoản thanh toán, dựa trên <code>payment_order_id</code>.</p>
+<h3><strong>Mô hình dữ liệu Payment service</strong></h3>
+<p>Chúng ta cần duy trì hai bảng - <code>payment_events</code> Và <code>payment_orders</code>.</p>
+<p>Đối với thanh toán, hiệu suất thường không phải là yếu tố quan trọng. Tuy nhiên, tính nhất quán mạnh mẽ là như vậy.</p>
+<p>Những cân nhắc khác khi chọn database:<br/>
+ * Thị trường mạnh mẽ về các DBA cần thuê để quản trị database<br/>
+ * Thành tích đã được chứng minh trong đó database đã được các tổ chức tài chính lớn khác sử dụng<br/>
+ * Công cụ hỗ trợ phong phú<br/>
+ * SQL truyền thống trên NoSQL/NewSQL để đảm bảo ACID của nó</p>
+<p>Đây là những gì <code>payment_events</code> bảng chứa:<br/>
+ * <code>checkout_id</code> - chuỗi, khóa chính<br/>
+ * <code>buyer_info</code> - string (ghi chú cá nhân - có lẽ foreign key sang bảng khác sẽ phù hợp hơn)<br/>
+ * <code>seller_info</code> - string (ghi chú cá nhân - nhận xét tương tự như trên)<br/>
+ * <code>credit_card_info</code> - phụ thuộc vào nhà cung cấp thẻ<br/>
+ * <code>is_payment_done</code> - boolean</p>
+<p>Đây là những gì <code>payment_orders</code> bảng chứa:<br/>
+ * <code>payment_order_id</code> - string, khóa chính<br/>
+ * <code>buyer_account</code> - string<br/>
+ * <code>amount</code> - string<br/>
+ * <code>currency</code> - string<br/>
+ * <code>checkout_id</code> - string, khóa ngoại<br/>
+ * <code>payment_order_status</code> - enum (<code>NOT_STARTED</code>, <code>EXECUTING</code>, <code>SUCCESS</code>, <code>FAILED</code>)<br/>
+ * <code>ledger_updated</code> - boolean<br/>
+ * <code>wallet_updated</code> - boolean</p>
+<p>Hãy cẩn thận:<br/>
+ * có nhiều lệnh thanh toán, liên kết với một sự kiện thanh toán nhất định<br/>
+ * chúng tôi không cần <code>seller_info</code> đối với pay-in flow. Trường đó chỉ cần cho pay-out flow<br/>
+ * <code>ledger_updated</code> Và <code>wallet_updated</code> được cập nhật khi dịch vụ tương ứng được gọi để ghi lại kết quả thanh toán<br/>
+ * quá trình chuyển đổi thanh toán được quản lý bởi một công việc nền, kiểm tra các cập nhật của các khoản thanh toán đang diễn ra và kích hoạt cảnh báo nếu khoản thanh toán không được xử lý trong khung thời gian hợp lý</p>
+<h3><strong>Hệ thống sổ cái ghi sổ kép</strong></h3>
+<p>Cơ chế kế toán kép là chìa khóa cho bất kỳ hệ thống thanh toán nào. Đó là một cơ chế theo dõi chuyển động của tiền bằng cách luôn áp dụng các hoạt động tiền cho hai tài khoản, trong đó số dư tài khoản của một người tăng (tín dụng) và tài khoản kia giảm (ghi nợ):</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th>Tài khoản</th>
+<th>Ghi nợ</th>
+<th>Tín dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>người mua</td>
+<td>$1</td>
+<td></td>
+</tr>
+<tr>
+<td>người bán</td>
+<td></td>
+<td>$1</td>
+</tr>
+</tbody>
+</table>
+<p>Tổng của tất cả các mục giao dịch luôn bằng không. Cơ chế này cung cấp khả năng truy xuất nguồn gốc từ đầu đến cuối của tất cả các chuyển động tiền trong hệ thống.</p>
+<h3><strong>Trang thanh toán được lưu trữ</strong></h3>
+<p>Để tránh lưu trữ thông tin thẻ tín dụng và phải tuân thủ nhiều quy định nặng nề khác nhau, hầu hết các công ty thích sử dụng một tiện ích do PSP cung cấp để lưu trữ và xử lý các khoản thanh toán bằng thẻ tín dụng cho bạn:</p>
+<figure class="sd-figure"><img alt="hosted-payment-page" loading="lazy" src="assets/content/system-design/images/ch26/hosted-payment-page.png"/></figure>
+<h3><strong>Pay-out flow</strong></h3>
+<p>Các thành phần của pay-out flow rất giống pay-in flow.</p>
+<p>Sự khác biệt chính:<br/>
+ * tiền được chuyển từ tài khoản ngân hàng của trang thương mại điện tử sang tài khoản ngân hàng của người bán<br/>
+ * chúng tôi có thể sử dụng nhà cung cấp Payment service tài khoản bên thứ ba như Tipalti<br/>
+ * Có rất nhiều yêu cầu về kế toán và quy định cần xử lý liên quan đến các khoản thanh toán</p>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<p>Phần này tập trung vào việc làm cho hệ thống nhanh hơn, mạnh mẽ hơn và an toàn hơn.</p>
+<h3><strong>Tích hợp PSP</strong></h3>
+<p>Nếu hệ thống của chúng tôi có thể kết nối trực tiếp với các ngân hàng hoặc chương trình thẻ, thì việc thanh toán có thể được thực hiện mà không cần PSP.<br/>
+Những kiểu kết nối này rất hiếm và không phổ biến, thường được thực hiện ở các công ty lớn để có thể biện minh cho khoản đầu tư.</p>
+<p>Nếu chúng ta đi theo con đường truyền thống, PSP có thể được tích hợp theo một trong hai cách:<br/>
+ * Thông qua API, nếu hệ thống thanh toán của chúng tôi có thể thu thập thông tin thanh toán<br/>
+ * Thông qua trang thanh toán được lưu trữ để tránh phải xử lý các quy định về thông tin thanh toán</p>
+<p>Dưới đây là cách hoạt động của quy trình làm việc của trang thanh toán được lưu trữ:</p>
+<figure class="sd-figure"><img alt="hosted-payment-page-workflow" loading="lazy" src="assets/content/system-design/images/ch26/hosted-payment-page-workflow.png"/></figure>
+<ul>
+<li>Người dùng nhấn vào nút "thanh toán" trên trình duyệt</li>
+<li>client gọi đến Payment service kèm theo thông tin lệnh thanh toán</li>
+<li>Sau khi nhận được thông tin lệnh thanh toán, Payment service sẽ gửi yêu cầu đăng ký thanh toán tới PSP.</li>
+<li>PSP nhận thông tin thanh toán như tiền tệ, số tiền, ngày hết hạn, v.v., cũng như UUID cho mục đích idempotency. Điển hình là UUID của lệnh thanh toán.</li>
+<li>PSP trả lại mã thông báo xác định duy nhất việc đăng ký thanh toán. Mã thông báo được lưu trữ trong database Payment service.</li>
+<li>Sau khi mã thông báo được lưu trữ, người dùng sẽ được cung cấp trang thanh toán do PSP lưu trữ. Nó được khởi tạo bằng cách sử dụng mã thông báo cũng như URL chuyển hướng thành công/thất bại. </li>
+<li>Người dùng điền chi tiết thanh toán trên trang PSP, PSP xử lý thanh toán và trả về trạng thái thanh toán</li>
+<li>Người dùng hiện được chuyển hướng trở lại redirectURL. Ví dụ url chuyển hướng - <code>https://your-company.com/?tokenID=JIOUIQ123NSF&amp;payResult=X324FSa</code></li>
+<li>Không đồng bộ, PSP gọi Payment service của chúng tôi qua webhook để thông báo cho phần phụ trợ của chúng tôi về kết quả thanh toán</li>
+<li>Payment service ghi lại kết quả thanh toán dựa trên webhook nhận được</li>
+</ul>
+<h3><strong>Reconciliation</strong></h3>
+<p>Phần trước giải thích lộ trình thanh toán thuận lợi. Các đường dẫn không hài lòng được phát hiện và điều chỉnh bằng quy trình điều chỉnh nền.</p>
+<p>Hàng đêm, PSP gửi một tệp giải quyết mà hệ thống của chúng tôi sử dụng để so sánh trạng thái của hệ thống bên ngoài với trạng thái của hệ thống bên trong của chúng tôi.</p>
+<figure class="sd-figure"><img alt="settlement-report" loading="lazy" src="assets/content/system-design/images/ch26/settlement-report.png"/></figure>
+<p>Quá trình này cũng có thể được sử dụng để phát hiện sự mâu thuẫn nội bộ giữa ví dụ như sổ cái và dịch vụ ví.</p>
+<p>Sự không phù hợp được xử lý thủ công bởi đội ngũ tài chính. Sự không phù hợp được xử lý như sau:<br/>
+ * có thể phân loại được, do đó, đây là sự không phù hợp đã biết và có thể được điều chỉnh bằng quy trình chuẩn<br/>
+ * có thể phân loại được nhưng không thể tự động hóa được. Được đội ngũ tài chính điều chỉnh thủ công<br/>
+ * không thể phân loại được. Được đội ngũ tài chính điều tra và điều chỉnh thủ công</p>
+<h3><strong>Xử lý sự chậm trễ trong xử lý thanh toán</strong></h3>
+<p>Có những trường hợp, việc thanh toán có thể mất hàng giờ để hoàn tất, mặc dù thông thường chỉ mất vài giây.</p>
+<p>Điều này có thể xảy ra do:<br/>
+ * một khoản thanh toán bị gắn cờ là có rủi ro cao và ai đó phải xem xét nó theo cách thủ công<br/>
+ * thẻ tín dụng yêu cầu bảo vệ bổ sung, ví dụ: Xác thực an toàn 3D, yêu cầu thêm chi tiết từ chủ thẻ để hoàn thành</p>
+<p>Những tình huống này được xử lý bởi:<br/>
+ * chờ PSP gửi cho chúng tôi webhook khi thanh toán hoàn tất hoặc thăm dò API của nó nếu PSP không cung cấp webhooks<br/>
+ * hiển thị trạng thái "đang chờ xử lý" cho người dùng và cung cấp cho họ một trang nơi họ có thể đăng ký để cập nhật thanh toán. Chúng tôi cũng có thể gửi email cho họ sau khi thanh toán của họ hoàn tất</p>
+<h3><strong>Giao tiếp giữa các dịch vụ nội bộ</strong></h3>
+<p>Có hai loại mô hình giao tiếp mà các dịch vụ sử dụng để liên lạc với nhau - đồng bộ và không đồng bộ.</p>
+<p>Giao tiếp đồng bộ (tức là HTTP) hoạt động tốt đối với các hệ thống quy mô nhỏ, nhưng bị ảnh hưởng khi quy mô tăng:<br/>
+ * hiệu suất thấp - chu kỳ yêu cầu-phản hồi kéo dài khi có nhiều dịch vụ tham gia vào chuỗi cuộc gọi<br/>
+ * khả năng cách ly lỗi kém - nếu PSP hoặc bất kỳ dịch vụ nào khác bị lỗi, người dùng sẽ không nhận được phản hồi<br/>
+ * khớp nối chặt chẽ - người gửi cần biết người nhận<br/>
+ * khó mở rộng quy mô - không dễ hỗ trợ lưu lượng truy cập tăng đột ngột do không có cache</p>
+<p>Truyền thông không đồng bộ có thể được chia thành hai loại.</p>
+<p>Một người nhận - nhiều người nhận đăng ký cùng một topic và tin nhắn chỉ được xử lý một lần:</p>
+<figure class="sd-figure"><img alt="single-receiver" loading="lazy" src="assets/content/system-design/images/ch26/single-receiver.png"/></figure>
+<p>Nhiều người nhận - nhiều người nhận đăng ký cùng một topic, nhưng tin nhắn được chuyển tiếp đến tất cả họ:</p>
+<figure class="sd-figure"><img alt="multiple-receiver" loading="lazy" src="assets/content/system-design/images/ch26/multiple-receiver.png"/></figure>
+<p>Mô hình sau hoạt động tốt cho hệ thống thanh toán của chúng tôi vì khoản thanh toán có thể gây ra nhiều tác dụng phụ, được xử lý bởi các dịch vụ khác nhau.</p>
+<p>Tóm lại, giao tiếp đồng bộ đơn giản hơn nhưng không cho phép các dịch vụ được tự chủ. <br/>
+Giao tiếp Async đánh đổi sự đơn giản và nhất quán để có được khả năng mở rộng và khả năng phục hồi.</p>
+<h3><strong>Xử lý các khoản thanh toán không thành công</strong></h3>
+<p>Mọi hệ thống thanh toán đều cần giải quyết các khoản thanh toán không thành công. Dưới đây là một số cơ chế chúng tôi sẽ sử dụng để đạt được điều đó:<br/>
+ * Theo dõi trạng thái thanh toán - bất cứ khi nào thanh toán không thành công, chúng tôi có thể xác định xem có thử lại/hoàn tiền hay không dựa trên trạng thái thanh toán.<br/>
+ * Retry queue - các khoản thanh toán mà chúng tôi sẽ thử lại sẽ được xuất bản vào Retry queue<br/>
+ * Dead letter queue - các khoản thanh toán không thành công về mặt thời gian sẽ được đẩy vào Dead letter queue, nơi khoản thanh toán không thành công có thể được gỡ lỗi và kiểm tra.</p>
+<figure class="sd-figure"><img alt="failed-payments" loading="lazy" src="assets/content/system-design/images/ch26/failed-payments.png"/></figure>
+<h3><strong>Giao hàng đúng một lần</strong></h3>
+<p>Chúng tôi cần đảm bảo khoản thanh toán được xử lý chính xác một lần để tránh tính phí hai lần cho client.</p>
+<p>Một thao tác được thực hiện chính xác một lần nếu nó được thực hiện ít nhất một lần và nhiều nhất một lần cùng một lúc.</p>
+<p>Để đạt được sự đảm bảo ít nhất một lần, chúng tôi sẽ sử dụng cơ chế thử lại:</p>
+<figure class="sd-figure"><img alt="retry-mechanism" loading="lazy" src="assets/content/system-design/images/ch26/retry-mechanism.png"/></figure>
+<p>Dưới đây là một số chiến lược phổ biến để quyết định khoảng thời gian thử lại:<br/>
+ * thử lại ngay lập tức - client ngay lập tức gửi yêu cầu khác sau khi thất bại<br/>
+ * khoảng thời gian cố định - đợi một khoảng thời gian cố định trước khi thử thanh toán lại<br/>
+ * khoảng thời gian tăng dần - tăng dần khoảng thời gian thử lại giữa mỗi lần thử lại<br/>
+ * lùi theo cấp số nhân - khoảng thời gian thử lại gấp đôi giữa các lần thử tiếp theo<br/>
+ * hủy - client hủy yêu cầu. Điều này xảy ra khi lỗi ở đầu cuối hoặc đạt đến ngưỡng thử lại</p>
+<p>Theo nguyên tắc chung, hãy mặc định chiến lược thử lại theo cấp số nhân. Một cách thực hành tốt là máy chủ chỉ định khoảng thời gian thử lại bằng cách sử dụng <code>Retry-After</code> tiêu đề.</p>
+<p>Vấn đề khi thử lại là máy chủ có thể xử lý khoản thanh toán hai lần:<br/>
+ * client nhấp vào "nút thanh toán" hai lần, do đó, họ bị tính phí hai lần<br/>
+ * thanh toán được xử lý thành công bởi PSP, nhưng không phải bởi các dịch vụ hạ nguồn (sổ cái, ví). Thử lại khiến thanh toán được xử lý lại bởi PSP</p>
+<p>Để giải quyết vấn đề thanh toán hai lần, chúng ta cần sử dụng cơ chế idempotency — một thuộc tính mà một thao tác được áp dụng nhiều lần chỉ được xử lý một lần.</p>
+<p>Từ góc độ API, client có thể thực hiện nhiều lệnh gọi tạo ra cùng một kết quả. <br/>
+Idempotency được quản lý bởi một tiêu đề đặc biệt trong yêu cầu (ví dụ: <code>idempotency-key</code>), thường là UUID.</p>
+<figure class="sd-figure"><img alt="idempotency-example" loading="lazy" src="assets/content/system-design/images/ch26/idempotency-example.png"/></figure>
+<p>Idempotency có thể đạt được bằng cách sử dụng cơ chế thêm các ràng buộc khóa duy nhất của database:<br/>
+ * máy chủ cố gắng chèn một hàng mới vào database<br/>
+ * việc chèn không thành công do vi phạm ràng buộc khóa duy nhất<br/>
+ * máy chủ phát hiện lỗi đó và thay vào đó trả lại existing object cho Client</p>
+<p>Idempotency cũng được áp dụng ở phía PSP, sử dụng nonce, đã được thảo luận trước đó. PSP sẽ cẩn thận để không xử lý các khoản thanh toán có cùng một nonce hai lần.</p>
+<h3><strong>tính nhất quán</strong></h3>
+<p>Có một số dịch vụ trạng thái được gọi trong suốt vòng đời thanh toán - PSP, sổ cái, ví, Payment service.</p>
+<p>Giao tiếp giữa hai dịch vụ bất kỳ có thể không thành công. <br/>
+Chúng tôi có thể đảm bảo tính nhất quán của dữ liệu cuối cùng giữa tất cả các dịch vụ bằng cách triển khai việc xử lý và đối chiếu chính xác một lần.</p>
+<p>Nếu sử dụng replication, chúng tôi sẽ phải đối mặt với độ trễ khi replicate, điều này có thể dẫn đến việc người dùng quan sát thấy dữ liệu không nhất quán giữa primary DB và replica.</p>
+<p>Để giảm thiểu điều đó, chúng tôi có thể phục vụ tất cả các hoạt động đọc và ghi từ database chính và chỉ sử dụng các replica để dự phòng và chuyển đổi dự phòng.<br/>
+Ngoài ra, chúng tôi có thể đảm bảo các replica luôn sync bằng cách sử dụng thuật toán đồng thuận như Paxos hoặc Raft.<br/>
+Chúng tôi cũng có thể sử dụng database phân tán dựa trên sự đồng thuận như YugabyteDB hoặc CockroachDB.</p>
+<h3><strong>Bảo mật thanh toán</strong></h3>
+<p>Dưới đây là một số cơ chế chúng tôi có thể sử dụng để đảm bảo an ninh thanh toán:<br/>
+ * Nghe lén yêu cầu/phản hồi - chúng tôi có thể sử dụng HTTPS để bảo mật mọi liên lạc<br/>
+ * Giả mạo dữ liệu - thực thi mã hóa và giám sát tính toàn vẹn<br/>
+ * Tấn công trung gian - sử dụng ghim chứng chỉ SSL<br/>
+ * Mất dữ liệu - replicate data trên nhiều vùng và chụp ảnh nhanh dữ liệu<br/>
+ * Tấn công DDoS - thực hiện rate limiter và firewall<br/>
+ * Trộm thẻ - sử dụng token thay vì lưu trữ thông tin thẻ thật trong hệ thống của chúng tôi<br/>
+ * Tuân thủ PCI - tiêu chuẩn bảo mật dành cho các tổ chức xử lý thẻ tín dụng có thương hiệu<br/>
+ * Lừa đảo - xác minh địa chỉ, giá trị xác minh thẻ (CVV), phân tích hành vi người dùng, v.v.</p>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Các điểm nói chuyện khác:<br/>
+ * Giám sát và cảnh báo<br/>
+ * Công cụ gỡ lỗi - chúng tôi cần các công cụ giúp bạn dễ hiểu lý do thanh toán không thành công<br/>
+ * Trao đổi tiền tệ - quan trọng khi thiết kế hệ thống thanh toán sử dụng quốc tế<br/>
+ * Địa lý - các khu vực khác nhau có thể có các phương thức thanh toán khác nhau<br/>
+ * Thanh toán bằng tiền mặt - rất phổ biến ở những nơi như Ấn Độ và Brazil<br/>
+ * Tích hợp Google/Apple Pay</p>
+

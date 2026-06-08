@@ -1,0 +1,200 @@
+<h2>Giới thiệu</h2>
+<p>Mở rộng quy mô hệ thống để hỗ trợ hàng triệu người dùng là một hành trình phức tạp, lặp đi lặp lại đòi hỏi phải tinh chỉnh và tối ưu hóa. Chương này phác thảo cách bắt đầu với một thiết lập máy chủ duy nhất và mở rộng quy mô kiến trúc từng bước để xử lý hàng triệu người dùng.</p>
+<hr/>
+<h2>Phần 1: Kiến trúc single server</h2>
+<p>Ban đầu, tất cả các thành phần (ứng dụng web, database, cache) chạy trên một máy chủ. </p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/single-server.png"/></figure>
+<h3>Luồng request</h3>
+<ol>
+<li>Người dùng truy cập ứng dụng thông qua tên miền (ví dụ: <code>API.mysite.com</code>), được phân giải thành địa chỉ IP bằng DNS.</li>
+<li>Địa chỉ IP của web server được trả về trình duyệt hoặc ứng dụng di động.</li>
+<li>HTTP request được gửi đến web server và trả về phản hồi HTML hoặc JSON.</li>
+</ol>
+<h3>Nguồn lưu lượng truy cập</h3>
+<ol>
+<li><strong>Ứng dụng web:</strong> Sử dụng các ngôn ngữ phía máy chủ (ví dụ: Python, Java) cho logic nghiệp vụ và các ngôn ngữ phía client (ví dụ: JavaScript, HTML) để trình bày.</li>
+<li><strong>Ứng dụng di động:</strong> Giao tiếp với web server bằng HTTP và JSON để trao đổi dữ liệu nhẹ.</li>
+</ol>
+<hr/>
+<h2>Phần 2: Tách database</h2>
+<p>Khi lượng người dùng phát triển, database sẽ được chuyển đến một máy chủ chuyên dụng để cho phép mở rộng quy mô độc lập các tầng database và web.</p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/database.png"/></figure>
+<h3>Lựa chọn database</h3>
+<ol>
+<li><strong>database quan hệ (SQL):</strong> Dữ liệu có cấu trúc được lưu trữ trong bảng. Ví dụ: MySQL, PostgreSQL.</li>
+<li><strong>database phi quan hệ (NoSQL):</strong> Thích hợp cho dữ liệu unstructured hoặc yêu cầu độ trễ thấp. Các danh mục bao gồm:<br/>
+   - Key-Value Store<br/>
+   - Graph Database<br/>
+   - Column Store<br/>
+   - Document Store</li>
+</ol>
+<ul>
+<li>database phi quan hệ có thể là lựa chọn phù hợp nếu:</li>
+<li>ứng dụng yêu cầu độ trễ siêu thấp.</li>
+<li>dữ liệu không có cấu trúc hoặc không có dữ liệu quan hệ.</li>
+<li>chỉ cần tuần tự hóa và giải tuần tự hóa dữ liệu (JSON, XML, YAML, v.v.).</li>
+<li>cần lưu trữ một lượng lớn dữ liệu.</li>
+</ul>
+<hr/>
+<h2>Phần 3: Scale dọc (vertical scaling) và ngang</h2>
+<h3>Scale dọc (vertical scaling)</h3>
+<ul>
+<li>Thêm nhiều tài nguyên hơn (CPU, RAM) vào các máy chủ hiện có.</li>
+<li>Bị giới hạn bởi những hạn chế về phần cứng và thiếu sự dư thừa.</li>
+</ul>
+<h3>Scale theo chiều ngang</h3>
+<ul>
+<li>Thêm nhiều máy chủ hơn vào nhóm, giúp nó phù hợp hơn với các hệ thống quy mô lớn.</li>
+<li>Bộ load balancer được sử dụng để xử lý việc định tuyến yêu cầu giữa các máy chủ.</li>
+</ul>
+<hr/>
+<h2>Phần 4: Load balancer</h2>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/load-balancer.png"/></figure>
+<p><strong>load balancer</strong> phân phối lưu lượng giữa nhiều máy chủ. Lợi ích bao gồm:<br/>
+1. Dự phòng: Nếu máy chủ ngoại tuyến, lưu lượng truy cập sẽ được định tuyến lại.<br/>
+   - Nếu máy chủ 1 ngoại tuyến, tất cả lưu lượng truy cập sẽ được chuyển đến máy chủ 2.<br/>
+2. Khả năng mở rộng: Dễ dàng thêm máy chủ để xử lý lưu lượng truy cập tăng đột biến.<br/>
+   - Nếu lưu lượng truy cập trang web tăng nhanh, các máy chủ tiếp theo có thể được thêm vào để xử lý lưu lượng bổ sung.</p>
+<hr/>
+<h2>Phần 5: Database replication</h2>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/database-replication.png"/></figure>
+<h3>Mô hình chủ-nô lệ</h3>
+<ul>
+<li><strong>database chủ:</strong> Xử lý các thao tác ghi.</li>
+<li>Tất cả các lệnh sửa đổi dữ liệu như chèn, xóa hoặc cập nhật phải được gửi đến database chính.</li>
+<li><strong>database nô lệ:</strong> Xử lý các hoạt động đọc, cải thiện hiệu suất và độ tin cậy.</li>
+<li>Vì tỷ lệ đọc và ghi cao hơn ở hầu hết các ứng dụng; do đó, số lượng nô lệ<br/>
+database trong một hệ thống thường lớn hơn số lượng database chính.</li>
+</ul>
+<h3>Những lợi ích</h3>
+<ol>
+<li>Cải thiện hiệu suất thông qua các hoạt động đọc song song.</li>
+<li>Tính sẵn sàng cao và độ tin cậy dữ liệu thông qua dự phòng.</li>
+</ol>
+<h3>Xử lý lỗi</h3>
+<ul>
+<li>Nếu chỉ có một database phụ và nó ngoại tuyến, các thao tác đọc sẽ được hướng dẫn<br/>
+vào database chủ tạm thời.</li>
+<li>Trong trường hợp có nhiều database phụ, các thao tác đọc được thực hiện<br/>
+được chuyển hướng đến database nô lệ lành mạnh khác và một máy chủ mới sẽ thay thế database cũ. </li>
+<li>Nếu database chính ngoại tuyến, database phụ sẽ được thăng cấp thành database mới<br/>
+bậc thầy.</li>
+<li>Trong hệ thống sản xuất, database phụ đã chọn có thể không cập nhật, do đó dữ liệu cần được cập nhật bằng cách chạy dữ liệu<br/>
+các tập lệnh khôi phục (các phương thức như đa chủ và circular replication có thể hữu ích).</li>
+</ul>
+<hr/>
+<h2>Phần 6: Cache</h2>
+<p><strong>cache</strong> lưu trữ dữ liệu được truy cập thường xuyên trong bộ nhớ để giảm tải database. Tầng cache là lớp lưu trữ dữ liệu tạm thời, nhanh hơn nhiều so với database. </p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/cache.png"/></figure>
+<h3>Cân nhắc về cache</h3>
+<ol>
+<li><strong>Trường hợp sử dụng</strong>: Cân nhắc sử dụng cache khi dữ liệu được đọc thường xuyên nhưng ít được sửa đổi.</li>
+<li><strong>Chính sách hết hạn:</strong> Sau khi dữ liệu được lưu trong cache hết hạn, dữ liệu đó sẽ bị xóa khỏi cache. Khi không có chính sách hết hạn, được lưu vào cache<br/>
+dữ liệu sẽ được lưu trữ vĩnh viễn trong bộ nhớ.</li>
+<li><strong>Tính nhất quán:</strong> Điều này có nghĩa là giữ cho kho dữ liệu và cache được sync. Sự không nhất quán<br/>
+có thể xảy ra do các hoạt động sửa đổi dữ liệu trên kho lưu trữ dữ liệu và cache không diễn ra trong một giao dịch. </li>
+<li><strong>Giảm thiểu thất bại</strong>: Một máy chủ cache đơn thể hiện một điểm lỗi tiềm ẩn, nhiều điểm lỗi<br/>
+nên sử dụng máy chủ cache trên các trung tâm dữ liệu khác nhau để tránh SPOF.</li>
+<li><strong>Chính sách trục xuất:</strong>: Sau khi cache đầy, các mục cần được gỡ bỏ để giải phóng bộ nhớ. LRU là chính sách loại bỏ cache phổ biến nhất.</li>
+</ol>
+<hr/>
+<h2>Phần 7: CDN (CDN)</h2>
+<p><strong>CDN</strong> cải thiện thời gian tải bằng cách lưu vào cache nội dung tĩnh (hình ảnh, CSS, JavaScript) trên các máy chủ được phân bổ theo địa lý.</p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/cdn.png"/></figure>
+<h3>Quy trình làm việc</h3>
+<ol>
+<li>Người dùng yêu cầu nội dung từ máy chủ CDN gần nhất.</li>
+<li>Nếu không có sẵn, nội dung sẽ được fetch từ máy chủ gốc và được lưu vào cache.</li>
+</ol>
+<h3>Những cân nhắc về CDN</h3>
+<ol>
+<li><strong>Trị giá:</strong> CDN được điều hành bởi các nhà cung cấp bên thứ ba tính phí truyền dữ liệu vào và ra khỏi CDN.</li>
+<li><strong>Hết hạn cache:</strong> Thời gian hết hạn của cache không được quá dài cũng không quá ngắn.</li>
+<li><strong>Dự phòng CDN:</strong> Nếu CDN ngừng hoạt động tạm thời, khách hàng sẽ có thể phát hiện sự cố<br/>
+và yêu cầu tài nguyên từ nguồn.</li>
+<li><strong>Vô hiệu hóa các tập tin:</strong> Nếu các tệp được cập nhật, cache sẽ bị vô hiệu hóa để trỏ đến các tệp được cập nhật.</li>
+</ol>
+<hr/>
+<h2>Phần 8: Cấp web stateless</h2>
+<p>Bằng cách di chuyển dữ liệu phiên tới kho dữ liệu dùng chung, web server trở nên stateless. Điều này cho phép:<br/>
+1. Scale theo chiều ngang dễ dàng hơn.<br/>
+2. Tự động mở rộng quy mô dựa trên lưu lượng truy cập.</p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/stateless.png"/></figure>
+<hr/>
+<h2>Phần 9: Thiết lập trung tâm đa dữ liệu</h2>
+<p>Triển khai trên nhiều trung tâm dữ liệu giúp cải thiện tính khả dụng và giảm độ trễ. Các chiến lược bao gồm:</p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/data-center.png"/></figure>
+<ol>
+<li><strong>Định tuyến GeoDNS:</strong> Hướng người dùng đến trung tâm dữ liệu gần nhất.</li>
+<li><strong>replicate data:</strong> sync dữ liệu giữa các trung tâm để tránh sự thiếu nhất quán.</li>
+</ol>
+<h3>Những cân nhắc chính</h3>
+<ul>
+<li><strong>Chuyển hướng giao thông:</strong> Cần có các công cụ hiệu quả để hướng lưu lượng truy cập đến đúng trung tâm dữ liệu.</li>
+<li><strong>sync dữ liệu:</strong> Một chiến lược chung là replicate data trên nhiều trung tâm dữ liệu. </li>
+<li><strong>Kiểm tra và triển khai:</strong>  Các công cụ triển khai tự động là rất quan trọng để giữ cho các dịch vụ nhất quán thông qua tất cả các trung tâm dữ liệu.</li>
+</ul>
+<hr/>
+<h2>Phần 10: message queue</h2>
+<p><strong>message queue</strong> là một thành phần bền vững, được lưu trữ trong bộ nhớ, hỗ trợ tính năng không đồng bộ<br/>
+giao tiếp. Nó phục vụ như một cache và phân phối các yêu cầu không đồng bộ.</p>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01//message-queue.png"/></figure>
+<ul>
+<li>Các dịch vụ đầu vào, được gọi là producer/publisher, tạo message và publish chúng lên message queue.</li>
+<li>Các dịch vụ khác, được gọi là consumer/subscriber, kết nối với queue và thực hiện các hành động được xác định bởi message.</li>
+</ul>
+<hr/>
+<h2>Phần 11: Ghi nhật ký, Số liệu và Tự động hóa</h2>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/logging.png"/></figure>
+<h3>Tầm quan trọng</h3>
+<ol>
+<li><strong>Ghi nhật ký:</strong> Theo dõi lỗi và tình trạng hệ thống.</li>
+<li><strong>Số liệu:</strong> Cung cấp thông tin chi tiết về hiệu suất và hoạt động của người dùng.</li>
+<li><strong>Tự động hóa:</strong> Hợp lý hóa việc thử nghiệm, triển khai và mở rộng quy mô.</li>
+</ol>
+<hr/>
+<h2>Phần 12: Mở rộng quy mô database</h2>
+<h3>Scale dọc (vertical scaling)</h3>
+<ul>
+<li>Thêm tài nguyên phần cứng nhưng có những hạn chế về vật lý và chi phí.</li>
+<li>Có nhiều nhược điểm:</li>
+<li>Nguy cơ xảy ra lỗi tại một điểm lớn hơn.</li>
+<li>Tổng chi phí của việc mở rộng quy mô theo chiều dọc cao</li>
+</ul>
+<h3>Scale theo chiều ngang (sharding)</h3>
+<figure class="sd-figure"><img alt="" loading="lazy" src="assets/content/system-design/images/ch01/horizontal-scaling.png"/></figure>
+<ul>
+<li>Chia dữ liệu thành nhiều phân đoạn bằng cách sử dụng các khóa (ví dụ: <code>user_id</code>).</li>
+<li>sharding tách database lớn thành các phần nhỏ hơn, dễ quản lý hơn gọi là phân đoạn.</li>
+<li>Mỗi phân đoạn chia sẻ cùng một lược đồ, mặc dù dữ liệu thực tế trên mỗi phân đoạn là duy nhất cho phân đoạn đó.</li>
+<li>Khóa shending rất quan trọng khi thực hiện chiến lược sharding. Khi chọn khóa sharding, điều quan trọng là chọn khóa có thể phân phối dữ liệu đồng đều.</li>
+</ul>
+<h4>Thử thách</h4>
+<ol>
+<li>
+<p><strong>Phân chia lại dữ liệu:</strong> Việc chia lại dữ liệu là cần thiết khi:<br/>
+   - Phân đoạn đơn không còn có thể chứa nhiều dữ liệu hơn do tốc độ tăng trưởng nhanh chóng. <br/>
+   - Một số phân đoạn nhất định có thể bị cạn kiệt phân đoạn nhanh hơn các phân đoạn khác do phân phối dữ liệu không đồng đều.<br/>
+   - consistent hashing được sử dụng để khắc phục những vấn đề này</p>
+</li>
+<li>
+<p><strong>Celebrity problem:</strong>  Việc truy cập quá mức vào một phân đoạn cụ thể có thể gây ra tình trạng quá tải máy chủ.<br/>
+   - Để giải quyết vấn đề này, chúng tôi có thể cần phân bổ một mảnh cho mỗi người nổi tiếng.</p>
+</li>
+<li>
+<p><strong>Join và denormalize:</strong> Khi database đã được phân chia trên nhiều máy chủ, rất khó để thực hiện các thao tác nối trên các phân đoạn database.<br/>
+   - Một cách giải quyết phổ biến là không chuẩn hóa database để có thể thực hiện các truy vấn trong một bảng duy nhất.</p>
+</li>
+</ol>
+<hr/>
+<h2>Phần kết luận</h2>
+<h3>Bài học chính</h3>
+<ol>
+<li>Giữ tầng web stateless.</li>
+<li>Xây dựng dự phòng ở mọi tầng.</li>
+<li>Sử dụng cache và CDN để tối ưu hóa hiệu suất.</li>
+<li>Scale tầng dữ liệu bằng sharding.</li>
+<li>Tách rời các thành phần để linh hoạt.</li>
+</ol>
+<p>Chương này cung cấp nền tảng vững chắc để xây dựng các hệ thống có khả năng mở rộng có thể xử lý hàng triệu người dùng.</p>
+

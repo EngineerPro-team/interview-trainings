@@ -1,0 +1,112 @@
+<h2>Giới thiệu</h2>
+<p>Chương này khám phá việc thiết kế và triển khai bộ rate limiter—một thành phần hệ thống được sử dụng để kiểm soát tốc độ lưu lượng được gửi bởi khách hàng hoặc dịch vụ. Bộ rate limiter rất quan trọng để ngăn chặn lạm dụng, giảm chi phí và đảm bảo sự ổn định của tài nguyên máy chủ. Ví dụ về việc sử dụng chúng bao gồm hạn chế bài đăng, tạo tài khoản và yêu cầu khen thưởng.</p>
+<h2>Lợi ích của việc Rate limiting</h2>
+<ul>
+<li><strong>Ngăn chặn các cuộc tấn công DoS:</strong> Chặn các cuộc gọi dư thừa để tránh tình trạng thiếu tài nguyên.</li>
+<li><strong>Giảm chi phí:</strong> Hạn chế các yêu cầu không cần thiết để giảm chi phí máy chủ.</li>
+<li><strong>Ngăn ngừa quá tải:</strong> Lọc các yêu cầu quá mức để ổn định hiệu suất máy chủ.</li>
+</ul>
+<h2>Bước 1: Tìm hiểu vấn đề</h2>
+<h3>Các tính năng chính</h3>
+<ul>
+<li>Rate limiter API phía máy chủ.</li>
+<li>Hỗ trợ nhiều quy tắc điều tiết.</li>
+<li>Xử lý các hệ thống quy mô lớn trong môi trường phân tán.</li>
+<li>Tùy chọn cho một dịch vụ độc lập hoặc mã cấp ứng dụng.</li>
+<li>Thông báo cho người dùng khi điều tiết.</li>
+</ul>
+<h3>Yêu cầu</h3>
+<ul>
+<li>Điều tiết yêu cầu chính xác.</li>
+<li>Độ trễ tối thiểu.</li>
+<li>Sử dụng bộ nhớ thấp.</li>
+<li>Khả năng phân tán.</li>
+<li>Xử lý ngoại lệ rõ ràng.</li>
+<li>Khả năng chịu lỗi cao.</li>
+</ul>
+<h2>Bước 2: Thiết kế cấp cao</h2>
+<h3>Tùy chọn vị trí</h3>
+<figure class="sd-figure"><img alt="Rate Limiting Middleware Architecture" loading="lazy" src="assets/content/system-design/images/ch04/rate_limiter_architecture.png" width="550"/></figure>
+<ol>
+<li><strong>Triển khai phía khách hàng:</strong> Không đáng tin cậy do có thể bị lạm dụng.</li>
+<li><strong>Triển khai phía máy chủ:</strong> Được ưu tiên để kiểm soát và độ tin cậy.</li>
+<li><strong>Phần mềm trung gian (Cổng API):</strong> Một lựa chọn linh hoạt để rate limiter tích hợp.</li>
+</ol>
+<h3>Hướng dẫn về vị trí</h3>
+<ul>
+<li>Đánh giá nhóm công nghệ hiện tại và chọn các phương án hiệu quả.</li>
+<li>Chọn các thuật toán phù hợp dựa trên nhu cầu kinh doanh.</li>
+<li>Sử dụng cổng API nếu sử dụng vi dịch vụ.</li>
+<li>Lựa chọn giải pháp thương mại nếu nguồn lực bị hạn chế.</li>
+</ul>
+<h2>Bước 3: Thuật toán Rate limiting</h2>
+<h3>1. Nhóm mã thông báo</h3>
+<figure class="sd-figure"><img alt="Token Bucket Algorithm" loading="lazy" src="assets/content/system-design/images/ch04/token-bucket.png" width="550"/></figure>
+<ul>
+<li><strong>Sự miêu tả:</strong> Mã thông báo được thêm vào nhóm với tỷ lệ cố định; mỗi yêu cầu tiêu thụ một mã thông báo.</li>
+<li><strong>Parameters:</strong> Kích thước thùng và tỷ lệ nạp lại.</li>
+<li><strong>Ưu điểm:</strong> Dễ thực hiện, tiết kiệm bộ nhớ, hỗ trợ bùng nổ lưu lượng.</li>
+<li><strong>Nhược điểm:</strong> Yêu cầu tuning parameters cẩn thận.</li>
+</ul>
+<h3>2. Xô bị rò rỉ</h3>
+<figure class="sd-figure"><img alt="Leaking Bucket Algorithm" loading="lazy" src="assets/content/system-design/images/ch04/leaking-bucket.png" width="550"/></figure>
+<ul>
+<li><strong>Sự miêu tả:</strong> Xử lý các yêu cầu ở tốc độ cố định bằng hàng đợi FIFO.</li>
+<li><strong>Ưu điểm:</strong> Bộ nhớ hiệu quả, tốc độ dòng chảy ổn định.</li>
+<li><strong>Nhược điểm:</strong> Sự bùng nổ lưu lượng có thể trì hoãn các yêu cầu gần đây.</li>
+</ul>
+<p>Ví dụ: https://github.com/uber-go/ratelimit</p>
+<h3>3. Bộ đếm cửa sổ cố định</h3>
+<figure class="sd-figure"><img alt="Fixed Window Counter" loading="lazy" src="assets/content/system-design/images/ch04/fixed-window-counter.png" width="550"/></figure>
+<ul>
+<li><strong>Sự miêu tả:</strong> Chia thời gian thành các khoảng thời gian cố định và sử dụng bộ đếm để giới hạn yêu cầu.</li>
+<li><strong>Ưu điểm:</strong> Đơn giản, hiệu quả cho các trường hợp sử dụng cụ thể.</li>
+<li>
+<p><strong>Nhược điểm:</strong> Lưu lượng truy cập tăng đột biến ở rìa cửa sổ có thể vượt quá giới hạn.</p>
+</li>
+<li>
+<p>Sự bùng nổ giao thông đột ngột ở rìa cửa sổ thời gian<br/>
+có thể gây ra nhiều yêu cầu hơn hạn mức cho phép.</p>
+</li>
+</ul>
+<figure class="sd-figure"><img alt="Fixed Window Issue" loading="lazy" src="assets/content/system-design/images/ch04/fixed-window-issue.png" width="550"/></figure>
+<h3>4. Nhật ký cửa sổ trượt</h3>
+<figure class="sd-figure"><img alt="Sliding Window Log" loading="lazy" src="assets/content/system-design/images/ch04/sliding-window-log.png" width="550"/></figure>
+<ul>
+<li><strong>Sự miêu tả:</strong> Theo dõi dấu thời gian để cho phép một khoảng thời gian luân phiên.</li>
+<li><strong>Ưu điểm:</strong> Rate limiting chính xác.</li>
+<li><strong>Nhược điểm:</strong> Tiêu thụ bộ nhớ cao.</li>
+</ul>
+<h3>5. Quầy cửa sổ trượt</h3>
+<figure class="sd-figure"><img alt="Fixed Window Counter" loading="lazy" src="assets/content/system-design/images/ch04/sliding-window-counter.png" width="550"/></figure>
+<ul>
+<li><strong>Sự miêu tả:</strong> Kết hợp các phương pháp cửa sổ cố định và nhật ký trượt để làm mịn các gai.</li>
+<li><strong>Ưu điểm:</strong> Bộ nhớ hiệu quả, xử lý các đợt bùng nổ lưu lượng.</li>
+<li><strong>Nhược điểm:</strong> Xấp xỉ có thể không hoàn toàn nghiêm ngặt.</li>
+</ul>
+<h2>Kiến trúc cấp cao</h2>
+<figure class="sd-figure"><img alt="Architecture" loading="lazy" src="assets/content/system-design/images/ch04/architecture.png" style="margin-left: 40px; margin-top: 40px; margin-bottom: 20px;" width="550"/></figure>
+<ul>
+<li><strong>Lưu trữ dữ liệu:</strong> Sử dụng cache trong bộ nhớ (ví dụ: Redis) để thực hiện các thao tác truy cập nhanh.</li>
+<li><strong>Các bước:</strong><br/>
+  1. Client gửi yêu cầu tới middleware.<br/>
+  2. Bộ đếm kiểm tra phần mềm trung gian trong Redis.<br/>
+  3. Yêu cầu được xử lý hoặc từ chối dựa trên giới hạn.</li>
+</ul>
+<h2>Cân nhắc nâng cao</h2>
+<h3>Môi trường phân tán</h3>
+<ul>
+<li><strong>Những thách thức:</strong> Điều kiện cuộc đua, vấn đề sync.</li>
+<li><strong>Giải pháp:</strong> Sử dụng khóa, tập lệnh Lua hoặc Redis sorted set trong Redis. Sử dụng các kho dữ liệu tập trung để sync.</li>
+</ul>
+<h3>Tối ưu hóa hiệu suất</h3>
+<ul>
+<li>Thiết lập trung tâm đa dữ liệu để giảm độ trễ.</li>
+<li>Các mô hình nhất quán cuối cùng để sync.</li>
+</ul>
+<h3>Giám sát</h3>
+<ul>
+<li>Phân tích thường xuyên để đảm bảo tính hiệu quả của thuật toán và điều chỉnh các quy tắc khi cần thiết.</li>
+</ul>
+
+

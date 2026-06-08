@@ -1,0 +1,118 @@
+<h2>Introduction</h2>
+<p>This chapter explores the design and implementation of a rate limiter—a system component used to control traffic rates sent by clients or services. Rate limiters are crucial for preventing abuse, reducing costs, and ensuring the stability of server resources. Examples of their use include limiting posts, account creations, and reward claims.</p>
+<h2>Benefits of Rate Limiting</h2>
+<ul>
+<li><strong>Preventing DoS Attacks:</strong> Blocking excess calls to avoid resource starvation.</li>
+<li><strong>Cost Reduction:</strong> Limiting unnecessary requests to reduce server expenses.</li>
+<li><strong>Preventing Overloads:</strong> Filtering out excessive requests to stabilize server performance.</li>
+</ul>
+<h2>Step 1: Understanding the Problem</h2>
+<h3>Key Features</h3>
+<ul>
+<li>Server-side API rate limiter.</li>
+<li>Support for multiple throttle rules.</li>
+<li>Handle large-scale systems in distributed environments.</li>
+<li>Option for a standalone service or application-level code.</li>
+<li>Inform users when throttled.</li>
+</ul>
+<h3>Requirements</h3>
+<ul>
+<li>Accurate request throttling.</li>
+<li>Minimal latency.</li>
+<li>Low memory usage.</li>
+<li>Distributed capability.</li>
+<li>Clear exception handling.</li>
+<li>High fault tolerance.</li>
+</ul>
+<h2>Step 2: High-Level Design</h2>
+<h3>Placement Options</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/rate_limiter_architecture.png"  alt="Rate Limiting Middleware Architecture" width="550" loading="lazy"></figure>
+
+<ol>
+<li><strong>Client-Side Implementation:</strong> Unreliable due to potential misuse.</li>
+<li><strong>Server-Side Implementation:</strong> Preferred for control and reliability.</li>
+<li><strong>Middleware (API Gateway):</strong> A flexible option for integrated rate limiting.</li>
+</ol>
+<h3>Guidelines for Placement</h3>
+<ul>
+<li>Evaluate current tech stack and choose efficient options.</li>
+<li>Select appropriate algorithms based on business needs.</li>
+<li>Use an API gateway if microservices are employed.</li>
+<li>Opt for commercial solutions if resources are limited.</li>
+</ul>
+<h2>Step 3: Rate Limiting Algorithms</h2>
+<h3>1. Token Bucket</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/token-bucket.png"  alt="Token Bucket Algorithm" width="550" loading="lazy"></figure>
+
+<ul>
+<li><strong>Description:</strong> Tokens are added to a bucket at a fixed rate; each request consumes a token.</li>
+<li><strong>Parameters:</strong> Bucket size and refill rate.</li>
+<li><strong>Pros:</strong> Easy to implement, memory-efficient, supports traffic bursts.</li>
+<li><strong>Cons:</strong> Requires careful parameter tuning.</li>
+</ul>
+<h3>2. Leaking Bucket</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/leaking-bucket.png"  alt="Leaking Bucket Algorithm" width="550" loading="lazy"></figure>
+
+<ul>
+<li><strong>Description:</strong> Processes requests at a fixed rate using a FIFO queue.</li>
+<li><strong>Pros:</strong> Memory-efficient, stable outflow rate.</li>
+<li><strong>Cons:</strong> Traffic bursts may delay recent requests.</li>
+</ul>
+<p>Example: https://github.com/uber-go/ratelimit</p>
+<h3>3. Fixed Window Counter</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/fixed-window-counter.png"  alt="Fixed Window Counter" width="550" loading="lazy"></figure>
+
+<ul>
+<li><strong>Description:</strong> Divides time into fixed intervals and uses counters to limit requests.</li>
+<li><strong>Pros:</strong> Simple, efficient for specific use cases.</li>
+<li>
+<p><strong>Cons:</strong> Traffic spikes at window edges can exceed limits.</p>
+</li>
+<li>
+<p>Sudden burst of traffic at the edges of time windows<br />
+could cause more requests than allowed quota to go through.</p>
+</li>
+</ul>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/fixed-window-issue.png"  alt="Fixed Window Issue" width="550" loading="lazy"></figure>
+<h3>4. Sliding Window Log</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/sliding-window-log.png"  alt="Sliding Window Log" width="550" loading="lazy"></figure>
+
+<ul>
+<li><strong>Description:</strong> Tracks timestamps to allow a rolling time window.</li>
+<li><strong>Pros:</strong> Accurate rate limiting.</li>
+<li><strong>Cons:</strong> High memory consumption.</li>
+</ul>
+<h3>5. Sliding Window Counter</h3>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/sliding-window-counter.png"  alt="Fixed Window Counter" width="550" loading="lazy"></figure>
+
+<ul>
+<li><strong>Description:</strong> Combines fixed window and sliding log methods for smoothing spikes.</li>
+<li><strong>Pros:</strong> Memory-efficient, handles traffic bursts.</li>
+<li><strong>Cons:</strong> Approximation may not be perfectly strict.</li>
+</ul>
+<h2>High-Level Architecture</h2>
+<figure class="sd-figure"><img src="assets/content/system-design/images/ch04/architecture.png" style="margin-left: 40px; margin-top: 40px; margin-bottom: 20px;" alt="Architecture" width="550" loading="lazy"></figure>
+
+<ul>
+<li><strong>Data Storage:</strong> Use in-memory caching (e.g., Redis) for fast counter operations.</li>
+<li><strong>Steps:</strong><br />
+  1. Client sends request to middleware.<br />
+  2. Middleware checks counters in Redis.<br />
+  3. Request is processed or rejected based on limits.</li>
+</ul>
+<h2>Advanced Considerations</h2>
+<h3>Distributed Environments</h3>
+<ul>
+<li><strong>Challenges:</strong> Race conditions, synchronization issues.</li>
+<li><strong>Solutions:</strong> Use locks, Lua scripts, or sorted sets in Redis. Employ centralized data stores for synchronization.</li>
+</ul>
+<h3>Performance Optimizations</h3>
+<ul>
+<li>Multi-data center setups for reduced latency.</li>
+<li>Eventual consistency models for synchronization.</li>
+</ul>
+<h3>Monitoring</h3>
+<ul>
+<li>Regular analytics to ensure algorithm effectiveness and adjust rules as needed.</li>
+</ul>
+

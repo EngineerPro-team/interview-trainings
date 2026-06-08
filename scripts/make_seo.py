@@ -21,12 +21,20 @@ SRC = os.path.join(ROOT, "src")
 OUT_DIR = os.path.join(ROOT, os.environ.get("EP_OUT", "src"))
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from site_config import BASE_URL, BASE_PATH, SITE_BASE, TOP_ROUTES, RESOURCES_ALIASES  # noqa: E402
+from site_config import (  # noqa: E402
+    BASE_URL,
+    BASE_PATH,
+    SITE_BASE,
+    TOP_ROUTES,
+    RESOURCES_ALIASES,
+    SYSTEM_DESIGN_URL_SLUG,
+)
 
 ROUTE_PRIORITY = {
-    "courses":   (0.9, "weekly"),
-    "stories":   (0.9, "weekly"),
-    "book":      (0.8, "monthly"),
+    "courses":       (0.9, "weekly"),
+    "stories":       (0.9, "weekly"),
+    "book":          (0.8, "monthly"),
+    SYSTEM_DESIGN_URL_SLUG: (0.8, "monthly"),
     "mentors":   (0.8, "monthly"),
     "resources": (0.8, "monthly"),
     "podcast":   (0.7, "weekly"),
@@ -44,6 +52,12 @@ def load_slugs(path: str, var_name: str) -> list[str]:
         return []
     arr = json.loads(m.group(1))
     return [item.get("slug") for item in arr if item.get("slug")]
+
+
+def load_sd_chapter_slugs() -> list[str]:
+    from build_pages import load_sd_chapters  # noqa: WPS433 — shared parser
+
+    return [ch["slug"] for ch in load_sd_chapters() if ch.get("available")]
 
 
 def main() -> int:
@@ -65,6 +79,10 @@ def main() -> int:
     # Story detail pages
     for s in load_slugs("stories-data.js", "STORIES"):
         urls.append((f"{SITE_BASE}/stories/{s}/", today, 0.6, "monthly"))
+
+    # System Design chapter pages
+    for s in load_sd_chapter_slugs():
+        urls.append((f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/{s}/", today, 0.65, "monthly"))
 
     # Resources deep-link sub-pages (/resources/hr-screen/, /resources/cs-fundamental/, …)
     for slug in RESOURCES_ALIASES:

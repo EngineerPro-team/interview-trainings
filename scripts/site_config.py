@@ -37,12 +37,16 @@ SITE_TAGLINE_EN: str = "Conquering Big Tech with battle-tested mentors"
 # build_pages.py if you want a richer card per page).
 OG_IMAGE: str = "/assets/img/og-share.png"
 
+# Public URL segment for System Design material tab (SPA route id stays "system-design").
+SYSTEM_DESIGN_URL_SLUG: str = "system-design-material"
+
 # Routes that should be prerendered as real paths (besides home which is "/").
 # Order also drives navigation in the prerendered <noscript> fallback.
 TOP_ROUTES = [
     ("courses",   "Khoá học",          "Courses"),
-    ("book",      "Coding Book",       "Coding Book"),
-    ("mock",      "Mock Interview 1-1", "Mock Interview 1-1"),
+    ("book",          "Coding Book",       "Coding Book"),
+    (SYSTEM_DESIGN_URL_SLUG, "System design material", "System design material"),
+    ("mock",          "Mock Interview 1-1", "Mock Interview 1-1"),
     ("resources", "Interview Resources", "Interview Resources"),
     ("mentors",   "Giảng viên",        "Mentors"),
     ("stories",   "Success Stories",   "Success Stories"),

@@ -1,0 +1,235 @@
+<h2>Introduction</h2>
+<p>We'll design a <strong>distributed email service</strong>, similar to <strong>Gmail</strong> in this chapter.</p>
+<p>In 2020, <strong>Gmail</strong> had 1.8bil active users, while <strong>Outlook</strong> had 400mil users worldwide.</p>
+<hr />
+<h2>Step 1: Understand the Problem and Establish Design Scope</h2>
+<ul>
+<li>C: How many users use the system?</li>
+<li>I: 1bil users</li>
+<li>C: I think following features are important - auth, send/receive email, fetch email, filter emails, search email, anti-spam protection.</li>
+<li>I: Good list. Don't worry about auth for now.</li>
+<li>C: How do users connect \w email servers?</li>
+<li>I: Typically, email clients connect via SMTP, POP, IMAP, but we'll use HTTP for this problem.</li>
+<li>C: Can emails have attachments?</li>
+<li>I: Yes</li>
+</ul>
+<h3><strong>Non-functional requirements</strong></h3>
+<ul>
+<li><strong>Reliability</strong> - we shouldn't lose data</li>
+<li><strong>Availability</strong> - We should use replication to prevent single points of failure. We should also tolerate partial system failures.</li>
+<li><strong>Scalability</strong> - As userbase grows, our system should be able to handle them.</li>
+<li><strong>Flexibility and extensibility</strong> - system should be flexible and easy to extend with new features. One of the reasons we chose HTTP over SMTP/other mail protocols.</li>
+</ul>
+<h3><strong>Back-of-the-envelope estimation</strong></h3>
+<ul>
+<li><strong>1bil users</strong></li>
+<li>Assuming one person sends 10 emails per day -&gt; <strong>100k emails per second</strong>.</li>
+<li>Assuming one person receives 40 emails per day and each email on average has 50kb metadata -&gt; <strong>730pb storage per year</strong>.</li>
+<li>Assuming 20% of emails have storage attachments and average size is 500kb -&gt; <strong>1,460pb per year</strong>.</li>
+</ul>
+<hr />
+<h2>Step 2: Propose High-Level Design and Get Buy-In</h2>
+<h3><strong>Email knowledge 101</strong></h3>
+<p>There are various protocols used for sending and receiving emails:<br />
+- <strong>SMTP</strong> - standard protocol for sending emails from one server to another.<br />
+- <strong>POP</strong> - standard protocol for receiving and downloading emails from a remote mail server to a local client. Once retrieved, emails are deleted from remote server.<br />
+- <strong>IMAP</strong> - similar to POP, it is used for receiving and downloading emails from a remote server, but it keeps the emails on the server-side.<br />
+- <strong>HTTPS</strong> - not technically an email protocol, but it can be used for web-based email clients.</p>
+<p>Apart from the mailing protocol, there are some DNS records we need to configure for our email server - the MX records:</p>
+<figure class="sd-figure"><img alt="dns-lookup" src="assets/content/system-design/images/ch23/dns-lookup.png" / loading="lazy"></figure>
+<p>Email attachments are sent base64-encoded and there is usually a size limit of 25mb on most mail services.<br />
+This is configurable and varies from individual to corporate accounts.</p>
+<h3><strong>Traditional mail servers</strong></h3>
+<p>Traditional mail servers work well when there are a limited number of users, connected to a single server.</p>
+<figure class="sd-figure"><img alt="traditional-mail-server" src="assets/content/system-design/images/ch23/traditional-mail-server.png" / loading="lazy"></figure>
+<ul>
+<li>Alice logs into her Outlook email and presses "send". Email is sent to Outlook mail server. Communication is via SMTP.</li>
+<li>Outlook server queries DNS to find MX record for gmail.com and transfers the email to their servers. Communication is via SMTP.</li>
+<li>Bob fetches emails from his gmail server via IMAP/POP.</li>
+</ul>
+<p>In traditional mail servers, emails were stored on the local file system. Every email was a separate file.</p>
+<figure class="sd-figure"><img alt="local-dir-storage" src="assets/content/system-design/images/ch23/local-dir-storage.png" / loading="lazy"></figure>
+<p>As the scale grew, disk I/O became a bottleneck. Also, it doesn't satisfy our high availability and reliability requirements.<br />
+Disks can be damaged and server can go down.</p>
+<h3><strong>Distributed mail servers</strong></h3>
+<p>Distributed mail servers are designed to support modern use-cases and solve modern scalability issues.</p>
+<p>These servers can still support IMAP/POP for native email clients and SMTP for mail exchange across servers.</p>
+<p>But for rich web-based mail clients, a RESTful API over HTTP is typically used.</p>
+<p>Example APIs:<br />
+- <code>POST /v1/messages</code> - sends a message to recipients in To, Cc, Bcc headers.<br />
+- <code>GET /v1/folders</code> - returns all folders of an email account</p>
+<p>Example response:</p>
+<pre><code>[{id: string        Unique folder identifier.
+  name: string      Name of the folder.
+                    According to RFC6154 [9], the default folders can be one of
+                    the following: All, Archive, Drafts, Flagged, Junk, Sent,
+                    and Trash.
+  user_id: string   Reference to the account owner
+}]
+</code></pre>
+<ul>
+<li><code>GET /v1/folders/{:folder_id}/messages</code> - returns all messages under a folder \w pagination</li>
+<li><code>GET /v1/messages/{:message_id}</code> - get all information about a particular message</li>
+</ul>
+<p>Example response:</p>
+<pre><code>{
+  user_id: string                      // Reference to the account owner.
+  from: {name: string, email: string}  // &lt;name, email&gt; pair of the sender.
+  to: [{name: string, email: string}]  // A list of &lt;name, email&gt; paris
+  subject: string                      // Subject of an email
+  body: string                         //  Message body
+  is_read: boolean                     //  Indicate if a message is read or not.
+}
+</code></pre>
+<p>Here's the high-level design of the distributed mail server:</p>
+<figure class="sd-figure"><img alt="high-level-architecture" src="assets/content/system-design/images/ch23/high-level-architecture.png" / loading="lazy"></figure>
+<ul>
+<li><strong>Webmail</strong> - users use web browsers to send/receive emails</li>
+<li><strong>Web servers</strong> - public-facing request/response services used to manage login, signup, user profile, etc.</li>
+<li><strong>Real-time servers</strong> - Used for pushing new email updates to clients in real-time. We use websockets for real-time communication but fallback to long-polling for older browsers that don't support them.</li>
+<li><strong>Metadata db</strong> - stores email metadata such as subject, body, from, to, etc.</li>
+<li><strong>Attachment store</strong> - Object store (eg Amazon S3), suitable for storing large files.</li>
+<li><strong>Distributed cache</strong> - We can cache recent emails in Redis to improve UX.</li>
+<li><strong>Search store</strong> - distributed document store, used for supporting full-text searches.</li>
+</ul>
+<p>Here's what the email sending flow looks like:</p>
+<figure class="sd-figure"><img alt="email-sending-flow" src="assets/content/system-design/images/ch23/email-sending-flow.png" / loading="lazy"></figure>
+<ul>
+<li>User writes an email and presses "send". Email is sent to load balancer.</li>
+<li>Load balancer rate limits excessive mail sends and routes to one of the web servers.</li>
+<li>Web servers do basic email validation (eg email size) and short-circuits outbound flow if domain is same as sender. But does spam check first.</li>
+<li>If basic validation passes, email is sent to message queue (attachment is referenced from object store)</li>
+<li>If basic validation fails, email is sent to error queue</li>
+<li>SMTP outgoing workers pull messages from outgoing queue, do spam/virus checks and route to destination mail server.</li>
+<li>Email is stored in the "Sent Emails" folder</li>
+</ul>
+<p>We need to also monitor size of outgoing message queue. Growing too large might indicate a problem:<br />
+- Recipient's mail server is unavailable. We can retry sending the email at a later time using exponential backoff.<br />
+- Not enough consumers to handle the load, we might have to scale the consumers.</p>
+<p>Here's the email receiving flow:</p>
+<figure class="sd-figure"><img alt="email-receiving-flow" src="assets/content/system-design/images/ch23/email-receiving-flkow.png" / loading="lazy"></figure>
+<ul>
+<li>Incoming emails arrive at the SMTP load balancer. Mails are distributed to SMTP servers, where mail acceptance policy is done (eg invalid emails are directly discarded).</li>
+<li>If attachment of email is too large, we can put it in object store (s3).</li>
+<li>Mail processing workers do preliminary checks, after which mails are forwarded to storage, cache, object store and real-time servers.</li>
+<li>Offline users get their new emails once they come back online via HTTP API.</li>
+</ul>
+<hr />
+<h2>Step 3: Design Deep Dive</h2>
+<p>Let's now go deeper into some of the components.</p>
+<h3><strong>Metadata database</strong></h3>
+<p>Here are some of the characteristics of email metadata:<br />
+- headers are usually small and frequently accessed<br />
+- Body size ranges from small to big, but is typically read once<br />
+- Most mail operations are isolated to a single user - eg fetching email, marking as read, searching.<br />
+- Data recency impacts data usage. Users typically read only recent emails<br />
+- Data has high-reliability requirements. Data loss is unacceptable.</p>
+<p>At gmail/outlook scale, the database is typically custom made to reduce input/output operations per second (IOPS).</p>
+<p>Let's consider what database options we have:<br />
+- <strong>Relational database</strong> - we can build indexes for headers and body, but these DBs are typically optimized for small chunks of data.<br />
+- <strong>Distributed object store</strong> - this can be a good option for backup storage, but can't efficiently support searching/marking as read/etc.<br />
+- <strong>NoSQL</strong> - Google BigTable is used by gmail, but it's not open-sourced.</p>
+<p>Based on above analysis, very few existing solutions seems to fit our needs perfectly.<br />
+In an interview setting, it's infeasible to design a new distributed database solution, but important to mention characteristics:<br />
+- Single column can be a single-digit MB<br />
+- Strong data consistency<br />
+- Designed to reduce disk I/O<br />
+- Highly available and fault tolerant<br />
+- Should be easy to create incremental backups</p>
+<p>In order to partition the data, we can use the <code>user_id</code> as a partition key, so that one user's data is stored on a single shard.<br />
+This prohibits us from sharing an email with multiple users, but this is not a requirement for this interview.</p>
+<p>Let's define the tables:<br />
+- Primary key consists of partition key (data distribution) and clustering key (sorting data)<br />
+- Queries we need to support - get all folders for a user, display all emails for a folder, create/get/delete an email, fetch read/unread email, get conversation threads (bonus)</p>
+<p>Legend for tables to follow:</p>
+<figure class="sd-figure"><img alt="legend" src="assets/content/system-design/images/ch23/legend.png" / loading="lazy"></figure>
+<p>Here is the folders table:</p>
+<figure class="sd-figure"><img alt="folders-table" src="assets/content/system-design/images/ch23/folders-table.png" / loading="lazy"></figure>
+<p>emails table:</p>
+<figure class="sd-figure"><img alt="emails-table" src="assets/content/system-design/images/ch23/emails-table.png" / loading="lazy"></figure>
+<ul>
+<li>email_id is timeuuid which allows sorting based on timestamp when email was created</li>
+</ul>
+<p>Attachments are stored in a separate table, identified by filename:</p>
+<figure class="sd-figure"><img alt="attachments" src="assets/content/system-design/images/ch23/attachments.png" / loading="lazy"></figure>
+<p>Supporting fetchin read/unread emails is easy in a traditional relational database, but not in Cassandra, since filtering on non-partition/clustering key is prohibited.<br />
+One workaround to fetch all emails in a folder and filter in-memory, but that doesn't work well for a big-enough application.</p>
+<p>What we can do is denormalize the emails table into read/unread emails tables:</p>
+<figure class="sd-figure"><img alt="read-unread-emails" src="assets/content/system-design/images/ch23/read-unread-emails.png" / loading="lazy"></figure>
+<p>In order to support conversation threads, we can include some headers, which mail clients interpret and use to reconstruct a conversation thread:</p>
+<pre><code>{
+  &quot;headers&quot; {
+     &quot;Message-Id&quot;: &quot;&lt;7BA04B2A-430C-4D12-8B57-862103C34501@gmail.com&gt;&quot;,
+     &quot;In-Reply-To&quot;: &quot;&lt;CAEWTXuPfN=LzECjDJtgY9Vu03kgFvJnJUSHTt6TW@gmail.com&gt;&quot;,
+     &quot;References&quot;: [&quot;&lt;7BA04B2A-430C-4D12-8B57-862103C34501@gmail.com&gt;&quot;]
+  }
+}
+</code></pre>
+<p>Finally, we'll trade availability for consistency for our distributed database, since it is a hard requirement for this problem.</p>
+<p>Hence, in the event of a failover or network parititon, sync/update actions will be briefly unavailable to impacted users.</p>
+<h3><strong>Email deliverability</strong></h3>
+<p>It is easy to setup a server to send emails, but getting the email to a receiver's inbox is hard, due to spam-protection algorithms.</p>
+<p>If we just setup a new mail server and start sending mails through it, our emails will probably end up in the spam folder.</p>
+<p>Here's what we can do to prevent that:<br />
+- <strong>Dedicated IPs</strong> - use dedicated IPs for sending emails, otherwise, recipient servers will not trust you.<br />
+- <strong>Classify emails</strong> - avoid sending marketing emails from the same servers to prevent more important email to be classified as spam<br />
+- <strong>Warm up your IP address</strong> slowly to build a good reputation with big email providers. It takes 2 to 6 weeks to warm up a new IP<br />
+- <strong>Ban spammers</strong> quickly to not deteriorate your reputation<br />
+- <strong>Feedback processing</strong> - setup a feedback loop with ISPs to keep track of complaint rate and ban spam accounts quickly.<br />
+- <strong>Email authentication</strong> - use common techniques to combat phishing such as Sender Policy Framework, DomainKeys Identified Mail, etc.</p>
+<p>You don't need to remember all of this. Just know that building a good mail server requires a lot of domain knowledge.</p>
+<h3><strong>Search</strong></h3>
+<p>Searching includes doing a full-text search based on email contents or more advanced queries based on from, to, subject, unread, etc filters.</p>
+<p>One characteristic of email search is that it is local to the user and it has more writes than reads, because we need to re-index it on each operation, but users rarely use the search tab.</p>
+<p>Let's compare google search with email search:</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th></th>
+<th>Scope</th>
+<th>Sorting</th>
+<th>Accuracy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Google search</td>
+<td>The whole internet</td>
+<td>Sort by relevance</td>
+<td>Indexing takes some time, so not instant results.</td>
+</tr>
+<tr>
+<td>Email search</td>
+<td>User's own email box</td>
+<td>Sort by attributes eg time, date, etc</td>
+<td>Indexing should be quick and results accurate.</td>
+</tr>
+</tbody>
+</table>
+<p>To achieve this search functionality, one option is to use an Elasticsearch cluster. We can use <code>user_id</code> as the partition key to group data under the same node:</p>
+<figure class="sd-figure"><img alt="elasticsearch" src="assets/content/system-design/images/ch23/elasticsearch.png" / loading="lazy"></figure>
+<p>Mutating operations are async via Kafka in order to decouple services from the reindexing flow.<br />
+Actually searching for data happens synchronously.</p>
+<p>Elasticsearch is one of the most popular search-engine databases and supports full-text search for emails very well.</p>
+<p>Alternatively, we can attempt to develop our own custom search solution to meet our specific requirements.</p>
+<p>Designing such a system is out of scope. One of the core challenges when building it is to optimize it for write-heavy workloads.</p>
+<p>To achieve that, we can use Log-Structured Merge-Trees (LSM) to structure the index data on disk. Write path is optimized for sequential writes only.<br />
+This technique is used in Cassandra, BigTable and RocksDB.</p>
+<p>Its core idea is to store data in-memory until a predefined threshold is reached, after which it is merged in the next layer (disk):</p>
+<figure class="sd-figure"><img alt="lsm-tree" src="assets/content/system-design/images/ch23/lsm-tree.png" / loading="lazy"></figure>
+<p>Main trade-offs between the two approaches:<br />
+- Elasticsearch scales to some extent, whereas a custom search engine can be fine-tuned for the email use-case, allowing it to scale further.<br />
+- Elasticsearch is a separate service we need to maintain, alongside the metadata store. A custom solution can be the datastore itself.<br />
+- Elasticsearch is an off-the-shelf solution, whereas the custom search engine would require significant engineering effort to build.</p>
+<h3><strong>Scalability and availability</strong></h3>
+<p>Since individual user operations don't collide with other users, most components can be independently scaled.</p>
+<p>To ensure high availability, we can also use a multi-DC setup with leader-folower failover in case of failures:</p>
+<figure class="sd-figure"><img alt="multi-dc-example" src="assets/content/system-design/images/ch23/multi-dc-example.png" / loading="lazy"></figure>
+<hr />
+<h2>Step 4: Wrap Up</h2>
+<p>Additional talking points:<br />
+- <strong>Fault tolerance</strong> - Many parts of the system could fail. It is worthwhile how we'd handle node failures.<br />
+- <strong>Compliance</strong> - PII needs to be stored in a reasonable way, given Europe's GDPR laws.<br />
+- <strong>Security</strong> - email encryption, phishing protection, safe browsing, etc.<br />
+- <strong>Optimizations</strong> - eg preventing duplication of the same attachments, sent multiple times by different users.</p>
+

@@ -1,0 +1,355 @@
+<h2>Giới thiệu</h2>
+<p><strong>Quảng cáo kỹ thuật số</strong> là một ngành công nghiệp lớn với sự nổi lên của Facebook, YouTube, TikTok, v.v.</p>
+<p>Do đó, việc theo dõi các sự kiện nhấp chuột vào quảng cáo là rất quan trọng. Trong chương này, chúng ta tìm hiểu cách thiết kế <strong>tổng hợp sự kiện nhấp vào quảng cáo</strong> hệ thống ở quy mô Facebook/Google.</p>
+<p>Quảng cáo kỹ thuật số có một quá trình được gọi là <strong>đặt giá thầu thời gian thực (RTB)</strong>, nơi khoảng không quảng cáo kỹ thuật số được mua và bán:</p>
+<figure class="sd-figure"><img alt="digital-advertising-example" loading="lazy" src="assets/content/system-design/images/ch21/digital-advertising-example.png"/></figure>
+<p>Tốc độ của RTB rất quan trọng vì nó thường xảy ra trong vòng một giây.<br/>
+Độ chính xác của dữ liệu cũng rất quan trọng vì nó ảnh hưởng đến số tiền mà nhà quảng cáo trả.</p>
+<p>Dựa trên tổng hợp sự kiện nhấp chuột vào quảng cáo, nhà quảng cáo có thể đưa ra các quyết định như điều chỉnh đối tượng và từ khóa mục tiêu.</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<ul>
+<li>C: Định dạng của dữ liệu đầu vào là gì?</li>
+<li>I: 1 tỷ lượt nhấp vào quảng cáo mỗi ngày và tổng cộng 2 triệu quảng cáo. Số sự kiện nhấp chuột vào quảng cáo tăng 30% so với cùng kỳ năm trước.</li>
+<li>C: Một số truy vấn quan trọng nhất mà hệ thống của chúng tôi cần hỗ trợ là gì?</li>
+<li>I: Các truy vấn hàng đầu cần xem xét:</li>
+<li>Trả về số sự kiện nhấp chuột cho quảng cáo X trong Y phút vừa qua</li>
+<li>Trả về top 100 quảng cáo được nhấp nhiều nhất trong 1 phút qua. Cả hai tham số nên được cấu hình. Sự tổng hợp xảy ra mỗi phút.</li>
+<li>Hỗ trợ lọc dữ liệu bằng <code>ip</code>, <code>user_id</code>, <code>country</code> cho các truy vấn trên</li>
+<li>C: Chúng ta có cần lo lắng về các trường hợp khó khăn không? Một số trong những cái tôi có thể nghĩ ra:</li>
+<li>Có thể có những sự kiện đến muộn hơn dự kiến</li>
+<li>Có thể có sự kiện trùng lặp</li>
+<li>Các phần khác nhau của hệ thống có thể không hoạt động, vì vậy chúng ta cần xem xét việc khôi phục hệ thống</li>
+<li>I: Đó là một danh sách tốt, hãy cân nhắc những điều đó</li>
+<li>C: Yêu cầu về độ trễ là gì?</li>
+<li>I: Độ trễ e2e vài phút để tổng hợp lượt nhấp vào quảng cáo. Đối với RTB, thời gian này chưa đến một giây. Bạn có thể có độ trễ đó để tổng hợp lượt nhấp vào quảng cáo vì độ trễ này thường được sử dụng để thanh toán và báo cáo.</li>
+</ul>
+<h3><strong>Yêu cầu chức năng</strong></h3>
+<ul>
+<li>Tổng hợp số lần click của <code>ad_id</code> trong Y phút cuối cùng</li>
+<li>Trả về top 100 được click nhiều nhất <code>ad_id</code> mỗi phút</li>
+<li>Hỗ trợ lọc tổng hợp theo các thuộc tính khác nhau</li>
+<li>Khối lượng tập dữ liệu ở quy mô Facebook hoặc Google</li>
+</ul>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li>Độ chính xác của kết quả tổng hợp rất quan trọng vì nó được dùng cho RTB và thanh toán quảng cáo</li>
+<li>Xử lý đúng cách các sự kiện bị trì hoãn hoặc trùng lặp</li>
+<li>Tính mạnh mẽ - hệ thống phải có khả năng phục hồi trước các lỗi một phần</li>
+<li>Độ trễ - độ trễ tối đa là vài phút e2e</li>
+</ul>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<ul>
+<li>1 tỷ DAU</li>
+<li>Giả sử người dùng nhấp vào 1 quảng cáo mỗi ngày -&gt; 1 tỷ lần nhấp vào quảng cáo mỗi ngày</li>
+<li>Số lần nhấp vào quảng cáo QPS = 10.000</li>
+<li>QPS đỉnh cao gấp 5 lần số lượng = 50.000</li>
+<li>Một lần nhấp vào quảng cáo sẽ chiếm dung lượng lưu trữ 0,1KB. Yêu cầu dung lượng lưu trữ hàng ngày là 100gb</li>
+<li>Dung lượng lưu trữ hàng tháng = 3tb</li>
+</ul>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<p>Trong phần này, chúng ta thảo luận về thiết kế API truy vấn, mô hình dữ liệu và thiết kế cấp cao.</p>
+<h3><strong>Thiết kế API truy vấn</strong></h3>
+<p>API là một hợp đồng giữa Client và máy chủ. Trong trường hợp của chúng tôi, khách hàng là người dùng trang tổng quan - nhà khoa học/nhà phân tích dữ liệu, nhà quảng cáo, v.v.</p>
+<p>Đây là yêu cầu chức năng của chúng ta:<br/>
+ - Tổng hợp số lần click của <code>ad_id</code> trong Y phút cuối cùng<br/>
+ - Trả về top N được click nhiều nhất <code>ad_id</code> trong M phút cuối<br/>
+ - Hỗ trợ lọc tổng hợp theo các thuộc tính khác nhau</p>
+<p>Chúng tôi cần hai endpoint để đạt được những yêu cầu đó. Việc lọc có thể được thực hiện thông qua các Query parameters trên một trong số chúng.</p>
+<p><strong>Tổng số lần nhấp vào ad_id trong M phút vừa qua</strong>:</p>
+<pre><code>GET /v1/ads/{:ad_id}/aggregated_count
+</code></pre>
+<p>Query parameters:<br/>
+ - từ - phút bắt đầu. Mặc định là bây giờ - 1 phút<br/>
+ - đến - phút cuối. Mặc định là bây giờ<br/>
+ - bộ lọc - mã định danh cho các chiến lược lọc khác nhau. Ví dụ: 001 có nghĩa là "nhấp chuột không phải ở Hoa Kỳ".</p>
+<p>Response:<br/>
+ - ad_id - mã nhận dạng quảng cáo<br/>
+ - đếm - tổng số giữa phút bắt đầu và phút kết thúc</p>
+<p><strong>Trả về N ad_id được nhấp nhiều nhất trong M phút qua</strong></p>
+<pre><code>GET /v1/ads/popular_ads
+</code></pre>
+<p>Query parameters:<br/>
+ - đếm - N quảng cáo được nhấp nhiều nhất<br/>
+ - cửa sổ - kích thước cửa sổ tổng hợp tính bằng phút<br/>
+ - bộ lọc - mã định danh cho các chiến lược lọc khác nhau</p>
+<p>Response:<br/>
+ - danh sách ad_id</p>
+<h3><strong>Mô hình dữ liệu</strong></h3>
+<p>Trong hệ thống của chúng tôi, chúng tôi có dữ liệu thô và tổng hợp.</p>
+<p>Dữ liệu thô trông như thế này:</p>
+<pre><code>[AdClickEvent] ad001, 2021-01-01 00:00:01, user 1, 207.148.22.22, USA
+</code></pre>
+<p>Đây là một ví dụ ở định dạng có cấu trúc:<br/>
+| quảng cáo_id | click_timestamp | người dùng | ip | đất nước |<br/>
+|-------|----------------------|-------|--------------|----------|<br/>
+| quảng cáo001 | 2021-01-01 00:00:01 | người dùng1 | 207.148.22.22 | Mỹ |<br/>
+| quảng cáo001 | 2021-01-01 00:00:02 | người dùng1 | 207.148.22.22 | Mỹ |<br/>
+| quảng cáo002 | 2021-01-01 00:00:02 | người dùng2 | 209.153.56.11 | Mỹ |</p>
+<p>Đây là phiên bản tổng hợp:<br/>
+| quảng cáo_id | nhấp_phút | bộ lọc_id | đếm |<br/>
+|-------|--------------|----------|-------|<br/>
+| quảng cáo001 | 202101010000 | 0012 | 2 |<br/>
+| quảng cáo001 | 202101010000 | 0023 | 3 |<br/>
+| quảng cáo001 | 202101010001 | 0012 | 1 |<br/>
+| quảng cáo001 | 202101010001 | 0023 | 6 |</p>
+<p>các <code>filter_id</code> giúp chúng tôi đạt được các yêu cầu lọc của mình.<br/>
+| bộ lọc_id | vùng | IP | user_id |<br/>
+|----------|--------|-------------|--------|<br/>
+| 0012 | Mỹ | * | * |<br/>
+| 0013 | * | 123.1.2.3 | * |</p>
+<p>Để hỗ trợ nhanh chóng quay lại N quảng cáo được nhấp nhiều nhất trong M phút vừa qua, chúng tôi cũng sẽ duy trì cấu trúc này:<br/>
+| Most_clicked_ads |           |                                                  |<br/>
+|-------------------||-----------|-------------------------------------------------|<br/>
+| kích thước cửa sổ | số nguyên | Kích thước cửa sổ tổng hợp (M) tính bằng phút |<br/>
+| cập nhật_time_phút | dấu thời gian | Dấu thời gian cập nhật lần cuối (ở mức độ chi tiết 1 phút) |<br/>
+| Most_clicked_ads | mảng | Danh sách ID quảng cáo ở định dạng JSON.                   |</p>
+<p>Một số ưu và nhược điểm giữa việc lưu trữ dữ liệu thô và lưu trữ dữ liệu tổng hợp là gì?<br/>
+ - Dữ liệu thô cho phép sử dụng toàn bộ tập dữ liệu và hỗ trợ lọc và tính toán lại dữ liệu<br/>
+ - Mặt khác, dữ liệu tổng hợp cho phép chúng ta có tập dữ liệu nhỏ hơn và truy vấn nhanh hơn<br/>
+ - Dữ liệu thô có nghĩa là có kho dữ liệu lớn hơn và truy vấn chậm hơn<br/>
+ - Tuy nhiên, dữ liệu tổng hợp là dữ liệu phái sinh nên có một số trường hợp bị mất dữ liệu.</p>
+<p>Trong thiết kế của chúng tôi, chúng tôi sẽ sử dụng kết hợp cả hai phương pháp:<br/>
+ - Bạn nên giữ lại dữ liệu thô để gỡ lỗi. Nếu có một số lỗi trong quá trình tổng hợp, chúng tôi có thể phát hiện ra lỗi và chèn lấp.<br/>
+ - Dữ liệu tổng hợp cũng nên được lưu trữ để thực hiện truy vấn nhanh hơn.<br/>
+ - Dữ liệu thô có thể được lưu trữ trong cold storage để tránh tốn thêm chi phí lưu trữ.</p>
+<p>Khi nói đến database, có một số yếu tố cần xem xét:<br/>
+ - Dữ liệu trông như thế nào? Nó có tính chất quan hệ, tài liệu hay blob?<br/>
+ - Khối lượng công việc nặng về đọc, viết nhiều hay cả hai?<br/>
+ - Có cần giao dịch không?<br/>
+ - Các truy vấn có dựa vào các hàm OLAP như SUM và COUNT không?</p>
+<p>Đối với dữ liệu thô, chúng ta có thể thấy rằng QPS trung bình là 10k và QPS cao nhất là 50k, do đó hệ thống có khả năng ghi nhiều.<br/>
+Mặt khác, lưu lượng đọc thấp vì dữ liệu thô chủ yếu được sử dụng làm backup copy nếu có sự cố.</p>
+<p>database quan hệ có thể thực hiện công việc này nhưng việc mở rộng quy mô ghi có thể gặp khó khăn. <br/>
+Ngoài ra, chúng ta có thể sử dụng Cassandra hoặc InfluxDB có khả năng hỗ trợ gốc tốt hơn cho các tải ghi nặng.</p>
+<p>Một tùy chọn khác là sử dụng Amazon S3 với định dạng dữ liệu cột như ORC, Parquet hoặc AVRO. Vì cách thiết lập này không quen thuộc nên chúng tôi sẽ sử dụng Cassandra.</p>
+<p>Đối với dữ liệu tổng hợp, khối lượng công việc vừa đọc vừa ghi nặng vì dữ liệu tổng hợp liên tục được truy vấn để có bảng thông tin và cảnh báo.<br/>
+Nó cũng nặng về khả năng ghi vì dữ liệu được tổng hợp và ghi mỗi phút bởi dịch vụ tổng hợp. <br/>
+Do đó, chúng tôi cũng sẽ sử dụng cùng một kho dữ liệu (Cassandra) ở đây.</p>
+<h3><strong>Thiết kế cấp cao</strong></h3>
+<p>Đây là cách hệ thống của chúng tôi trông như thế nào:</p>
+<figure class="sd-figure"><img alt="high-level-design-1" loading="lazy" src="assets/content/system-design/images/ch21/high-level-design-1.png"/></figure>
+<p>Luồng dữ liệu dưới dạng luồng dữ liệu không giới hạn trên cả đầu vào và đầu ra.</p>
+<p>Để tránh xảy ra tình trạng synchronous sink, trong đó sự cố của consumer có thể khiến toàn bộ hệ thống bị đình trệ, <br/>
+chúng tôi sẽ tận dụng quá trình xử lý không đồng bộ bằng cách sử dụng message queue (Kafka) để tách rời consumer và producer.</p>
+<figure class="sd-figure"><img alt="high-level-design-2" loading="lazy" src="assets/content/system-design/images/ch21/high-level-design-2.png"/></figure>
+<p>message queue đầu tiên lưu trữ dữ liệu sự kiện nhấp vào quảng cáo:<br/>
+| quảng cáo_id | click_timestamp | user_id | ip | đất nước |<br/>
+|-------|--------|---------|------|--------|</p>
+<p>message queue thứ hai chứa số lần nhấp vào quảng cáo, được tổng hợp mỗi phút:<br/>
+| quảng cáo_id | nhấp_phút | đếm |<br/>
+|-------|--------------|-------|</p>
+<p>Cũng như N quảng cáo được nhấp chuột nhiều nhất được tổng hợp mỗi phút:<br/>
+| cập nhật_time_phút | Most_clicked_ads |<br/>
+|-------------------||-------------------|</p>
+<p>message queue thứ hai ở đó để đạt được ngữ nghĩa cam kết nguyên tử chính xác từ đầu đến cuối:</p>
+<figure class="sd-figure"><img alt="atomic-commit" loading="lazy" src="assets/content/system-design/images/ch21/atomic-commit.png"/></figure>
+<p>Đối với dịch vụ tổng hợp, sử dụng khung MapReduce là một lựa chọn tốt:</p>
+<figure class="sd-figure"><img alt="ad-count-map-reduce" loading="lazy" src="assets/content/system-design/images/ch21/ad-count-map-reduce.png"/></figure>
+<figure class="sd-figure"><img alt="top-100-map-reduce" loading="lazy" src="assets/content/system-design/images/ch21/top-100-map-reduce.png"/></figure>
+<p>Mỗi nút chịu trách nhiệm cho một nhiệm vụ duy nhất và nó sẽ gửi kết quả xử lý đến nút hạ lưu.</p>
+<p>Nút bản đồ chịu trách nhiệm đọc từ nguồn dữ liệu, sau đó lọc và chuyển đổi dữ liệu.</p>
+<p>Ví dụ: nút bản đồ có thể phân bổ dữ liệu trên các nút tổng hợp khác nhau dựa trên <code>ad_id</code>:</p>
+<figure class="sd-figure"><img alt="map-node" loading="lazy" src="assets/content/system-design/images/ch21/map-node.png"/></figure>
+<p>Ngoài ra, chúng tôi có thể phân phối quảng cáo trên các partition Kafka và cho phép các nút tổng hợp đăng ký trực tiếp trong một nhóm consumer.<br/>
+Tuy nhiên, nút ánh xạ cho phép chúng tôi vệ sinh hoặc chuyển đổi dữ liệu trước khi xử lý tiếp theo.</p>
+<p>Một lý do khác có thể là chúng tôi không kiểm soát được cách dữ liệu được tạo ra, <br/>
+vậy các sự kiện liên quan đến giống nhau <code>ad_id</code> có thể đi trên các partition khác nhau.</p>
+<p>Nút tổng hợp tính các sự kiện nhấp vào quảng cáo theo <code>ad_id</code> trong bộ nhớ mỗi phút.</p>
+<p>Nút giảm thu thập kết quả tổng hợp từ nút tổng hợp và tạo ra kết quả cuối cùng:</p>
+<figure class="sd-figure"><img alt="reduce-node" loading="lazy" src="assets/content/system-design/images/ch21/reduce-node.png"/></figure>
+<p>Mô hình DAG này sử dụng mô hình MapReduce. Cần có dữ liệu lớn và tận dụng tính toán phân tán song song để biến nó thành dữ liệu có kích thước thông thường.</p>
+<p>Trong mô hình DAG, dữ liệu trung gian được lưu trữ trong bộ nhớ và các nút khác nhau giao tiếp với nhau bằng TCP hoặc bộ nhớ dùng chung.</p>
+<p>Hãy cùng khám phá xem mô hình này hiện có thể giúp chúng ta đạt được các trường hợp sử dụng khác nhau như thế nào.</p>
+<p><strong>Trường hợp sử dụng 1 - tổng hợp số lần nhấp chuột</strong>:</p>
+<figure class="sd-figure"><img alt="use-case-1" loading="lazy" src="assets/content/system-design/images/ch21/use-case-1.png"/></figure>
+<ul>
+<li>Quảng cáo được partition bằng cách sử dụng <code>ad_id % 3</code></li>
+</ul>
+<p><strong>Trường hợp sử dụng 2 - trả về N quảng cáo được nhấp nhiều nhất</strong>:</p>
+<figure class="sd-figure"><img alt="use-case-2" loading="lazy" src="assets/content/system-design/images/ch21/use-case-2.png"/></figure>
+<ul>
+<li>Trong trường hợp này, chúng tôi đang tổng hợp 3 quảng cáo hàng đầu, nhưng điều này có thể mở rộng đến N quảng cáo hàng đầu một cách dễ dàng</li>
+<li>Mỗi nút duy trì cấu trúc dữ liệu heap để truy xuất nhanh N quảng cáo hàng đầu</li>
+</ul>
+<p><strong>Ca sử dụng 3 - lọc dữ liệu</strong>:<br/>
+Để hỗ trợ lọc dữ liệu nhanh, chúng tôi có thể xác định trước tiêu chí lọc và tổng hợp trước dựa trên tiêu chí đó:<br/>
+| quảng cáo_id | nhấp_phút | đất nước | đếm |<br/>
+|-------|--------------|---------|-------|<br/>
+| quảng cáo001 | 202101010001 | Mỹ | 100 |<br/>
+| quảng cáo001 | 202101010001 | GPB | 200 |<br/>
+| quảng cáo001 | 202101010001 | người khác | 3000 |<br/>
+| quảng cáo002 | 202101010001 | Mỹ | 10 |<br/>
+| quảng cáo002 | 202101010001 | GPB | 25 |<br/>
+| quảng cáo002 | 202101010001 | người khác | 12 |</p>
+<p>Kỹ thuật này được gọi là <strong>lược đồ sao</strong> và được sử dụng rộng rãi trong kho dữ liệu.<br/>
+Các trường lọc được gọi <strong>kích thước</strong>.</p>
+<p>Cách tiếp cận này có những lợi ích sau:<br/>
+ - Đơn giản để hiểu và xây dựng<br/>
+ - Dịch vụ tổng hợp hiện tại có thể được tái sử dụng để tạo thêm thứ nguyên trong lược đồ sao.<br/>
+ - Truy xuất dữ liệu theo tiêu chí lọc nhanh chóng do kết quả được tính toán trước</p>
+<p>Hạn chế của phương pháp này là nó tạo ra nhiều nhóm và bản ghi hơn, đặc biệt khi chúng ta có nhiều tiêu chí lọc.</p>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<p>Chúng ta hãy đi sâu hơn vào một số chủ đề thú vị hơn.</p>
+<h3><strong>Truyền trực tuyến so với hàng loạt</strong></h3>
+<p>Kiến trúc cấp cao mà chúng tôi đề xuất là một loại hệ thống xử lý luồng. <br/>
+Dưới đây là so sánh giữa ba loại hệ thống:<br/>
+|                         | Dịch vụ (Hệ thống trực tuyến) | Hệ thống hàng loạt (hệ thống ngoại tuyến) | Hệ thống truyền phát (gần hệ thống thời gian thực) |<br/>
+|--------------------------|----------------------------------------|----------------------------------------------------------------|-------------------------------------------------------|<br/>
+| Khả năng đáp ứng | Trả lời khách hàng nhanh chóng | Không cần phản hồi cho khách hàng | Không cần phản hồi cho khách hàng |<br/>
+| Đầu vào | Yêu cầu của người dùng | Đầu vào bị chặn với kích thước hữu hạn. Một lượng lớn dữ liệu | Đầu vào không có ranh giới (luồng vô hạn) |<br/>
+| Đầu ra | Phản hồi cho khách hàng | Chế độ xem cụ thể hóa, số liệu tổng hợp, v.v. | Chế độ xem cụ thể hóa, số liệu tổng hợp, v.v. |<br/>
+| Đo lường hiệu suất | Tính sẵn có, độ trễ | Thông lượng | Thông lượng, độ trễ |<br/>
+| Ví dụ | Mua sắm trực tuyến | Bản đồGiảm | Nhấp nháy [13] |</p>
+<p>Trong thiết kế của chúng tôi, chúng tôi đã sử dụng kết hợp cả việc batching và phát trực tuyến. </p>
+<p>Chúng tôi đã sử dụng tính năng phát trực tuyến để xử lý dữ liệu khi dữ liệu đến và tạo ra kết quả tổng hợp gần như theo thời gian thực.<br/>
+Mặt khác, chúng tôi đã sử dụng tính năng theo đợt để sao lưu dữ liệu lịch sử.</p>
+<p>Một hệ thống chứa hai đường dẫn xử lý - hàng loạt và phát trực tuyến, đồng thời, kiến trúc này được gọi là lambda.<br/>
+Một điểm bất lợi là bạn có hai đường dẫn xử lý với hai cơ sở mã khác nhau cần duy trì.</p>
+<p>Kappa là một kiến trúc thay thế, kết hợp xử lý hàng loạt và xử lý luồng trong một đường dẫn xử lý.<br/>
+Ý tưởng chính là sử dụng một công cụ xử lý luồng đơn.</p>
+<p>Kiến trúc Lambda:</p>
+<figure class="sd-figure"><img alt="lambda-architecture" loading="lazy" src="assets/content/system-design/images/ch21/lambda-architecture.png"/></figure>
+<p>Kiến trúc Kappa:</p>
+<figure class="sd-figure"><img alt="kappa-architecture" loading="lazy" src="assets/content/system-design/images/ch21/kappa-architecture.png"/></figure>
+<p>Thiết kế cấp cao của chúng tôi sử dụng kiến trúc Kappa vì việc xử lý lại dữ liệu lịch sử cũng thông qua dịch vụ tổng hợp.</p>
+<p>Bất cứ khi nào chúng tôi phải tính toán lại dữ liệu tổng hợp do một lỗi lớn trong logic tổng hợp, chúng tôi có thể tính toán lại dữ liệu tổng hợp từ dữ liệu thô mà chúng tôi lưu trữ.<br/>
+ - Dịch vụ tính toán lại lấy dữ liệu từ raw object store. Đây là một công việc hàng loạt.<br/>
+ - Dữ liệu lấy về được gửi đến dịch vụ tổng hợp chuyên dụng nên dịch vụ tổng hợp xử lý theo thời gian thực không bị ảnh hưởng.<br/>
+ - Kết quả tổng hợp được gửi đến hàng tin nhắn thứ hai, sau đó chúng tôi cập nhật kết quả vào database tổng hợp.</p>
+<figure class="sd-figure"><img alt="recalculation-example" loading="lazy" src="assets/content/system-design/images/ch21/recalculation-example.png"/></figure>
+<h3><strong>Thời gian</strong></h3>
+<p>Chúng tôi cần dấu thời gian để thực hiện tổng hợp. Nó có thể được tạo ra ở hai nơi:<br/>
+ - thời gian sự kiện - khi nhấp chuột vào quảng cáo xảy ra<br/>
+ - Thời gian xử lý - thời gian hệ thống khi server xử lý sự kiện</p>
+<p>Do việc sử dụng xử lý không đồng bộ (message queue) và độ trễ mạng, có thể có sự khác biệt đáng kể giữa thời gian sự kiện và thời gian xử lý.<br/>
+ - Nếu sử dụng thời gian xử lý, kết quả tổng hợp có thể không chính xác<br/>
+ - Nếu sử dụng thời gian sự kiện, chúng ta phải xử lý các sự kiện bị trì hoãn</p>
+<p>Không có giải pháp hoàn hảo, chúng ta cần cân nhắc sự đánh đổi:<br/>
+|                 | Ưu điểm | Nhược điểm |<br/>
+|-----------------|---------------------------------------|---------------------------------------------------------------------------------------------------|<br/>
+| Thời gian sự kiện | Kết quả tổng hợp chính xác hơn | Khách hàng có thể có sai thời gian hoặc dấu thời gian có thể được tạo bởi những người dùng có ý đồ xấu |<br/>
+| Thời gian xử lý | Dấu thời gian của máy chủ đáng tin cậy hơn | Dấu thời gian không chính xác nếu sự kiện bị trễ |</p>
+<p>Vì độ chính xác của dữ liệu rất quan trọng nên chúng tôi sẽ sử dụng thời gian sự kiện để tổng hợp.</p>
+<p>Để giảm thiểu vấn đề sự kiện bị trì hoãn, một kỹ thuật gọi là "hình mờ" có thể được tận dụng.</p>
+<p>Trong ví dụ bên dưới, sự kiện 2 bỏ lỡ khoảng thời gian cần tổng hợp:</p>
+<figure class="sd-figure"><img alt="watermark-technique" loading="lazy" src="assets/content/system-design/images/ch21/watermark-technique.png"/></figure>
+<p>Tuy nhiên, nếu chúng tôi cố tình mở rộng khoảng thời gian tổng hợp, chúng tôi có thể giảm khả năng xảy ra các sự kiện bị bỏ lỡ.<br/>
+Phần mở rộng của cửa sổ được gọi là "hình mờ":</p>
+<figure class="sd-figure"><img alt="watermark-2" loading="lazy" src="assets/content/system-design/images/ch21/watermark-2.png"/></figure>
+<ul>
+<li>Hình mờ ngắn làm tăng khả năng xảy ra sự kiện bị bỏ lỡ nhưng giảm độ trễ</li>
+<li>Hình mờ dài hơn giúp giảm khả năng xảy ra sự kiện bị bỏ lỡ nhưng làm tăng độ trễ</li>
+</ul>
+<p>Luôn có khả năng xảy ra các sự kiện bị bỏ lỡ, bất kể kích thước của hình mờ. Nhưng việc tối ưu hóa cho những sự kiện có xác suất thấp như vậy sẽ không có tác dụng gì.</p>
+<p>Thay vào đó, chúng ta có thể giải quyết những mâu thuẫn đó bằng cách thực hiện đối chiếu vào cuối ngày.</p>
+<h3><strong>Cửa sổ tổng hợp</strong></h3>
+<p>Có 4 loại chức năng của cửa sổ:<br/>
+ - Cửa sổ lật (cố định)<br/>
+ - Cửa sổ nhảy<br/>
+ - Cửa sổ trượt<br/>
+ - Cửa sổ phiên</p>
+<p>Trong thiết kế của mình, chúng tôi tận dụng cửa sổ lộn xộn để tổng hợp lượt nhấp vào quảng cáo:</p>
+<figure class="sd-figure"><img alt="tumbling-window" loading="lazy" src="assets/content/system-design/images/ch21/tumbling-window.png"/></figure>
+<p>Cũng như một cửa sổ trượt cho N quảng cáo được nhấp nhiều nhất trong tổng hợp M phút:</p>
+<figure class="sd-figure"><img alt="sliding-window" loading="lazy" src="assets/content/system-design/images/ch21/sliding-window.png"/></figure>
+<h3><strong>Đảm bảo giao hàng</strong></h3>
+<p>Vì dữ liệu chúng tôi tổng hợp sẽ được sử dụng để thanh toán nên độ chính xác của dữ liệu là ưu tiên hàng đầu.</p>
+<p>Do đó, chúng ta cần thảo luận:<br/>
+ - Cách tránh xử lý các sự kiện trùng lặp<br/>
+ - Làm thế nào để đảm bảo tất cả các sự kiện được xử lý</p>
+<p>Có ba đảm bảo giao hàng mà chúng tôi có thể sử dụng - nhiều nhất một lần, ít nhất một lần và chính xác một lần.</p>
+<p>Trong hầu hết các trường hợp, at-least-once delivery chấp nhận được một lượng nhỏ duplicate.<br/>
+Tuy nhiên, đây không phải là trường hợp đối với hệ thống của chúng tôi vì sự khác biệt ở một tỷ lệ phần trăm nhỏ có thể dẫn đến sai lệch hàng triệu đô la.<br/>
+Do đó, chúng ta sẽ cần sử dụng ngữ nghĩa phân phối chính xác một lần.</p>
+<h3><strong>Chống trùng lặp dữ liệu</strong></h3>
+<p>Một trong những vấn đề phổ biến nhất về chất lượng dữ liệu là dữ liệu trùng lặp.</p>
+<p>Nó có thể đến từ nhiều nguồn khác nhau:<br/>
+ - Phía khách hàng - khách hàng có thể gửi lại cùng một sự kiện nhiều lần. Các sự kiện trùng lặp được gửi với mục đích xấu sẽ được xử lý tốt nhất bằng công cụ xử lý rủi ro.<br/>
+ - Máy chủ ngừng hoạt động - Nút dịch vụ tổng hợp ngừng hoạt động giữa quá trình tổng hợp và dịch vụ ngược tuyến chưa nhận được xác nhận nên sự kiện được gửi lại.</p>
+<p>Dưới đây là ví dụ về sự trùng lặp dữ liệu xảy ra do không xác nhận được sự kiện ở bước nhảy cuối cùng:</p>
+<figure class="sd-figure"><img alt="data-duplication-example" loading="lazy" src="assets/content/system-design/images/ch21/data-duplication-example.png"/></figure>
+<p>Trong ví dụ này, offset 100 sẽ được xử lý và gửi xuôi dòng nhiều lần.</p>
+<p>Một tùy chọn để thử và giảm thiểu điều này là lưu trữ phần bù được nhìn thấy lần cuối trong HDFS/S3, nhưng điều này có nguy cơ dẫn đến kết quả không bao giờ đến được hạ lưu:</p>
+<figure class="sd-figure"><img alt="data-duplication-example-2" loading="lazy" src="assets/content/system-design/images/ch21/data-duplication-example-2.png"/></figure>
+<p>Cuối cùng, chúng ta có thể lưu trữ phần bù trong khi tương tác với hạ lưu một cách nguyên tử. Để đạt được điều này, chúng ta cần thực hiện một giao dịch phân tán:</p>
+<figure class="sd-figure"><img alt="data-duplication-example-3" loading="lazy" src="assets/content/system-design/images/ch21/data-duplication-example-3.png"/></figure>
+<p><strong>Ghi chú cá nhân</strong>: Ngoài ra, nếu hệ thống hạ nguồn xử lý kết quả tổng hợp theo cách idempotent thì không cần giao dịch phân tán.</p>
+<h3><strong>Quy mô hệ thống</strong></h3>
+<p>Hãy thảo luận về cách chúng tôi mở rộng quy mô hệ thống khi nó phát triển.</p>
+<p>Chúng tôi có ba thành phần độc lập - message queue, dịch vụ tổng hợp và database.<br/>
+Vì chúng được tách rời nên chúng ta có thể mở rộng chúng một cách độc lập.</p>
+<p>Làm cách nào để chúng tôi mở rộng message queue:<br/>
+ - Chúng tôi không đặt giới hạn cho producer nên họ có thể mở rộng quy mô dễ dàng<br/>
+ - consumer có thể được mở rộng quy mô bằng cách gán họ vào các nhóm consumer và tăng số lượng consumer.<br/>
+ - Để làm được việc này chúng ta cũng cần đảm bảo có đủ partition được tạo trước<br/>
+ - Ngoài ra, việc tái cân bằng consumer có thể mất một thời gian khi có hàng nghìn consumer nên nên thực hiện ngoài giờ cao điểm<br/>
+ - Chúng ta cũng có thể xem xét việc partition topic theo geography, ví dụ: <code>topic_na</code>, <code>topic_eu</code>, vân vân.</p>
+<figure class="sd-figure"><img alt="scale-consumers" loading="lazy" src="assets/content/system-design/images/ch21/scale-consumers.png"/></figure>
+<p>Làm cách nào để chúng tôi mở rộng quy mô dịch vụ tổng hợp:</p>
+<figure class="sd-figure"><img alt="aggregation-service-scaling" loading="lazy" src="assets/content/system-design/images/ch21/aggregation-service-scaling.png"/></figure>
+<ul>
+<li>Các nút thu nhỏ bản đồ có thể dễ dàng được thu nhỏ bằng cách thêm nhiều nút hơn</li>
+<li>Thông lượng của dịch vụ tổng hợp có thể được mở rộng bằng cách sử dụng đa luồng</li>
+<li>Ngoài ra, chúng ta có thể tận dụng các nhà cung cấp tài nguyên như Apache YARN để sử dụng đa xử lý</li>
+<li>Tùy chọn 1 dễ dàng hơn, nhưng tùy chọn 2 được sử dụng rộng rãi hơn trong thực tế vì nó có khả năng mở rộng hơn</li>
+<li>Đây là ví dụ đa luồng:</li>
+</ul>
+<figure class="sd-figure"><img alt="multi-threading-example" loading="lazy" src="assets/content/system-design/images/ch21/multi-threading-example.png"/></figure>
+<p>Làm cách nào để chúng tôi mở rộng quy mô database:<br/>
+ - Nếu chúng tôi sử dụng Cassandra, nó thực sự hỗ trợ Scale theo chiều ngang bằng cách sử dụng consistent hashing<br/>
+ - Nếu một nút mới được thêm vào cụm, dữ liệu sẽ tự động được cân bằng lại trên tất cả các nút (ảo)<br/>
+ - Với phương pháp này, không cần phải sharding (tái) thủ công</p>
+<figure class="sd-figure"><img alt="cassandra-scalability" loading="lazy" src="assets/content/system-design/images/ch21/cassandra-scalability.png"/></figure>
+<p>Một vấn đề khác về khả năng mở rộng cần xem xét là vấn đề về điểm phát sóng - điều gì sẽ xảy ra nếu một quảng cáo phổ biến hơn và được chú ý nhiều hơn những quảng cáo khác?</p>
+<figure class="sd-figure"><img alt="hotspot-issue" loading="lazy" src="assets/content/system-design/images/ch21/hotspot-issue.png"/></figure>
+<ul>
+<li>Trong ví dụ trên, các nút dịch vụ tổng hợp có thể đăng ký các tài nguyên bổ sung thông qua resource manager</li>
+<li>resource manager phân bổ nhiều tài nguyên hơn, do đó nút gốc không bị quá tải</li>
+<li>Nút ban đầu chia các sự kiện thành 3 nhóm và mỗi nút tổng hợp xử lý 100 sự kiện</li>
+<li>Kết quả được ghi lại vào nút tổng hợp ban đầu</li>
+</ul>
+<p>Các cách khác, phức tạp hơn để xử lý hotspot problem:<br/>
+ - Tổng hợp toàn cầu-địa phương<br/>
+ - Chia tập hợp riêng biệt</p>
+<h3><strong>Dung sai lỗi</strong></h3>
+<p>Trong các nút tổng hợp, chúng tôi đang xử lý dữ liệu trong bộ nhớ. Nếu một nút bị hỏng, dữ liệu đã xử lý sẽ bị mất.</p>
+<p>Chúng tôi có thể tận dụng khoản bù đắp của consumer trong kafka để tiếp tục từ nơi chúng tôi đã dừng lại sau khi một nút khác giải quyết vấn đề.<br/>
+Tuy nhiên, chúng tôi cần duy trì trạng thái trung gian bổ sung vì chúng tôi đang tổng hợp N quảng cáo hàng đầu trong M phút.</p>
+<p>Chúng tôi có thể tạo ảnh chụp nhanh vào một phút cụ thể để tổng hợp đang diễn ra:</p>
+<figure class="sd-figure"><img alt="fault-tolerance-example" loading="lazy" src="assets/content/system-design/images/ch21/fault-tolerance-example.png"/></figure>
+<p>Nếu một nút ngừng hoạt động, nút mới có thể đọc phần bù dành cho consumer đã cam kết mới nhất cũng như ảnh chụp nhanh mới nhất để tiếp tục công việc:</p>
+<figure class="sd-figure"><img alt="fault-tolerance-recovery-example" loading="lazy" src="assets/content/system-design/images/ch21/fault-tolerance-recovery-example.png"/></figure>
+<h3><strong>Giám sát dữ liệu và tính chính xác</strong></h3>
+<p>Vì dữ liệu chúng tôi tổng hợp rất quan trọng vì nó được sử dụng để thanh toán nên điều quan trọng là phải có sự giám sát nghiêm ngặt tại chỗ để đảm bảo tính chính xác.</p>
+<p>Một số số liệu chúng tôi có thể muốn theo dõi:<br/>
+ - <strong>Độ trễ</strong>: Dấu thời gian của các sự kiện khác nhau có thể được theo dõi để hiểu độ trễ e2e của hệ thống<br/>
+ - <strong>Kích thước message queue</strong>: Nếu kích thước hàng đợi tăng đột ngột, chúng ta cần thêm nhiều nút tổng hợp hơn. Vì Kafka được triển khai thông qua nhật ký cam kết phân tán nên thay vào đó, chúng tôi cần theo dõi các số liệu về độ trễ của hồ sơ.<br/>
+ - <strong>Tài nguyên hệ thống trên các nút tổng hợp</strong>: CPU, đĩa, JVM, v.v.</p>
+<p>Chúng tôi cũng cần triển khai quy trình đối chiếu, đây là công việc hàng loạt, chạy vào cuối ngày. <br/>
+Nó tính toán kết quả tổng hợp từ dữ liệu thô và so sánh chúng với dữ liệu thực tế được lưu trữ trong database tổng hợp:</p>
+<figure class="sd-figure"><img alt="reconciliation-flow" loading="lazy" src="assets/content/system-design/images/ch21/reconciliation-flow.png"/></figure>
+<h3><strong>Thiết kế thay thế</strong></h3>
+<p>Trong một cuộc phỏng vấn về thiết kế hệ thống tổng quát, bạn không cần phải biết phần bên trong của phần mềm chuyên dụng được sử dụng trong xử lý dữ liệu lớn.</p>
+<p>Giải thích quá trình suy nghĩ và thảo luận về sự đánh đổi quan trọng hơn việc biết các công cụ cụ thể, đó là lý do tại sao chương này đề cập đến một giải pháp chung.</p>
+<p>Một thiết kế thay thế, tận dụng công cụ có sẵn, là lưu trữ dữ liệu nhấp chuột vào quảng cáo trong Hive với lớp ElasticSearch được xây dựng trên cùng để truy vấn nhanh hơn.</p>
+<p>Việc tổng hợp thường được thực hiện trong database OLAP như ClickHouse hoặc Druid.</p>
+<figure class="sd-figure"><img alt="alternative-design" loading="lazy" src="assets/content/system-design/images/ch21/alternative-design.png"/></figure>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Những điều chúng tôi đề cập:<br/>
+ - Mô hình dữ liệu và thiết kế API<br/>
+ - Sử dụng MapReduce để tổng hợp các sự kiện nhấp vào quảng cáo<br/>
+ - Mở rộng message queue, dịch vụ tổng hợp và database<br/>
+ - Giảm thiểu hotspot problem<br/>
+ - Giám sát hệ thống liên tục<br/>
+ - Sử dụng đối chiếu để đảm bảo tính đúng đắn<br/>
+ - Khả năng chịu lỗi</p>
+<p>Tổng hợp sự kiện nhấp chuột vào quảng cáo là một hệ thống xử lý dữ liệu lớn điển hình.</p>
+<p>Sẽ dễ hiểu và thiết kế nó hơn nếu bạn có kiến thức trước về các công nghệ liên quan:<br/>
+ - Apache Kafka<br/>
+ - Apache Spark<br/>
+ - Liên kết Apache</p>
+

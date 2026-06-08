@@ -1,0 +1,381 @@
+<h2>Giới thiệu</h2>
+<p>Chúng tôi sẽ thiết kế <strong>message queue được phân phối</strong> trong chương này.</p>
+<p>Lợi ích của message queue:<br/>
+- <strong>Tách rời</strong>: Loại bỏ sự liên kết chặt chẽ giữa các thành phần. Hãy để họ cập nhật riêng.<br/>
+- <strong>Cải thiện khả năng mở rộng</strong>: producer và consumer có thể được mở rộng quy mô độc lập dựa trên lưu lượng truy cập.<br/>
+- <strong>Tăng tính khả dụng</strong>: Nếu một phần của hệ thống ngừng hoạt động, các phần khác vẫn tiếp tục tương tác với hàng đợi.<br/>
+- <strong>Hiệu suất tốt hơn</strong>: producer có thể tạo tin nhắn mà không cần chờ xác nhận của consumer.</p>
+<p>Một số triển khai message queue phổ biến - Kafka, RabbitMQ, RocketMQ, Apache Pulsar, ActiveMQ, ZeroMQ.</p>
+<p>Nói đúng ra, Kafka và Pulsar không phải là message queue. Họ là những nền tảng phát trực tuyến sự kiện.<br/>
+Tuy nhiên, có sự hội tụ các tính năng làm mờ đi sự khác biệt giữa message queue và nền tảng truyền phát sự kiện.</p>
+<p>Trong chương này, chúng ta sẽ xây dựng một message queue có hỗ trợ các tính năng nâng cao hơn như lưu giữ dữ liệu lâu, sử dụng tin nhắn lặp lại, v.v.</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<p>message queue phải hỗ trợ một số tính năng cơ bản - producer tạo ra tin nhắn và consumer sử dụng chúng.<br/>
+Tuy nhiên, có những cân nhắc khác nhau liên quan đến hiệu suất, gửi tin nhắn, lưu giữ dữ liệu, v.v.</p>
+<p>Dưới đây là một bộ câu hỏi tiềm năng giữa Ứng viên và Người phỏng vấn:<br/>
+ * C: Định dạng và kích thước tin nhắn trung bình là gì? Có phải nó chỉ là văn bản?<br/>
+ * I: Tin nhắn chỉ ở dạng văn bản và thường có vài KB<br/>
+ * C: Tin nhắn có thể được sử dụng nhiều lần không?<br/>
+ * I: Có, những consumer khác nhau có thể sử dụng tin nhắn nhiều lần. Đây là một yêu cầu bổ sung mà message queue truyền thống không hỗ trợ.<br/>
+ * C: Các tin nhắn có được sử dụng theo đúng thứ tự được tạo ra không?<br/>
+ * I: Có, đảm bảo thứ tự message phải được giữ nguyên. Đây là một yêu cầu bổ sung, message queue truyền thống không hỗ trợ điều này.<br/>
+ * C: Các yêu cầu lưu giữ dữ liệu là gì?<br/>
+ * I: Tin nhắn cần được lưu giữ trong hai tuần. Đây là một yêu cầu bổ sung.<br/>
+ * C: Chúng ta muốn hỗ trợ bao nhiêu producer và consumer?<br/>
+ * I: Càng nhiều càng tốt.<br/>
+ * C: Chúng tôi muốn hỗ trợ ngữ nghĩa phân phối dữ liệu nào? Nhiều nhất một lần, ít nhất một lần, chính xác một lần?<br/>
+ * I: Chúng tôi chắc chắn muốn hỗ trợ ít nhất một lần. Lý tưởng nhất là chúng tôi có thể hỗ trợ tất cả và làm cho chúng có thể cấu hình được.<br/>
+ * C: Thông lượng mục tiêu cho độ trễ từ đầu đến cuối là bao nhiêu?<br/>
+ * I: Nó sẽ hỗ trợ thông lượng cao cho các trường hợp sử dụng như tổng hợp nhật ký và thông lượng thấp cho các trường hợp sử dụng truyền thống hơn.</p>
+<h3><strong>Yêu cầu chức năng</strong></h3>
+<ul>
+<li>producer gửi tin nhắn đến message queue</li>
+<li>consumer sử dụng tin nhắn từ hàng đợi</li>
+<li>Tin nhắn có thể được sử dụng một lần hoặc nhiều lần</li>
+<li>Dữ liệu lịch sử có thể được cắt ngắn</li>
+<li>Kích thước tin nhắn nằm trong phạm vi KB</li>
+<li>Thứ tự tin nhắn cần được giữ nguyên</li>
+<li>Ngữ nghĩa phân phối dữ liệu có thể định cấu hình - tối đa một lần/ít nhất một lần/chính xác một lần.</li>
+</ul>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li><strong>Thông lượng cao hoặc độ trễ thấp</strong>: Có thể cấu hình dựa trên trường hợp sử dụng</li>
+<li><strong>Có thể mở rộng</strong>: hệ thống phải được phân phối và hỗ trợ khối lượng tin nhắn tăng đột ngột</li>
+<li><strong>Kiên trì và bền bỉ</strong>: dữ liệu phải được lưu giữ trên đĩa và được replicate giữa các node</li>
+</ul>
+<p>message queue truyền thống thường không hỗ trợ lưu giữ dữ liệu và không cung cấp đảm bảo ordering. Điều này giúp đơn giản hóa rất nhiều việc thiết kế và chúng ta sẽ thảo luận về nó.</p>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<p>Các thành phần chính của message queue:</p>
+<figure class="sd-figure"><img alt="message-queue-components" loading="lazy" src="assets/content/system-design/images/ch19/message-queue-components.png"/></figure>
+<ul>
+<li>producer gửi tin nhắn đến hàng đợi</li>
+<li>consumer đăng ký vào hàng đợi và sử dụng các tin nhắn đã đăng ký</li>
+<li>message queue là một dịch vụ ở giữa giúp tách producer khỏi consumer, cho phép họ mở rộng quy mô một cách độc lập.</li>
+<li>producer và consumer đều là Client, trong khi message queue là máy chủ.</li>
+</ul>
+<h3><strong>Mô hình nhắn tin</strong></h3>
+<p>Loại mô hình nhắn tin đầu tiên là điểm-điểm và thường thấy trong message queue truyền thống:</p>
+<figure class="sd-figure"><img alt="point-to-point-model" loading="lazy" src="assets/content/system-design/images/ch19/point-to-point-model.png"/></figure>
+<ul>
+<li>Một tin nhắn được gửi đến hàng đợi và nó được sử dụng bởi chính xác một consumer.</li>
+<li>Có thể có nhiều consumer, nhưng một tin nhắn chỉ được tiêu thụ một lần.</li>
+<li>Sau khi tin nhắn được xác nhận là đã sử dụng, nó sẽ bị xóa khỏi hàng đợi.</li>
+<li>Không có sự lưu giữ dữ liệu trong mô hình điểm-điểm, nhưng có điều đó trong thiết kế của chúng tôi.</li>
+</ul>
+<p>Mặt khác, mô hình pub/sub phổ biến hơn đối với các nền tảng phát trực tuyến sự kiện:</p>
+<figure class="sd-figure"><img alt="publish-subscribe-model" loading="lazy" src="assets/content/system-design/images/ch19/publish-subscribe-model.png"/></figure>
+<ul>
+<li>Trong mô hình này, tin nhắn được liên kết với một topic.</li>
+<li>consumer đã đăng ký một topic và họ nhận được tất cả các tin nhắn được gửi đến topic này.</li>
+</ul>
+<h3><strong>topic, partition và Broker</strong></h3>
+<p>Điều gì xảy ra nếu khối lượng dữ liệu cho một topic quá lớn? Một cách để mở rộng quy mô là chia topic thành các partition (còn gọi là sharding):</p>
+<figure class="sd-figure"><img alt="partitions" loading="lazy" src="assets/content/system-design/images/ch19/partitions.png"/></figure>
+<ul>
+<li>Tin nhắn gửi đến một topic được phân bổ đều trên các partition</li>
+<li>Các máy chủ lưu trữ partition được gọi là broker</li>
+<li>Mỗi topic hoạt động giống như một hàng đợi sử dụng FIFO để xử lý tin nhắn. Thứ tự tin nhắn được giữ nguyên trong một partition.</li>
+<li>Vị trí của tin nhắn trong partition được gọi là <strong>offset</strong>.</li>
+<li>Mỗi tin nhắn được tạo ra sẽ được gửi đến một partition cụ thể. Khóa partition chỉ định partition mà tin nhắn sẽ đến. </li>
+<li>Ví dụ: một <code>user_id</code> có thể được sử dụng làm khóa partition để đảm bảo thứ tự các tin nhắn cho cùng một người dùng.</li>
+<li>Mỗi consumer đăng ký một hoặc nhiều partition. Khi có nhiều consumer cho cùng một thông điệp, họ sẽ tạo thành một nhóm consumer.</li>
+</ul>
+<h3><strong>Nhóm consumer</strong></h3>
+<p>Nhóm consumer là một nhóm consumer làm việc cùng nhau để tiếp nhận thông điệp từ một topic:</p>
+<figure class="sd-figure"><img alt="consumer-groups" loading="lazy" src="assets/content/system-design/images/ch19/consumer-groups.png"/></figure>
+<ul>
+<li>Messages được replicate cho mỗi nhóm consumer (không phải cho mỗi consumer).</li>
+<li>Mỗi nhóm consumer duy trì mức offset riêng của mình.</li>
+<li>Việc đọc các tin nhắn song song bởi một nhóm consumer sẽ cải thiện thông lượng nhưng lại cản trở việc đảm bảo ordering.</li>
+<li>Điều này có thể được giảm thiểu bằng cách chỉ cho phép một consumer trong một nhóm đăng ký vào một partition. </li>
+<li>Điều này có nghĩa là chúng ta không thể có nhiều consumer trong một nhóm hơn số partition.</li>
+</ul>
+<h3><strong>Kiến trúc cấp cao</strong></h3>
+<figure class="sd-figure"><img alt="high-level-architecture" loading="lazy" src="assets/content/system-design/images/ch19/high-level-architecture.png"/></figure>
+<ul>
+<li><strong>Client</strong>: producer và consumer. producer push messages đến một topic được chỉ định. Nhóm consumer đăng ký tin nhắn từ một topic.</li>
+<li><strong>Broker</strong>: giữ nhiều partition. Một partition chứa một tập hợp con các tin nhắn cho một topic.</li>
+<li><strong>Data storage</strong>: lưu trữ tin nhắn trong partition.</li>
+<li><strong>state storage</strong>: duy trì trạng thái của consumer.</li>
+<li><strong>metadata storage</strong>: lưu trữ cấu hình và thuộc tính topic</li>
+<li><strong>Coordination service</strong>: chịu trách nhiệm khám phá dịch vụ (broker nào còn sống) và leader election (broker nào là leader, chịu trách nhiệm phân công các partition).</li>
+</ul>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<p>Để đạt được thông lượng cao và duy trì yêu cầu lưu giữ dữ liệu cao, chúng tôi đã thực hiện một số lựa chọn thiết kế quan trọng:<br/>
+ * Chúng tôi đã chọn cấu trúc dữ liệu trên đĩa tận dụng các đặc tính của ổ cứng hiện đại và chiến lược cache trên ổ đĩa của các hệ điều hành hiện đại.<br/>
+ * Cấu trúc dữ liệu tin nhắn là bất biến để tránh extra copy overhead, điều mà chúng tôi muốn tránh trong hệ thống có khối lượng lớn/lưu lượng truy cập cao.<br/>
+ * Chúng tôi thiết kế các write xoay quanh batching vì I/O nhỏ là kẻ thù của thông lượng cao.</p>
+<h3><strong>Data storage</strong></h3>
+<p>Để tìm kho lưu trữ dữ liệu tốt nhất cho tin nhắn, chúng ta phải kiểm tra các thuộc tính của tin nhắn:<br/>
+ * Write-heavy, read-heavy<br/>
+ * Không có thao tác cập nhật/xóa. Trong message queue truyền thống, có thao tác "xóa" vì tin nhắn không được giữ lại.<br/>
+ * Mẫu truy cập đọc/ghi chủ yếu theo tuần tự.</p>
+<p>Lựa chọn của chúng tôi là gì:<br/>
+- <strong>database</strong>: không lý tưởng vì database thông thường không hỗ trợ tốt cả ghi và đọc các hệ thống nặng.<br/>
+- <strong>Write-ahead log (WAL)</strong>: một tệp văn bản đơn giản chỉ hỗ trợ gắn thêm vào nó và rất thân thiện với ổ cứng. <br/>
+  * Chúng tôi chia các partition thành các phân đoạn để tránh duy trì một tệp rất lớn.<br/>
+  * Các segment cũ ở chế độ chỉ đọc. Chỉ segment mới nhất nhận write.</p>
+<figure class="sd-figure"><img alt="wal-example" loading="lazy" src="assets/content/system-design/images/ch19/wal-example.png"/></figure>
+<p>Các tệp WAL cực kỳ hiệu quả khi được sử dụng với ổ cứng truyền thống. </p>
+<p>Có một quan niệm sai lầm rằng tốc độ truy cập của ổ cứng HDD chậm, nhưng điều đó phụ thuộc rất nhiều vào kiểu truy cập.<br/>
+Khi kiểu truy cập là tuần tự (như trong trường hợp của chúng tôi), ổ cứng HDD có thể đạt tốc độ ghi/đọc vài MB/s, đủ cho nhu cầu của chúng tôi.<br/>
+Chúng tôi cũng dựa trên thực tế là hệ điều hành lưu trữ dữ liệu đĩa trong bộ nhớ một cách tích cực.</p>
+<h3><strong>Cấu trúc dữ liệu tin nhắn</strong></h3>
+<p>Điều quan trọng là lược đồ thông báo phải tuân thủ giữa producer, hàng đợi và consumer để tránh bị extra copy overhead. Điều này cho phép xử lý hiệu quả hơn nhiều.</p>
+<p>Cấu trúc tin nhắn ví dụ:</p>
+<figure class="sd-figure"><img alt="message-structure" loading="lazy" src="assets/content/system-design/images/ch19/message-structure.png"/></figure>
+<p>Khóa của tin nhắn chỉ định tin nhắn thuộc về partition nào. Một bản đồ ví dụ là <code>hash(key) % numPartitions</code>.<br/>
+Để linh hoạt hơn, producer có thể ghi đè các khóa mặc định để kiểm soát thông báo partition nào được phân phối tới.</p>
+<p>Giá trị tin nhắn là tải trọng của tin nhắn. Nó có thể là bản rõ hoặc khối nhị phân nén.</p>
+<p><strong>Ghi chú:</strong> Khóa tin nhắn, không giống như các Key-Value store truyền thống, không cần phải là duy nhất. Việc có các khóa trùng lặp và thậm chí bị thiếu là điều có thể chấp nhận được.</p>
+<p>Các tập tin tin nhắn khác:<br/>
+- <strong>Topic</strong>: topic của tin nhắn<br/>
+- <strong>partition</strong>: ID của partition chứa tin nhắn<br/>
+- <strong>offset</strong>: Vị trí của tin nhắn trong một partition. Một tin nhắn có thể được định vị thông qua <code>topic</code>, <code>partition</code>, <code>offset</code>.<br/>
+- <strong>Dấu thời gian</strong>: Khi tin nhắn được lưu trữ<br/>
+- <strong>Kích cỡ</strong>: kích thước của tin nhắn này<br/>
+- <strong>CRC</strong>: tổng kiểm tra để đảm bảo tính toàn vẹn của tin nhắn</p>
+<p>Các tính năng bổ sung như lọc có thể được hỗ trợ bằng cách thêm các trường bổ sung.</p>
+<h3><strong>Batching</strong></h3>
+<p>Batching rất quan trọng đối với hiệu suất của hệ thống. Chúng tôi áp dụng batching ở producer, consumer và message queue.</p>
+<p>Nó rất quan trọng bởi vì:<br/>
+ * Nó cho phép hệ điều hành nhóm các tin nhắn lại với nhau, giảm chi phí cho các chuyến đi khứ hồi mạng đắt tiền<br/>
+ * Các tin nhắn được ghi tuần tự vào WAL theo nhóm, điều này dẫn đến nhiều thao tác ghi tuần tự và lưu vào cache đĩa.</p>
+<p>Có sự cân bằng giữa độ trễ và thông lượng:<br/>
+ * Batching lớn dẫn đến thông lượng cao và độ trễ cao hơn. <br/>
+ * Batching nhỏ hơn dẫn đến thông lượng thấp hơn và độ trễ thấp hơn.</p>
+<p>Nếu chúng tôi cần hỗ trợ độ trễ thấp hơn do hệ thống được triển khai dưới dạng message queue truyền thống thì hệ thống có thể được điều chỉnh để sử dụng kích thước lô nhỏ hơn.</p>
+<p>Nếu được điều chỉnh về thông lượng, chúng tôi có thể cần nhiều partition hơn cho mỗi topic để bù cho thông lượng ghi tuần tự chậm hơn.</p>
+<h3><strong>Luồng producer</strong></h3>
+<p>Nếu producer muốn gửi tin nhắn đến một partition thì nên kết nối với broker nào?</p>
+<p>Một tùy chọn là giới thiệu một lớp định tuyến, định tuyến các thông báo đến đúng broker. Nếu replication được bật, broker chính xác là leader replica:</p>
+<figure class="sd-figure"><img alt="routing-layer" loading="lazy" src="assets/content/system-design/images/ch19/routing-layer.png"/></figure>
+<ul>
+<li>Lớp định tuyến đọc replica distribution plan từ metadata store và lưu vào cache cục bộ.</li>
+<li>producer gửi tin nhắn đến lớp định tuyến.</li>
+<li>Tin nhắn được chuyển tiếp đến broker 1, leader của partition đó</li>
+<li>Follower replica lấy thông điệp mới từ leader. Sau khi nhận đủ số xác nhận, leader sẽ commit dữ liệu và phản hồi cho producer.</li>
+</ul>
+<p>Lý do có replica là để cho phép khả năng chịu lỗi.</p>
+<p>Cách tiếp cận này hoạt động nhưng có một số nhược điểm:<br/>
+ * Các bước nhảy mạng bổ sung do có thành phần bổ sung<br/>
+ * Thiết kế không cho phép gửi tin nhắn theo nhóm</p>
+<p>Để giảm thiểu những vấn đề này, chúng tôi có thể nhúng lớp định tuyến vào producer:</p>
+<figure class="sd-figure"><img alt="routing-layer-producer" loading="lazy" src="assets/content/system-design/images/ch19/routing-layer-producer.png"/></figure>
+<ul>
+<li>Ít bước nhảy mạng hơn dẫn đến độ trễ thấp hơn</li>
+<li>producer có thể kiểm soát partition mà tin nhắn được chuyển đến</li>
+<li>Cache cho phép chúng tôi gửi hàng loạt tin nhắn trong bộ nhớ và gửi các lô lớn hơn trong một yêu cầu, điều này làm tăng thông lượng.</li>
+</ul>
+<p>Lựa chọn kích thước lô là sự cân bằng cổ điển giữa thông lượng và độ trễ. </p>
+<figure class="sd-figure"><img alt="batch-size-throughput-vs-latency" loading="lazy" src="assets/content/system-design/images/ch19/batch-size-throughput-vs-latency.png"/></figure>
+<ul>
+<li>Kích thước lô lớn hơn dẫn đến thời gian chờ đợi lâu hơn trước khi lô được cam kết. </li>
+<li>Kích thước lô nhỏ hơn dẫn đến yêu cầu được gửi sớm hơn và có độ trễ thấp hơn nhưng thông lượng thấp hơn.</li>
+</ul>
+<h3><strong>Luồng consumer</strong></h3>
+<p>consumer chỉ định offset của nó trong một partition và nhận một đoạn thông báo, bắt đầu từ offset đó:</p>
+<figure class="sd-figure"><img alt="consumer-example" loading="lazy" src="assets/content/system-design/images/ch19/consumer-example.png"/></figure>
+<p>Một cân nhắc quan trọng khi thiết kế consumer là nên dùng push hay pull model:<br/>
+- <strong>Push model</strong>: dẫn đến độ trễ thấp hơn khi broker gửi tin nhắn đến consumer ngay khi nhận được chúng.<br/>
+  * Tuy nhiên, nếu tốc độ tiêu dùng thấp hơn tốc độ sản xuất thì consumer có thể bị choáng ngợp.<br/>
+  * Việc giao dịch với consumer có khả năng xử lý khác nhau là một thách thức vì broker kiểm soát tốc độ tiêu thụ.<br/>
+- <strong>Pull model</strong>: dẫn đến việc consumer kiểm soát mức tiêu dùng. <br/>
+  * Nếu tốc độ tiêu thụ chậm, consumer sẽ không bị choáng ngợp và chúng ta có thể mở rộng quy mô để bắt kịp.<br/>
+  * Pull model phù hợp hơn cho việc xử lý hàng loạt vì với push model, broker không thể biết consumer có thể xử lý bao nhiêu tin nhắn. <br/>
+  * Mặt khác, với pull model, consumer có thể tích cực fetch các lô tin nhắn lớn.<br/>
+  * Nhược điểm là độ trễ cao hơn và có thêm network call khi không có tin nhắn mới. Vấn đề thứ hai có thể được giảm thiểu bằng long polling.</p>
+<p>Do đó, hầu hết message queue (và chúng tôi) đều chọn pull model.</p>
+<figure class="sd-figure"><img alt="consumer-flow" loading="lazy" src="assets/content/system-design/images/ch19/consumer-flow.png"/></figure>
+<ul>
+<li>Một consumer mới đăng ký topic A và tham gia nhóm 1.</li>
+<li>Nút Broker chính xác được tìm thấy bằng cách băm tên nhóm. Bằng cách này, tất cả consumer trong một nhóm đều kết nối với cùng một broker.</li>
+<li>Lưu ý rằng consumer group coordinator này khác với coordination service (ZooKeeper).</li>
+<li>Coordinator xác nhận rằng consumer đã tham gia nhóm và chỉ định partition 2 cho consumer đó.</li>
+<li>Có các chiến lược phân bổ partition khác nhau - vòng tròn, phạm vi, v.v.</li>
+<li>Consumer fetcheseseseseseses các tin nhắn mới nhất từ offset cuối cùng. State storage lưu offset cho consumer.</li>
+<li>consumer xử lý tin nhắn và cam kết offset cho broker. Thứ tự của các hoạt động đó ảnh hưởng đến ngữ nghĩa gửi tin nhắn.</li>
+</ul>
+<h3><strong>Consumer rebalancing</strong></h3>
+<p>Tái cân bằng consumer có trách nhiệm quyết định consumer nào chịu trách nhiệm cho partition nào.</p>
+<p>Quá trình này xảy ra khi consumer tham gia/rời khỏi hoặc một partition được thêm/xóa.</p>
+<p>broker, đóng vai trò là coordinator, đóng một vai trò rất lớn trong việc điều phối quy trình tái cân bằng.</p>
+<figure class="sd-figure"><img alt="consumer-rebalancing" loading="lazy" src="assets/content/system-design/images/ch19/consumer-rebalancing.png"/></figure>
+<ul>
+<li>Tất cả consumer trong cùng một nhóm được kết nối với cùng một Coordinator. Coordinator được tìm thấy bằng cách băm tên nhóm.</li>
+<li>Khi danh sách consumer thay đổi, Coordinator sẽ chọn một leader mới của nhóm.</li>
+<li>Group leader tính toán kế hoạch phân công partition mới và báo cáo lại cho Coordinator để thông báo cho những consumer khác.</li>
+</ul>
+<p>Khi Coordinator ngừng nhận heartbeat từ consumer trong nhóm, quá trình tái cân bằng sẽ được kích hoạt:</p>
+<figure class="sd-figure"><img alt="consumer-rebalance-example" loading="lazy" src="assets/content/system-design/images/ch19/consumer-rebalance-example.png"/></figure>
+<p>Hãy cùng khám phá điều gì sẽ xảy ra khi consumer tham gia một nhóm:</p>
+<figure class="sd-figure"><img alt="consumer-join-group-usecase" loading="lazy" src="assets/content/system-design/images/ch19/consumer-join-group-usecase.png"/></figure>
+<ul>
+<li>Ban đầu, chỉ có consumer A ở trong nhóm và nó sử dụng tất cả các partition.</li>
+<li>consumer B gửi yêu cầu tham gia nhóm.</li>
+<li>coordinator thông báo cho tất cả thành viên trong nhóm rằng đã đến lúc cân bằng lại một cách thụ động - như một phản ứng với heartbeat.</li>
+<li>Sau khi tất cả consumer tham gia lại nhóm, Coordinator sẽ chọn leader và thông báo cho những consumer còn lại về kết quả bầu chọn.</li>
+<li>Leader tạo kế hoạch phân công partition và gửi cho Coordinator. Những consumer khác chờ kế hoạch phân công.</li>
+<li>consumer bắt đầu tiêu thụ từ các partition mới được chỉ định.</li>
+</ul>
+<p>Đây là những gì xảy ra khi consumer rời khỏi nhóm:</p>
+<figure class="sd-figure"><img alt="consumer-leaves-group-usecase" loading="lazy" src="assets/content/system-design/images/ch19/consumer-leaves-group-usecase.png"/></figure>
+<ul>
+<li>consumer A và B thuộc cùng một nhóm</li>
+<li>consumer B yêu cầu rời khỏi nhóm</li>
+<li>Khi Coordinator nhận được heartbeat của A, nó sẽ thông báo cho họ rằng đã đến lúc phải cân bằng lại.</li>
+<li>Các bước còn lại đều giống nhau.</li>
+</ul>
+<p>Quá trình này tương tự khi consumer không gửi heartbeat trong một thời gian dài:</p>
+<figure class="sd-figure"><img alt="consumer-no-heartbeat-usecase" loading="lazy" src="assets/content/system-design/images/ch19/consumer-no-heartbeat-usecase.png"/></figure>
+<h3><strong>state storage</strong></h3>
+<p>State storage lưu trữ ánh xạ giữa các partition và consumer, cũng như các consumed offset cuối cùng cho một partition.</p>
+<figure class="sd-figure"><img alt="state-storage" loading="lazy" src="assets/content/system-design/images/ch19/state-storage.png"/></figure>
+<p>Offset của nhóm 1 là 6, nghĩa là tất cả tin nhắn trước đó đều đã được consume. Nếu consumer gặp sự cố, consumer mới sẽ tiếp tục từ offset đó trở đi.</p>
+<p>Các mẫu truy cập dữ liệu cho các trạng thái của consumer:<br/>
+ * Thao tác đọc/ghi thường xuyên nhưng âm lượng thấp<br/>
+ * Dữ liệu được cập nhật thường xuyên nhưng hiếm khi bị xóa<br/>
+ * Đọc/ghi ngẫu nhiên<br/>
+ * Tính nhất quán của dữ liệu là quan trọng</p>
+<p>Với những yêu cầu này, KV store nhanh như ZooKeeper là lý tưởng.</p>
+<h3><strong>metadata storage</strong></h3>
+<p>Bộ metadata storage lưu trữ cấu hình và thuộc tính topic - số partition, thời gian lưu giữ, replica distribution.</p>
+<p>metadata không thay đổi thường xuyên và dung lượng nhỏ nhưng yêu cầu tính nhất quán cao.<br/>
+ZooKeeper là một lựa chọn tốt cho việc lưu trữ này.</p>
+<h3><strong>ZooKeeper</strong></h3>
+<p>ZooKeeper là điều cần thiết để xây dựng message queue được phân phối.</p>
+<p>Nó là một key-value store phân cấp, thường được sử dụng cho cấu hình phân tán, dịch vụ sync và đăng ký đặt tên (tức là khám phá dịch vụ).</p>
+<figure class="sd-figure"><img alt="ZooKeeper" loading="lazy" src="assets/content/system-design/images/ch19/zookeeper.png"/></figure>
+<p>Với sự thay đổi này, broker chỉ cần duy trì dữ liệu cho các tin nhắn. metadata và state storage có trong ZooKeeper.</p>
+<p>ZooKeeper cũng giúp bầu chọn leader của các broker replica.</p>
+<h3><strong>Sao chép</strong></h3>
+<p>Trong các hệ thống phân tán, vấn đề phần cứng là không thể tránh khỏi. Chúng tôi có thể giải quyết vấn đề này thông qua replication để đạt được tính sẵn sàng cao.</p>
+<figure class="sd-figure"><img alt="replication-example" loading="lazy" src="assets/content/system-design/images/ch19/replication-example.png"/></figure>
+<ul>
+<li>Mỗi partition được replicate trên nhiều broker, nhưng chỉ có một leader replica.</li>
+<li>producer gửi tin nhắn đến leader replica</li>
+<li>Follower lấy các messages được replicate từ leader</li>
+<li>Sau khi đã đồng bộ đủ replica trong ISR, leader sẽ gửi lại xác nhận cho producer</li>
+<li>Việc phân phối các replica cho mỗi partition được gọi là replica distribution plan.</li>
+<li>Leader cho một partition nhất định tạo replica distribution plan và lưu nó trong ZooKeeper</li>
+</ul>
+<h3><strong>In-sync replica</strong></h3>
+<p>Một vấn đề chúng ta cần giải quyết là giữ cho các thông điệp được sync giữa leader và follower trong một partition nhất định.</p>
+<p>In-sync replica (ISR) là replica cho partition luôn sync với leader replica.</p>
+<p><code>replica.lag.max.messages</code> xác định số lượng message mà một replica có thể tụt lại phía sau leader mà vẫn được coi là in-sync.</p>
+<figure class="sd-figure"><img alt="in-sync-replicas-example" loading="lazy" src="assets/content/system-design/images/ch19/in-sync-replicas-example.png"/></figure>
+<ul>
+<li>Cam kết offset là 13</li>
+<li>Hai tin nhắn mới được ghi vào leader nhưng chưa được commit.</li>
+<li>Một thông báo được cam kết khi tất cả các replica trong ISR đã sync thông báo đó</li>
+<li>Bản sao 2 và 3 đã hoàn toàn bắt kịp leader, do đó chúng nằm trong ISR</li>
+<li>Bản sao 4 đã bị tụt lại phía sau, do đó hiện đã bị xóa khỏi ISR</li>
+</ul>
+<p>ISR phản ánh sự cân bằng giữa hiệu suất và độ bền.<br/>
+ * Để producer không bị mất tin nhắn, tất cả các replica phải được sync trước khi gửi xác nhận<br/>
+ * Nhưng slow replication sẽ khiến toàn bộ partition không khả dụng</p>
+<p>Xử lý xác nhận có thể được cấu hình.</p>
+<p><code>ACK=all</code> có nghĩa là tất cả các replica trong ISR phải sync một tin nhắn. Tin nhắn gửi chậm nhưng độ bền tin nhắn là cao nhất.</p>
+<figure class="sd-figure"><img alt="ack-all" loading="lazy" src="assets/content/system-design/images/ch19/ack-all.png"/></figure>
+<p><code>ACK=1</code> có nghĩa là producer nhận được xác nhận sau khi leader nhận được tin nhắn. Tin nhắn gửi nhanh nhưng độ bền tin nhắn thấp.</p>
+<figure class="sd-figure"><img alt="ack-1" loading="lazy" src="assets/content/system-design/images/ch19/ack-1.png"/></figure>
+<p><code>ACK=0</code> có nghĩa là producer gửi tin nhắn mà không cần chờ bất kỳ sự xác nhận nào từ leader. Tin nhắn gửi nhanh nhất, độ bền tin nhắn thấp nhất.</p>
+<figure class="sd-figure"><img alt="ack-0" loading="lazy" src="assets/content/system-design/images/ch19/ack-0.png"/></figure>
+<p>Về phía consumer, chúng tôi có thể kết nối tất cả consumer với leader của một partition và cho phép họ đọc tin nhắn từ đó:<br/>
+ * Điều này làm cho thiết kế đơn giản nhất và vận hành dễ dàng nhất<br/>
+ * Tin nhắn trong một partition chỉ được gửi đến một consumer trong nhóm, điều này giới hạn kết nối với leader replica<br/>
+ * Số lượng kết nối tới leader replica thường không cao miễn là topic không quá hot<br/>
+ * Chúng tôi có thể mở rộng một hot topic bằng cách tăng số lượng partition và consumer<br/>
+ * Trong một số trường hợp nhất định, có thể hợp lý nếu để consumer đọc từ ISR, ví dụ: nếu họ ở một DC riêng biệt</p>
+<p>Danh sách ISR được duy trì bởi leader, theo dõi độ trễ giữa leader và từng replica.</p>
+<h3><strong>Khả năng mở rộng</strong></h3>
+<p>Hãy đánh giá cách chúng ta có thể mở rộng quy mô các phần khác nhau của hệ thống.</p>
+<h4>producer</h4>
+<p>Producer nhỏ hơn nhiều so với consumer. Khả năng mở rộng của producer có thể dễ dàng đạt được bằng cách thêm/xóa các phiên bản producer mới.</p>
+<h4>consumer</h4>
+<p>Các nhóm consumer bị cô lập với nhau. Dễ dàng thêm/bớt nhóm consumer theo ý muốn.</p>
+<p>Tái cân bằng giúp xử lý trường hợp consumer được thêm/xóa khỏi nhóm một cách khéo léo.</p>
+<p>Các nhóm consumer đang tái cân bằng giúp chúng tôi đạt được khả năng mở rộng và khả năng chịu lỗi.</p>
+<h4>broker</h4>
+<p>Các broker xử lý thất bại như thế nào?</p>
+<figure class="sd-figure"><img alt="broker-failure-recovery" loading="lazy" src="assets/content/system-design/images/ch19/broker-failure-recovery.png"/></figure>
+<ul>
+<li>Khi một broker bị lỗi, vẫn còn đủ replica để tránh mất dữ liệu partition</li>
+<li>Một leader mới được bầu và broker coordinator phân phối lại các partition ở broker bị lỗi cho các replica hiện có</li>
+<li>các replica hiện có nhận các partition mới và đóng vai trò là follower cho đến khi chúng bắt kịp leader và trở thành ISR</li>
+</ul>
+<p>Những cân nhắc bổ sung để làm cho broker có khả năng chịu lỗi:<br/>
+ * Số lượng ISR tối thiểu cân bằng độ trễ và độ an toàn. Bạn có thể tinh chỉnh nó để đáp ứng nhu cầu của bạn.<br/>
+ * Nếu tất cả các replica của một partition đều nằm trong cùng một nút thì thật lãng phí tài nguyên. Bản sao nên có trên các broker khác nhau.<br/>
+ * Nếu tất cả các replica của partition bị hỏng thì dữ liệu sẽ bị mất vĩnh viễn. Việc phân bổ các replica khắp các trung tâm dữ liệu có thể hữu ích nhưng sẽ gây ra nhiều độ trễ. Một lựa chọn là sử dụng <a href="https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27846330">phản chiếu dữ liệu</a> như một công việc xung quanh.</p>
+<p>Làm cách nào để chúng tôi xử lý việc re-replicate khi thêm broker mới?</p>
+<figure class="sd-figure"><img alt="broker-replica-redistribution" loading="lazy" src="assets/content/system-design/images/ch19/broker-replica-redistribution.png"/></figure>
+<ul>
+<li>Chúng tôi có thể tạm thời cho phép nhiều replica hơn mức được định cấu hình cho đến khi broker mới bắt kịp</li>
+<li>Sau khi thực hiện xong, chúng ta có thể xóa replica partition không còn cần thiết nữa</li>
+</ul>
+<h4>partition</h4>
+<p>Bất cứ khi nào một partition mới được thêm vào, producer sẽ được thông báo và việc tái cân bằng consumer được kích hoạt.</p>
+<p>Về mặt lưu trữ dữ liệu, chúng ta chỉ có thể lưu trữ tin nhắn mới vào partition mới thay vì replicate tất cả những tin nhắn cũ:</p>
+<figure class="sd-figure"><img alt="partition-example" loading="lazy" src="assets/content/system-design/images/ch19/partition-exmaple.png"/></figure>
+<p>Giảm số lượng partition có liên quan nhiều hơn:</p>
+<figure class="sd-figure"><img alt="partition-decrease" loading="lazy" src="assets/content/system-design/images/ch19/partition-decrease.png"/></figure>
+<ul>
+<li>Sau khi một partition ngừng hoạt động, các partition còn lại chỉ nhận được tin nhắn mới</li>
+<li>partition đã ngừng hoạt động không bị xóa ngay lập tức vì các tin nhắn vẫn có thể được sử dụng từ nó</li>
+<li>Sau khi hết khoảng thời gian lưu giữ được định cấu hình trước, chúng tôi có cắt bớt dữ liệu và giải phóng dung lượng lưu trữ không</li>
+<li>Trong giai đoạn chuyển tiếp, producer chỉ gửi tin nhắn đến các partition đang hoạt động, nhưng consumer sẽ đọc từ tất cả</li>
+<li>Sau khi hết thời gian lưu giữ, consumer sẽ được cân bằng lại</li>
+</ul>
+<h3><strong>Ngữ nghĩa phân phối dữ liệu</strong></h3>
+<p>Hãy thảo luận về ngữ nghĩa phân phối khác nhau.</p>
+<h4>Nhiều nhất một lần</h4>
+<p>Với sự đảm bảo này, tin nhắn sẽ được gửi không quá một lần và hoàn toàn không thể gửi được.</p>
+<figure class="sd-figure"><img alt="at-most-once" loading="lazy" src="assets/content/system-design/images/ch19/at-most-once.png"/></figure>
+<ul>
+<li>producer gửi tin nhắn không đồng bộ đến một topic. Nếu việc gửi tin nhắn không thành công thì không cần thử lại.</li>
+<li>Consumer fetcheseseseseseses tin nhắn và ngay lập tức cam kết offset. Nếu consumer gặp sự cố trước khi xử lý tin nhắn, tin nhắn sẽ không được xử lý.</li>
+</ul>
+<h4>Ít nhất một lần</h4>
+<p>Một tin nhắn có thể được gửi nhiều lần và không có tin nhắn nào được xử lý.</p>
+<figure class="sd-figure"><img alt="at-least-once" loading="lazy" src="assets/content/system-design/images/ch19/at-least-once.png"/></figure>
+<ul>
+<li>producer gửi tin nhắn với <code>ack=1</code> hoặc <code>ack=all</code>. Nếu có bất kỳ vấn đề gì, nó sẽ tiếp tục thử lại.</li>
+<li>Consumer fetcheseseseseseses tin nhắn và chỉ commit offset sau khi xử lý xong.</li>
+<li>Có thể một tin nhắn được gửi nhiều lần nếu ví dụ: consumer gặp sự cố trước khi thực hiện bù trừ nhưng sau khi xử lý nó.</li>
+<li>Đây là lý do tại sao, điều này tốt cho các trường hợp sử dụng có thể chấp nhận được việc replicate data hoặc có thể loại bỏ trùng lặp.</li>
+</ul>
+<h4>Đúng một lần</h4>
+<p>Việc triển khai hệ thống cực kỳ tốn kém, mặc dù đó là sự đảm bảo thân thiện nhất với người dùng:</p>
+<figure class="sd-figure"><img alt="exactly-once" loading="lazy" src="assets/content/system-design/images/ch19/exactly-once.png"/></figure>
+<h3><strong>Tính năng nâng cao</strong></h3>
+<p>Hãy thảo luận về một số tính năng nâng cao, chúng ta có thể thảo luận trong cuộc phỏng vấn.</p>
+<h4>Lọc tin nhắn</h4>
+<p>Một số consumer có thể chỉ muốn sử dụng các tin nhắn thuộc một loại nhất định trong một partition.</p>
+<p>Điều này có thể đạt được bằng cách xây dựng các topic riêng biệt cho từng tập hợp con tin nhắn, nhưng điều này có thể tốn kém nếu hệ thống có quá nhiều trường hợp sử dụng khác nhau.<br/>
+ * Sẽ lãng phí tài nguyên nếu lưu trữ cùng một thông điệp về các topic khác nhau<br/>
+ * producer hiện được kết hợp chặt chẽ với consumer khi nó thay đổi theo từng yêu cầu mới của consumer</p>
+<p>Chúng tôi có thể giải quyết vấn đề này bằng cách lọc tin nhắn.<br/>
+ * Một cách tiếp cận đơn giản là thực hiện lọc ở phía consumer, nhưng điều đó sẽ tạo ra lưu lượng truy cập không cần thiết của consumer<br/>
+ * Ngoài ra, tin nhắn có thể có thẻ đính kèm và consumer có thể chỉ định thẻ nào họ đã đăng ký<br/>
+ * Việc lọc cũng có thể được thực hiện thông qua tải trọng tin nhắn nhưng việc đó có thể khó khăn và không an toàn đối với các tin nhắn được mã hóa/tuần tự hóa<br/>
+ * Đối với các công thức toán học phức tạp hơn, broker có thể triển khai parser ngữ pháp hoặc script executor, nhưng điều đó có thể nặng nề đối với message queue</p>
+<figure class="sd-figure"><img alt="message-filtering" loading="lazy" src="assets/content/system-design/images/ch19/message-filtering.png"/></figure>
+<h4>Tin nhắn bị trì hoãn và tin nhắn theo lịch trình</h4>
+<p>Đối với một số trường hợp sử dụng, chúng tôi có thể muốn trì hoãn hoặc lên lịch gửi tin nhắn. <br/>
+Ví dụ: chúng tôi có thể gửi séc xác minh thanh toán trong 30 phút kể từ bây giờ, điều này sẽ kích hoạt consumer xem liệu thanh toán có thành công hay không.</p>
+<p>Điều này có thể đạt được bằng cách gửi tin nhắn đến temporary store trong broker và di chuyển tin nhắn đến partition vào đúng thời điểm:</p>
+<figure class="sd-figure"><img alt="delayed-message-implementation" loading="lazy" src="assets/content/system-design/images/ch19/delayed-message-implementation.png"/></figure>
+<ul>
+<li>Nơi lưu trữ tạm thời có thể là một hoặc nhiều topic tin nhắn đặc biệt</li>
+<li>Chức năng định thời có thể đạt được bằng cách sử dụng delay queue chuyên dụng hoặc một <a href="http://www.cs.columbia.edu/~nahum/w6998/papers/sosp87-timing-wheels.pdf">bánh xe thời gian phân cấp</a></li>
+</ul>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Điểm nói chuyện bổ sung:<br/>
+- <strong>Giao thức liên lạc</strong>: Những cân nhắc quan trọng - hỗ trợ tất cả các trường hợp sử dụng và khối lượng dữ liệu lớn, cũng như xác minh tính toàn vẹn của tin nhắn. Các giao thức phổ biến - giao thức AMQP và Kafka.<br/>
+- <strong>Thử lại mức tiêu thụ</strong>: nếu chúng tôi không thể xử lý tin nhắn ngay lập tức, chúng tôi có thể gửi tin nhắn đó đến một topic dành riêng cho việc thử lại để thử lại sau.<br/>
+- <strong>Historical data archive</strong>: tin nhắn cũ có thể được sao lưu trong các high-capacity storage như HDFS hoặc object storage (ví dụ S3).</p>

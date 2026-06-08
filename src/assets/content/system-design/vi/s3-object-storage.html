@@ -1,0 +1,327 @@
+<h2>Giới thiệu</h2>
+<p>Trong chương này, chúng ta sẽ thiết kế dịch vụ <strong>object storage</strong> tương tự <strong>Amazon S3</strong>.</p>
+<p>Hệ thống lưu trữ được chia thành ba loại lớn:<br/>
+- <strong>Khối lưu trữ</strong><br/>
+- <strong>Lưu trữ tập tin</strong><br/>
+- <strong>Object storage</strong></p>
+<p><strong>Khối lưu trữ</strong> là những thiết bị xuất hiện vào những năm 1960. Ổ cứng HDD và SSD là những ví dụ như vậy.<br/>
+Các thiết bị này thường được gắn vật lý vào máy chủ, mặc dù chúng cũng có thể được gắn vào mạng thông qua các giao thức mạng tốc độ cao.<br/>
+Máy chủ có thể định dạng các khối thô và sử dụng chúng như một hệ thống tệp hoặc có thể trực tiếp kiểm soát chúng cho máy chủ.</p>
+<p><strong>Lưu trữ tập tin</strong> được xây dựng trên khối lưu trữ. Nó cung cấp mức độ trừu tượng cao hơn, giúp quản lý các thư mục và tệp dễ dàng hơn.</p>
+<p><strong>Object storage</strong> hy sinh hiệu suất để có độ bền cao, quy mô rộng lớn và chi phí thấp.<br/>
+Nó nhắm mục tiêu dữ liệu "lạnh" và chủ yếu được sử dụng để lưu trữ và sao lưu.<br/>
+Không có cấu trúc thư mục phân cấp, tất cả dữ liệu được lưu trữ dưới dạng object trong cấu trúc phẳng.<br/>
+Nó tương đối chậm so với các loại lưu trữ khác. Hầu hết các nhà cung cấp đám mây đều có dịch vụ Object storage - Amazon S3, Google GCS, v.v.</p>
+<figure class="sd-figure"><img alt="storage-comparison" loading="lazy" src="assets/content/system-design/images/ch24/storage-comparison.png"/></figure>
+<table class="sd-table">
+<thead>
+<tr>
+<th></th>
+<th>Khối lưu trữ</th>
+<th>Lưu trữ tệp</th>
+<th>Object storage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nội dung có thể thay đổi</td>
+<td>Y</td>
+<td>Y</td>
+<td>N (có phiên bản object)</td>
+</tr>
+<tr>
+<td>Trị giá</td>
+<td>Cao</td>
+<td>Trung bình đến cao</td>
+<td>Thấp</td>
+</tr>
+<tr>
+<td>Hiệu suất</td>
+<td>Trung bình đến cao, rất cao</td>
+<td>Trung bình đến cao</td>
+<td>Thấp đến trung bình</td>
+</tr>
+<tr>
+<td>tính nhất quán</td>
+<td>Tính nhất quán mạnh mẽ</td>
+<td>Tính nhất quán mạnh mẽ</td>
+<td>Tính nhất quán mạnh mẽ [5]</td>
+</tr>
+<tr>
+<td>Truy cập dữ liệu</td>
+<td>SAS/iSCSI/FC</td>
+<td>Truy cập tệp tiêu chuẩn, CIFS/SMB và NFS</td>
+<td>API RESTful</td>
+</tr>
+<tr>
+<td>Khả năng mở rộng</td>
+<td>Khả năng mở rộng trung bình</td>
+<td>Khả năng mở rộng cao</td>
+<td>Khả năng mở rộng rộng rãi</td>
+</tr>
+<tr>
+<td>Tốt cho</td>
+<td>Máy ảo (VM), database</td>
+<td>Truy cập hệ thống tập tin có mục đích chung</td>
+<td>Dữ liệu nhị phân, dữ liệu unstructured</td>
+</tr>
+</tbody>
+</table>
+<p>Một số thuật ngữ liên quan đến Object storage:<br/>
+- <strong>Bucket</strong> - container logic cho các object. Tên là duy nhất trên toàn cầu.<br/>
+- <strong>Object</strong> - Một phần dữ liệu riêng lẻ, được lưu trữ trong một bucket. Chứa dữ liệu object và metadata.<br/>
+- <strong>Versioning</strong> - Tính năng giữ nhiều biến thể của một object trong cùng một bucket.<br/>
+- <strong>Mã định danh tài nguyên thống nhất (URI)</strong> - mỗi tài nguyên được xác định duy nhất bởi một URI.<br/>
+- <strong>Thỏa thuận cấp độ dịch vụ (SLA)</strong> - Hợp đồng giữa nhà cung cấp dịch vụ và client.</p>
+<p>SLA lớp lưu trữ Truy cập không thường xuyên theo tiêu chuẩn của Amazon S3:<br/>
+- Độ bền 99,999999999% trên nhiều Vùng sẵn sàng<br/>
+- Dữ liệu có khả năng phục hồi trong trường hợp toàn bộ Vùng sẵn sàng bị phá hủy<br/>
+- Được thiết kế để có độ sẵn sàng 99,9%</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<ul>
+<li>C: Những tính năng nào nên được đưa vào?</li>
+<li>I: Tạo bucket, upload/download object, versioning, listing object trong bucket</li>
+<li>C: Kích thước dữ liệu điển hình là gì?</li>
+<li>I: Chúng ta cần lưu trữ cả object lớn và object nhỏ một cách hiệu quả</li>
+<li>C: Chúng ta lưu trữ bao nhiêu dữ liệu trong một năm?</li>
+<li>I: 100 petabyte</li>
+<li>C: Chúng ta có thể giả sử độ bền dữ liệu là 6 số 9 (99,9999%) và tính khả dụng của dịch vụ là 4 số 9 (99,99%) không?</li>
+<li>I: Ừ, nghe có vẻ hợp lý</li>
+</ul>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li><strong>100 PB dữ liệu</strong></li>
+<li><strong>Độ bền dữ liệu 6 số 9</strong></li>
+<li><strong>4 số chín về tính sẵn có của dịch vụ</strong></li>
+<li>Hiệu quả lưu trữ. Giảm chi phí lưu trữ trong khi vẫn duy trì độ tin cậy và hiệu suất cao</li>
+</ul>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<p>Bộ Object storage có thể gặp tắc nghẽn về dung lượng ổ đĩa hoặc IO mỗi giây (IOPS).</p>
+<p>Giả định:<br/>
+- chúng tôi có 20% object nhỏ (dưới 1mb), 60% object cỡ trung bình (1-64mb) và 20% object lớn (lớn hơn 64mb),<br/>
+- Một đĩa cứng (SATA, 7200rpm) có khả năng thực hiện 100-150 tìm kiếm ngẫu nhiên mỗi giây (100-150 IOPS)</p>
+<p>Với các giả định đã đưa ra, chúng ta có thể ước tính tổng số object mà hệ thống có thể tồn tại.<br/>
+- Hãy sử dụng kích thước trung bình cho mỗi loại object để đơn giản hóa việc tính toán - 0,5mb cho nhỏ, 32mb cho trung bình, 200mb cho lớn.<br/>
+- Với 100PB dung lượng lưu trữ (10^11 MB) và 40% mức sử dụng dung lượng lưu trữ dẫn đến các object 0,68 tỷ<br/>
+- Nếu giả sử metadata là 1kb thì chúng tôi cần dung lượng 0,68tb để lưu trữ thông tin metadata</p>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<p>Hãy cùng khám phá một số thuộc tính thú vị của việc Object storage trước khi đi sâu vào thiết kế:<br/>
+- <strong>Object immutability</strong> - các object trong bộ Object storage là bất biến (không phải trường hợp trong các hệ thống lưu trữ khác). Chúng tôi có thể xóa chúng hoặc thay thế chúng, nhưng không cập nhật.<br/>
+- <strong>key-value store</strong> - URI object là khóa của nó và chúng ta có thể lấy nội dung của nó bằng cách thực hiện lệnh gọi HTTP<br/>
+- <strong>Viết một lần, đọc nhiều lần</strong> - mẫu truy cập dữ liệu đang viết một lần và đọc nhiều lần. Theo một số nghiên cứu của Linkedin, 95% hoạt động được đọc<br/>
+- Hỗ trợ cả object nhỏ và lớn</p>
+<p>Triết lý thiết kế Object storage tương tự như UNIX - khi chúng ta lưu một tệp, nó sẽ tạo tên tệp trong cấu trúc dữ liệu, được gọi là inode và dữ liệu tệp được lưu trữ ở các vị trí đĩa khác nhau.<br/>
+Inode chứa danh sách các con trỏ khối tệp, trỏ đến các vị trí khác nhau trên đĩa.</p>
+<p>Khi truy cập một tệp, trước tiên chúng tôi fetch metadata của nó từ inode, trước khi fetch nội dung tệp.</p>
+<p>Bộ Object storage hoạt động tương tự - Metadata store được sử dụng cho thông tin tệp nhưng nội dung được lưu trữ trên đĩa:</p>
+<figure class="sd-figure"><img alt="object-store-vs-unix" loading="lazy" src="assets/content/system-design/images/ch24/object-store-vs-unix.png"/></figure>
+<p>Bằng cách tách metadata khỏi nội dung tệp, chúng tôi có thể mở rộng quy mô các cửa hàng khác nhau một cách độc lập:</p>
+<figure class="sd-figure"><img alt="bucket-and-object" loading="lazy" src="assets/content/system-design/images/ch24/bucket-and-object.png"/></figure>
+<h3><strong>Thiết kế cấp cao</strong></h3>
+<figure class="sd-figure"><img alt="high-level-design" loading="lazy" src="assets/content/system-design/images/ch24/high-level-design.png"/></figure>
+<ul>
+<li><strong>Load balancer</strong> - phân phối các yêu cầu API trên các replica dịch vụ</li>
+<li><strong>API service</strong> - Máy chủ stateless, điều phối các cuộc gọi tới metadata và object store, cũng như dịch vụ IAM.</li>
+<li><strong>Quản lý danh tính và quyền truy cập (IAM)</strong> - vị trí trung tâm cho auth, authz, kiểm soát truy cập.</li>
+<li><strong>Data store</strong> - lưu trữ và truy xuất dữ liệu thực tế. Hoạt động dựa trên ID object (UUID).</li>
+<li><strong>Metadata store</strong> - stores object metadata</li>
+</ul>
+<h3><strong>Tải lên một object</strong></h3>
+<figure class="sd-figure"><img alt="uploading-object" loading="lazy" src="assets/content/system-design/images/ch24/uploading-object.png"/></figure>
+<ul>
+<li>tạo bucket tên là "bucket-to-share" thông qua HTTP request PUT</li>
+<li>API service gọi IAM để đảm bảo người dùng được ủy quyền và có quyền ghi</li>
+<li>API service gọi metadata store để tạo bucket entry. Sau khi tạo, phản hồi thành công sẽ được trả về.</li>
+<li>Sau khi bucket được tạo, HTTP PUT được gửi để tạo object có tên "script.txt"</li>
+<li>API service xác minh danh tính người dùng và đảm bảo người dùng có quyền ghi</li>
+<li>Sau khi xác thực thành công, tải trọng object sẽ được gửi qua HTTP PUT đến data store. Data store vẫn tồn tại và trả về UUID.</li>
+<li>API service gọi metadata store để tạo mục nhập mới với object_id, Buck_id và Buck_name, cùng với các metadata khác.</li>
+</ul>
+<p>Yêu cầu tải lên object ví dụ:</p>
+<pre><code>PUT /bucket-to-share/script.txt HTTP/1.1
+Host: foo.s3example.org
+Date: Sun, 12 Sept 2021 17:51:00 GMT
+Authorization: authorization string
+Content-Type: text/plain
+Content-Length: 4567
+x-amz-meta-author: Alex
+
+[4567 bytes of object data]
+</code></pre>
+<h3><strong>Đang tải xuống một object</strong></h3>
+<p>Nhóm không có hệ thống phân cấp thư mục, nhưng chúng ta có thể tạo hệ thống phân cấp logic bằng cách ghép tên bucket và tên object để mô phỏng cấu trúc thư mục.</p>
+<p>Ví dụ GET request để fetch một object:</p>
+<pre><code>GET /bucket-to-share/script.txt HTTP/1.1
+Host: foo.s3example.org
+Date: Sun, 12 Sept 2021 18:30:01 GMT
+Authorization: authorization string
+</code></pre>
+<figure class="sd-figure"><img alt="download-object" loading="lazy" src="assets/content/system-design/images/ch24/download-object.png"/></figure>
+<ul>
+<li>Client gửi HTTP request GET tới bộ load balancer, tức là <code>GET /bucket-to-share/script.txt</code></li>
+<li>API service truy vấn IAM để xác minh người dùng có quyền đọc bucket</li>
+<li>Sau khi được xác thực, UUID của object sẽ được truy xuất từ ​​Metadata store</li>
+<li>Tải trọng object được lấy từ Data store dựa trên UUID và trả về client</li>
+</ul>
+<hr/>
+<p>// chạy nước rút 1</p>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<h3><strong>Data store</strong></h3>
+<p>Đây là cách API service tương tác với Data store:</p>
+<figure class="sd-figure"><img alt="data-store-interactions" loading="lazy" src="assets/content/system-design/images/ch24/data-store-interactions.png"/></figure>
+<p>Các thành phần chính của Data store:</p>
+<figure class="sd-figure"><img alt="data-store-main-components" loading="lazy" src="assets/content/system-design/images/ch24/data-store-main-components.png"/></figure>
+<p>Dịch vụ định tuyến dữ liệu cung cấp API RESTful hoặc gRPC để truy cập cụm nút dữ liệu.<br/>
+Đây là một dịch vụ stateless, mở rộng quy mô bằng cách thêm nhiều máy chủ hơn.</p>
+<p>Trách nhiệm chính của nó là:<br/>
+- truy vấn dịch vụ vị trí để có được nút dữ liệu tốt nhất để lưu trữ dữ liệu<br/>
+- đọc dữ liệu từ các nút dữ liệu và gửi lại cho API service<br/>
+- Ghi dữ liệu vào các nút dữ liệu</p>
+<p>Dịch vụ vị trí xác định nút dữ liệu nào sẽ lưu trữ một object.<br/>
+Nó duy trì một bản đồ cụm ảo, xác định cấu trúc liên kết vật lý của một cụm.</p>
+<figure class="sd-figure"><img alt="virtual-cluster-map" loading="lazy" src="assets/content/system-design/images/ch24/virtual-cluster-map.png"/></figure>
+<p>Dịch vụ này cũng gửi heartbeat đến tất cả các nút dữ liệu để xác định xem có nên xóa chúng khỏi cụm ảo hay không.</p>
+<p>Vì đây là một dịch vụ quan trọng nên nên duy trì một cụm gồm 5 hoặc 7 replica, được sync thông qua thuật toán đồng thuận Paxos hoặc Raft.<br/>
+Ví dụ: một cụm 7 nút có thể chịu đựng được 3 nút bị lỗi.</p>
+<p>Các nút dữ liệu lưu trữ dữ liệu object thực tế.<br/>
+Độ tin cậy và độ bền được đảm bảo bằng cách replicate data sang nhiều nút dữ liệu.</p>
+<p>Mỗi nút dữ liệu có một daemon đang chạy, gửi heartbeat đến dịch vụ vị trí.</p>
+<p>heartbeat bao gồm:<br/>
+- Nút dữ liệu quản lý bao nhiêu ổ đĩa (HDD hoặc SSD)?<br/>
+- Mỗi ổ lưu trữ bao nhiêu dữ liệu?</p>
+<h4>Luồng lưu trữ dữ liệu</h4>
+<figure class="sd-figure"><img alt="data-persistence-flow" loading="lazy" src="assets/content/system-design/images/ch24/data-persistence-flow.png"/></figure>
+<ul>
+<li>API service chuyển tiếp dữ liệu object tới data store</li>
+<li>Dịch vụ định tuyến dữ liệu gửi dữ liệu đến nút dữ liệu chính</li>
+<li>Nút dữ liệu chính lưu dữ liệu cục bộ và replicate sang hai nút dữ liệu thứ cấp. Phản hồi được gửi sau khi replicate thành công.</li>
+<li>UUID của object được trả về API service.</li>
+</ul>
+<p>Hãy cẩn thận:<br/>
+- Với một object UUID, replica group của nó được chọn một cách xác định bằng cách sử dụng consistent hashing<br/>
+- Ở bước 4, nút dữ liệu chính replicate data object trước khi trả về phản hồi. Điều này ủng hộ tính nhất quán mạnh mẽ hơn độ trễ cao hơn.</p>
+<figure class="sd-figure"><img alt="consistency-vs-latency" loading="lazy" src="assets/content/system-design/images/ch24/consistency-vs-latency.png"/></figure>
+<h4>Cách tổ chức dữ liệu</h4>
+<p>Một cách tiếp cận đơn giản để quản lý dữ liệu là lưu trữ từng object trong một tệp riêng biệt.</p>
+<p>Tính năng này hoạt động nhưng không hiệu quả với nhiều tệp nhỏ trong hệ thống tệp:<br/>
+- Các khối dữ liệu trên HDD bị lãng phí vì mọi file đều sử dụng toàn bộ kích thước khối. Kích thước khối điển hình là 4kb.<br/>
+- Nhiều file nghĩa là nhiều inode. Hệ điều hành không xử lý tốt việc có quá nhiều inode và cũng có giới hạn inode tối đa.</p>
+<p>Những vấn đề này có thể được giải quyết bằng cách hợp nhất nhiều tệp nhỏ thành tệp lớn hơn thông qua Write-ahead log (WAL). Khi tệp đạt đến dung lượng (thường là vài GB), một tệp mới sẽ được tạo:</p>
+<figure class="sd-figure"><img alt="wal-optimization" loading="lazy" src="assets/content/system-design/images/ch24/wal-optimization.png"/></figure>
+<p>Nhược điểm của phương pháp này là quyền truy cập ghi vào tệp cần phải được tuần tự hóa. Nhiều lõi truy cập vào cùng một tệp phải chờ lẫn nhau.<br/>
+Để khắc phục điều này, chúng tôi có thể giới hạn tệp ở các lõi cụ thể để tránh xung đột khóa.</p>
+<h4>Tra cứu object</h4>
+<p>Để hỗ trợ lưu trữ nhiều object trong cùng một tệp, chúng ta cần duy trì một bảng cho nút dữ liệu biết:<br/>
+- <code>object_id</code><br/>
+- <code>filename</code> nơi object được lưu trữ<br/>
+- <code>file_offset</code> nơi object bắt đầu<br/>
+- <code>object_size</code></p>
+<p>Chúng ta có thể triển khai bảng này trong database dựa trên tệp như RocksDB hoặc database quan hệ truyền thống.<br/>
+Vì mẫu truy cập có tốc độ ghi thấp + đọc cao nên database quan hệ hoạt động tốt hơn.</p>
+<p>Chúng ta nên triển khai nó như thế nào?<br/>
+Chúng tôi có thể triển khai db và Scale nó một cách riêng biệt trong một cụm, được tất cả các nút dữ liệu truy cập.</p>
+<p>Nhược điểm:<br/>
+- chúng tôi cần phải mở rộng quy mô cụm một cách mạnh mẽ để phục vụ tất cả các yêu cầu<br/>
+- có thêm độ trễ mạng giữa nút dữ liệu và cụm db</p>
+<p>Một cách khác là lợi dụng thực tế là các nút dữ liệu chỉ quan tâm đến dữ liệu liên quan đến chúng,<br/>
+vì vậy chúng tôi có thể triển khai db quan hệ trong chính nút dữ liệu.</p>
+<p>SQLite là một lựa chọn tốt vì đây là database quan hệ dựa trên tệp nhẹ.</p>
+<h4>Luồng lưu trữ dữ liệu được cập nhật</h4>
+<figure class="sd-figure"><img alt="updated-data-persistence-flow" loading="lazy" src="assets/content/system-design/images/ch24/updated-data-persistence-flow.png"/></figure>
+<ul>
+<li>API service gửi yêu cầu lưu một object mới</li>
+<li>Dịch vụ nút dữ liệu sẽ thêm object mới vào cuối tệp, có tên là "/data/c"</li>
+<li>Một bản ghi mới cho object được chèn vào bảng ánh xạ object</li>
+</ul>
+<h4>Độ bền</h4>
+<p>Độ bền của dữ liệu là một yêu cầu quan trọng trong thiết kế của chúng tôi. Để đạt được độ bền 6 số 9, mọi trường hợp hỏng hóc cần được kiểm tra kỹ lưỡng.</p>
+<p>Vấn đề đầu tiên cần giải quyết là lỗi phần cứng. Chúng ta có thể đạt được điều đó bằng cách replicate data nodes để giảm thiểu xác suất thất bại.<br/>
+Nhưng ngoài ra, chúng tôi cũng phải nhân rộng trên các miền lỗi khác nhau (cross-rack, cross-dc, mạng riêng biệt, v.v.).<br/>
+Một sự kiện quan trọng có thể gây ra nhiều lỗi phần cứng trong cùng một miền:</p>
+<figure class="sd-figure"><img alt="failure-domain-isolation" loading="lazy" src="assets/content/system-design/images/ch24/failure-domain-isolation.png"/></figure>
+<p>Giả sử tỷ lệ hỏng hóc hàng năm của một ổ cứng HDD thông thường là 0,81% thì việc tạo ra 3 replica mang lại cho chúng ta độ bền 6 nines.</p>
+<p>Việc replicate data nodes như vậy mang lại cho chúng tôi độ bền mà chúng tôi mong muốn, nhưng chúng tôi cũng có thể tận dụng mã hóa xóa để giảm chi phí lưu trữ.</p>
+<p>Mã hóa xóa cho phép chúng ta sử dụng các bit chẵn lẻ, cho phép chúng ta xây dựng lại các bit bị mất trong trường hợp xảy ra lỗi:</p>
+<figure class="sd-figure"><img alt="erasure-coding" loading="lazy" src="assets/content/system-design/images/ch24/erasure-coding.png"/></figure>
+<p>Hãy tưởng tượng những bit đó là các nút dữ liệu. Nếu hai trong số chúng bị hỏng, chúng có thể được phục hồi bằng cách sử dụng bốn cái còn lại.</p>
+<p>Có các sơ đồ mã hóa xóa khác nhau. Trong trường hợp của chúng tôi, chúng tôi có thể sử dụng mã hóa xóa 8 + 4, phân chia thành các miền lỗi khác nhau để tối đa hóa độ tin cậy:</p>
+<figure class="sd-figure"><img alt="erasure-coding-across-failure-domains" loading="lazy" src="assets/content/system-design/images/ch24/erasure-coding-across-failure-domains.png"/></figure>
+<p>Mã hóa xóa cho phép chúng tôi đạt được chi phí lưu trữ thấp hơn nhiều (cải thiện 50%) nhưng phải trả giá bằng tốc độ truy cập do dịch vụ định tuyến dữ liệu phải thu thập dữ liệu từ nhiều vị trí:</p>
+<figure class="sd-figure"><img alt="erasure-coding-vs-replication" loading="lazy" src="assets/content/system-design/images/ch24/erasure-coding-vs-replication.png"/></figure>
+<p>Những lưu ý khác:<br/>
+- Replication yêu cầu 200% chi phí lưu trữ (với 3 replica) so với 50% thông qua mã hóa xóa<br/>
+- Xóa mã hóa <a href="https://github.com/Backblaze/erasure-coding-durability">cho chúng ta độ bền 11 nines</a> so với 6 số chín qua replication<br/>
+- Mã hóa xóa yêu cầu tính toán nhiều hơn để tính toán và lưu trữ các số chẵn lẻ</p>
+<p>Tóm lại, replication hữu ích hơn cho các ứng dụng nhạy cảm với độ trễ, trong khi mã hóa xóa lại hấp dẫn vì hiệu quả chi phí lưu trữ và độ bền.<br/>
+Việc xóa mã hóa cũng khó thực hiện hơn nhiều.</p>
+<h4>Xác minh tính đúng đắn</h4>
+<p>Nếu một đĩa bị lỗi hoàn toàn thì lỗi đó rất dễ được phát hiện. Điều này ít đơn giản hơn trong trường hợp một phần bộ nhớ đĩa bị hỏng.</p>
+<p>Để phát hiện điều này, chúng tôi có thể sử dụng tổng kiểm tra - hàm băm của nội dung tệp, có thể được sử dụng để xác minh tính toàn vẹn của tệp.</p>
+<p>Trong trường hợp của chúng tôi, chúng tôi sẽ lưu trữ tổng kiểm tra cho từng tệp và từng object:</p>
+<figure class="sd-figure"><img alt="checksums-for-correctness" loading="lazy" src="assets/content/system-design/images/ch24/checksums-for-correctness.png"/></figure>
+<p>Trong trường hợp mã hóa xóa (8 + 4), chúng tôi sẽ cần fetch riêng từng phần trong số 8 phần dữ liệu và xác minh từng tổng kiểm tra của chúng.</p>
+<p>// chạy nước rút 2</p>
+<h3><strong>Metadata data model</strong></h3>
+<p>Lược đồ bảng:</p>
+<figure class="sd-figure"><img alt="metadata-data-model" loading="lazy" src="assets/content/system-design/images/ch24/metadata-data-model.png"/></figure>
+<p>Các truy vấn chúng tôi cần hỗ trợ:<br/>
+- Tìm ID object theo tên<br/>
+- Chèn/xóa object theo tên<br/>
+- Liệt kê các object trong bucket có chung tiền tố</p>
+<p>Thường có giới hạn về số lượng nhóm mà người dùng có thể tạo, do đó, kích thước của bảng bucket nhỏ và có thể vừa với một máy chủ db.<br/>
+Nhưng chúng tôi vẫn cần mở rộng quy mô máy chủ để có được thông lượng đọc.</p>
+<p>Tuy nhiên, bảng object có thể sẽ không vừa với một máy chủ database. Do đó, chúng ta có thể mở rộng bảng thông qua sharding:<br/>
+- Phân chia theo bucket_id sẽ dẫn đến các vấn đề về điểm phát sóng vì một bucket có thể có hàng tỷ object<br/>
+- sharding theo Bucket_id giúp tải được phân bổ đều hơn nhưng truy vấn của chúng ta sẽ bị chậm<br/>
+- Chúng tôi chọn sharding theo <code>hash(bucket_name, object_name)</code> vì hầu hết các truy vấn đều dựa trên tên object/nhóm.</p>
+<p>Tuy nhiên, ngay cả với sơ đồ sharding này, việc liệt kê các object vào bucket sẽ rất chậm.</p>
+<h3><strong>Liệt kê các object trong một bucket</strong></h3>
+<p>Trong một database, việc liệt kê một object dựa trên tiền tố của nó (trông giống như một thư mục) hoạt động như sau:</p>
+<pre><code>SELECT * FROM object WHERE bucket_id = "123" AND object_name LIKE `abc/%`
+</code></pre>
+<p>Đây là một thách thức khó thực hiện khi sharded database. Để đạt được điều đó, chúng ta có thể chạy truy vấn trên mọi phân đoạn và tổng hợp kết quả trong bộ nhớ.<br/>
+Tuy nhiên, điều này làm cho việc phân trang trở nên khó khăn vì các phân đoạn khác nhau chứa kích thước kết quả khác nhau và chúng tôi cần duy trì giới hạn/độ lệch riêng cho từng phân đoạn.</p>
+<p>Chúng ta có thể tận dụng thực tế là object stores thông thường không được tối ưu hóa để liệt kê các object, vì vậy chúng ta có thể hy sinh hiệu suất listing.<br/>
+Chúng ta cũng có thể tạo một bảng không chuẩn hóa để liệt kê các object, sharded by bucket ID.<br/>
+Điều đó sẽ làm cho truy vấn danh sách của chúng tôi đủ nhanh vì nó được tách biệt với một phiên bản database duy nhất.</p>
+<h3><strong>Phiên bản object</strong></h3>
+<p>Phiên bản hoạt động bằng cách có một phiên bản khác <code>object_version</code> cột thuộc loại TIMEUUID, cho phép chúng tôi sắp xếp các bản ghi dựa trên nó.</p>
+<p>Mỗi phiên bản mới tạo ra một <code>object_id</code>:</p>
+<figure class="sd-figure"><img alt="object-versioning" loading="lazy" src="assets/content/system-design/images/ch24/object-versioning.png"/></figure>
+<p>Xóa một object sẽ tạo một phiên bản mới với một đặc biệt <code>object_id</code> cho biết object đã bị xóa. Các truy vấn cho nó trả về 404:</p>
+<figure class="sd-figure"><img alt="deleting-versioned-object" loading="lazy" src="assets/content/system-design/images/ch24/deleting-versioned-object.png"/></figure>
+<h3><strong>Tối ưu hóa tải lên các tệp lớn</strong></h3>
+<p>Việc tải lên các tệp lớn có thể được tối ưu hóa bằng cách sử dụng tính năng multipart upload - chia một tệp lớn thành nhiều phần, được tải lên độc lập:</p>
+<figure class="sd-figure"><img alt="multipart-upload" loading="lazy" src="assets/content/system-design/images/ch24/multipart-upload.png"/></figure>
+<ul>
+<li>Client gọi dịch vụ để bắt đầu multipart upload</li>
+<li>Data store trả về ID tải lên xác định duy nhất nội dung tải lên</li>
+<li>Client chia tệp lớn thành nhiều phần, tải lên độc lập bằng id tải lên</li>
+<li>Khi một đoạn được tải lên, Data store trả về một etag, là tổng kiểm tra md5, xác định đoạn tải lên đó</li>
+<li>Sau khi tất cả các bộ phận được tải lên, client sẽ gửi yêu cầu multipart upload hoàn chỉnh, bao gồm upload_id, số bộ phận và tất cả các thẻ etags</li>
+<li>Data store tập hợp lại object từ các bộ phận của nó. Quá trình này có thể mất một vài phút. Sau đó, phản hồi thành công sẽ được trả lại cho client.</li>
+</ul>
+<p>Những phần cũ không còn hữu ích có thể được loại bỏ vào thời điểm này. Chúng tôi có thể giới thiệu một Garbage collector để giải quyết vấn đề đó.</p>
+<h3><strong>Garbage collection</strong></h3>
+<p>Garbage collection là quá trình lấy lại không gian lưu trữ không còn được sử dụng. Có một số cách khiến dữ liệu trở thành rác:<br/>
+- <strong>xóa object lười biếng</strong> - object được đánh dấu là đã xóa mà không thực sự bị xóa<br/>
+- <strong>dữ liệu mồ côi</strong> - ví dụ: tải lên không thành công giữa chừng và các phần cũ cần phải xóa<br/>
+- <strong>dữ liệu bị hỏng</strong> - dữ liệu không xác minh được tổng kiểm tra</p>
+<p>Garbage collector cũng chịu trách nhiệm thu hồi không gian chưa sử dụng trong các replica.<br/>
+Với replication, dữ liệu sẽ bị xóa khỏi cả primary data và replica. Với mã hóa xóa (8+4), dữ liệu sẽ bị xóa khỏi tất cả 12 nút.</p>
+<p>Để thuận tiện cho việc xóa, chúng tôi sẽ sử dụng một quy trình gọi là nén:<br/>
+- Garbage collector replicate các object không bị xóa khỏi "data/b" sang "data/d"<br/>
+- <code>object_mapping</code> bảng được cập nhật sau khi replicate hoàn tất bằng giao dịch database<br/>
+- Để tránh tạo quá nhiều tệp nhỏ, việc nén được thực hiện trên các tệp lớn hơn một ngưỡng nhất định</p>
+<figure class="sd-figure"><img alt="compaction" loading="lazy" src="assets/content/system-design/images/ch24/compaction.png"/></figure>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Những điều chúng tôi đề cập:<br/>
+- Thiết kế object store giống S3<br/>
+- So sánh sự khác biệt giữa object store, khối và tệp<br/>
+- Bao gồm việc tải lên, tải xuống, liệt kê, versioning các object trong bucket<br/>
+- Đi sâu vào thiết kế - lưu trữ dữ liệu và metadata storage, erasure coding và xóa, multipart upload, sharding</p>
+
+

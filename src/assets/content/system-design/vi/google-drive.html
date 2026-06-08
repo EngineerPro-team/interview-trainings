@@ -1,0 +1,216 @@
+<h2>Giới thiệu</h2>
+<p>Google Drive là dịch vụ lưu trữ và file sync dựa trên đám mây cho phép người dùng lưu trữ, truy cập và chia sẻ tệp từ nhiều thiết bị khác nhau. Chương này thảo luận về việc thiết kế một hệ thống có thể mở rộng với các tính năng sau:<br/>
+- <strong>Tải lên và tải xuống tệp</strong><br/>
+- <strong>file sync trên các thiết bị</strong><br/>
+- <strong>Chia sẻ tệp</strong><br/>
+- <strong>Lịch sử sửa đổi tệp</strong><br/>
+- <strong>Thông báo chỉnh sửa, xóa và chia sẻ</strong></p>
+<hr/>
+<h2>Bước 1: Tìm hiểu vấn đề</h2>
+<h3>Yêu cầu chính</h3>
+<h4>Yêu cầu chức năng:</h4>
+<ul>
+<li>Tải lên và tải xuống các tập tin.</li>
+<li>sync tập tin trên nhiều thiết bị.</li>
+<li>Duy trì các bản sửa đổi tập tin.</li>
+<li>Cho phép chia sẻ tập tin với quyền.</li>
+<li>Gửi thông báo về chỉnh sửa, xóa và chia sẻ tệp.</li>
+</ul>
+<h4>Yêu cầu phi chức năng:</h4>
+<ul>
+<li><strong>Độ tin cậy:</strong> Mất dữ liệu là không thể chấp nhận được.</li>
+<li><strong>Fast sync:</strong> Tránh sự thiếu kiên nhẫn của người dùng với việc sync bị trì hoãn.</li>
+<li><strong>Hiệu quả băng thông:</strong> Giảm thiểu việc sử dụng dữ liệu không cần thiết.</li>
+<li><strong>Khả năng mở rộng:</strong> Xử lý 10 triệu người dùng hoạt động hàng ngày (DAU).</li>
+<li><strong>Tính sẵn sàng cao:</strong> Hoạt động liền mạch khi máy chủ gặp sự cố hoặc sự cố mạng.</li>
+</ul>
+<h3>Những ràng buộc và giả định</h3>
+<ul>
+<li>Người dùng nhận được <strong>10 GB dung lượng trống</strong>.</li>
+<li>Kích thước tập tin tối đa: <strong>10GB</strong>.</li>
+<li>Kích thước tải lên tệp trung bình: <strong>500 KB</strong>.</li>
+<li>Tần suất tải lên: <strong>2 tập tin mỗi ngày cho mỗi người dùng</strong>.</li>
+<li>Tổng dung lượng cần thiết: <strong>500 PB</strong>.</li>
+</ul>
+<hr/>
+<h2>Bước 2: Thiết kế cấp cao</h2>
+<h3>Kiến trúc single server</h3>
+<p>Một thiết lập cơ bản bao gồm:<br/>
+1. <strong>web server:</strong> Xử lý tải lên và tải xuống.<br/>
+2. <strong>metadata database:</strong>  để theo dõi metadata như dữ liệu người dùng, thông tin đăng nhập, thông tin tệp/<br/>
+3. <strong>Thư mục lưu trữ:</strong> Giữ các tập tin được sắp xếp theo không gian tên.</p>
+<figure class="sd-figure"><img alt="Namespaces" loading="lazy" src="assets/content/system-design/images/ch15/namespaces.png"/></figure>
+<ul>
+<li>Một web server và một thư mục có tên drive/ được thiết lập làm thư mục gốc để lưu trữ các tệp đã tải lên. </li>
+<li>Trong thư mục drive/, có một danh sách các thư mục được gọi là không gian tên. </li>
+<li>Mỗi không gian tên chứa tất cả các tệp được tải lên cho người dùng đó. </li>
+<li>Mỗi tệp hoặc thư mục có thể được xác định duy nhất bằng cách nối không gian tên và đường dẫn tương đối.</li>
+</ul>
+<p>Thiết kế này phục vụ như một điểm khởi đầu nhưng không đủ để mở rộng quy mô.</p>
+<h4>API</h4>
+<ol>
+<li><strong>Tải tệp lên Google Drive:</strong> Hai loại tải lên được hỗ trợ<ul>
+<li>Tải lên đơn giản: Được sử dụng khi kích thước tệp nhỏ.</li>
+<li>Tiếp tục tải lên: <ul>
+<li>Endpoint: https://API.example.com/files/upload?uploadType=resumable</li>
+<li>Gửi yêu cầu ban đầu để truy xuất URL có thể tiếp tục.</li>
+<li>Tải lên dữ liệu và theo dõi trạng thái tải lên</li>
+<li>Nếu quá trình tải lên bị gián đoạn, hãy tiếp tục tải lên.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Tải xuống tệp từ Google Drive:</strong> Để tải xuống một tập tin<ul>
+<li>Endpoint: https://API.example.com/files/download</li>
+</ul>
+</li>
+<li><strong>Nhận các bản sửa đổi tập tin:</strong><ul>
+<li>Endpoint: https://API.example.com/files/list_revisions</li>
+</ul>
+</li>
+</ol>
+<h3>Chuyển sang hệ thống phân tán</h3>
+<h4>Cải tiến:</h4>
+<ol>
+<li><strong>sharding:</strong> Chia lưu trữ trên các máy chủ dựa trên <code>user_id</code>.</li>
+<li>
+<p><strong>Amazon S3:</strong> Sử dụng S3 để lưu trữ tệp dự phòng và có thể mở rộng với replication giữa các vùng.</p>
+<figure class="sd-figure"><img alt="Replication" loading="lazy" src="assets/content/system-design/images/ch15/replication.png"/></figure>
+</li>
+<li>
+<p><strong>Load balancer:</strong> Phân phối lưu lượng truy cập trên nhiều web server.</p>
+</li>
+<li><strong>Sao chép metadata database:</strong> Đảm bảo tính khả dụng thông qua sharding và Database replication.</li>
+</ol>
+<h4>sync conflict:</h4>
+<p>Đối với hệ thống lưu trữ lớn như Google Drive, thỉnh thoảng xảy ra sync conflict.<br/>
+Khi hai người dùng sửa đổi cùng một tệp hoặc thư mục cùng một lúc, xung đột sẽ xảy ra.</p>
+<figure class="sd-figure"><img alt="Sync Conflicts" loading="lazy" src="assets/content/system-design/images/ch15/sync-conflicts.png"/></figure>
+<ul>
+<li>Trong ví dụ, người dùng 1 và người dùng 2 cố gắng cập nhật cùng một tệp cùng một lúc, nhưng tệp của người dùng 1 được hệ thống của chúng tôi xử lý trước tiên.</li>
+<li>Thao tác cập nhật của Người dùng 1 đã thành công nhưng người dùng 2 gặp phải sync conflict. </li>
+<li>Hệ thống hiển thị hai copies của cùng file: local copy của người dùng 2 và phiên bản mới nhất từ ​​máy chủ.</li>
+<li>Người dùng 2 có tùy chọn hợp nhất cả hai tệp hoặc ghi đè phiên bản này bằng phiên bản kia.</li>
+</ul>
+<h3>Thiết kế cải tiến</h3>
+<figure class="sd-figure"><img alt="High Level Design" loading="lazy" src="assets/content/system-design/images/ch15/high-level-design.png"/></figure>
+<ol>
+<li>
+<p><strong>User interaction:</strong>: Người dùng truy cập ứng dụng thông qua trình duyệt hoặc ứng dụng di động.</p>
+</li>
+<li>
+<p><strong>Chặn máy chủ:</strong><br/>
+   - Tập tin được chia thành <strong>Khối 4 MB</strong> (kích thước tối đa) và được gán các giá trị băm duy nhất.<br/>
+   - Các khối được lưu trữ độc lập trong cloud object storage (ví dụ: Amazon S3).<br/>
+   - Tái tạo tập tin liên quan đến việc nối các khối theo một thứ tự cụ thể.</p>
+</li>
+<li>
+<p><strong>Lưu trữ đám mây:</strong> Các khối được lưu trữ trong cloud object storage để có khả năng mở rộng và dự phòng.</p>
+</li>
+<li>
+<p><strong>cold storage:</strong> Các tập tin không hoạt động được chuyển sang cold storage để giảm chi phí.</p>
+</li>
+<li>
+<p><strong>Load balancer:</strong> Phân phối yêu cầu đồng đều giữa các API server để đảm bảo hoạt động hiệu quả.</p>
+</li>
+<li>
+<p><strong>API server:</strong><br/>
+   - Xử lý xác thực người dùng, quản lý hồ sơ và cập nhật metadata tệp.<br/>
+   - Quản lý tất cả các quy trình công việc không tải lên.</p>
+</li>
+<li>
+<p><strong>metadata database và cache:</strong><br/>
+   - metadata storage cho người dùng, tệp, khối và phiên bản.<br/>
+   - metadata được truy cập thường xuyên được lưu vào cache để truy xuất nhanh hơn.</p>
+</li>
+<li>
+<p><strong>Notification Service:</strong><br/>
+   - <strong>hệ thống pub/sub</strong> notify client về những thay đổi của tệp (thêm, chỉnh sửa, xóa).<br/>
+   - Đảm bảo client có thể lấy các bản cập nhật mới nhất.</p>
+</li>
+<li>
+<p><strong>Offline backup queue:</strong> Lưu trữ tạm thời thông tin thay đổi tệp để offline client sync khi trực tuyến trở lại.</p>
+</li>
+</ol>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<h3>metadata database</h3>
+<p>Một phiên bản được đơn giản hóa cao được hiển thị bên dưới vì nó chỉ bao gồm các bảng và trường quan trọng nhất.</p>
+<h4>Thiết kế lược đồ:</h4>
+<ul>
+<li><strong>Bảng người dùng:</strong> Lưu trữ hồ sơ người dùng và sở thích.</li>
+<li><strong>Bảng Tệp:</strong> Duy trì metadata của tệp (ví dụ: kích thước, tên, đường dẫn).</li>
+<li><strong>Bảng khối:</strong> Theo dõi các khối tập tin để xây dựng lại các tập tin.</li>
+<li><strong>Bảng phiên bản tệp:</strong> Lưu trữ lịch sử sửa đổi tập tin.</li>
+</ul>
+<figure class="sd-figure"><img alt="Metadata Database " loading="lazy" src="assets/content/system-design/images/ch15/metadata-database.png"/></figure>
+<hr/>
+<h3>Luồng tải lên tệp</h3>
+<ol>
+<li><strong>Tải lên tệp:</strong><br/>
+   - File được chia thành các khối, nén và mã hóa bởi máy chủ khối.<br/>
+   - Các khối được tải lên máy chủ khối và được lưu trữ trong S3.</li>
+<li><strong>Upload metadata:</strong><br/>
+   - Client gửi metadata đến API server.<br/>
+   - metadata được lưu trữ trong database với trạng thái <code>pending</code>.</li>
+<li><strong>Hoàn thành:</strong><br/>
+   - S3 kích hoạt lệnh gọi lại để cập nhật trạng thái tệp thành <code>uploaded</code>.<br/>
+   - Notification Service thông báo cho người dùng có liên quan.</li>
+</ol>
+<figure class="sd-figure"><img alt="Upload Flow " loading="lazy" src="assets/content/system-design/images/ch15/upload-flow.png"/></figure>
+<hr/>
+<h3>file sync</h3>
+<ol>
+<li>
+<p><strong>sync Delta:</strong> Chỉ chuyển các khối đã sửa đổi thay vì toàn bộ tệp.</p>
+<figure class="sd-figure"><img alt="Delta Sync" loading="lazy" src="assets/content/system-design/images/ch15/delta-sync.png"/></figure>
+</li>
+<li>
+<p><strong>nén:</strong> Các khối được nén bằng thuật toán nén tùy thuộc vào loại tệp. </p>
+</li>
+<li><strong>Giải quyết xung đột:</strong><br/>
+   - Phiên bản được xử lý đầu tiên sẽ thắng.<br/>
+   - Các phiên bản xung đột được lưu riêng để người dùng giải quyết.</li>
+</ol>
+<figure class="sd-figure"><img alt="File Synce " loading="lazy" src="assets/content/system-design/images/ch15/file-sync.png"/></figure>
+<hr/>
+<h3>Luồng tải xuống tệp</h3>
+<p>Luồng tải xuống được kích hoạt khi tệp được thêm hoặc chỉnh sửa ở nơi khác. Có hai cách để client có thể biết:<br/>
+- Nếu client A online trong khi file bị client khác thay đổi, Notification Service sẽ thông báo cho client A.<br/>
+- Nếu Client A ngoại tuyến trong khi tệp được Client khác thay đổi, dữ liệu sẽ được lưu vào cache. Khi Client ngoại tuyến trực tuyến trở lại, nó sẽ lấy những thay đổi mới nhất.</p>
+<p>Khi client biết tệp bị thay đổi, trước tiên, client sẽ yêu cầu metadata thông qua API server, sau đó<br/>
+tải xuống các khối để xây dựng tập tin.</p>
+<ol>
+<li><strong>Long polling:</strong> Notification Service notify client về các cập nhật tập tin.</li>
+<li><strong>Fetch metadata:</strong> Client fetch metadata đã cập nhật thông qua API.</li>
+<li><strong>Block download:</strong> Client tải xuống các khối được cập nhật từ máy chủ khối và xây dựng lại tệp.</li>
+</ol>
+<figure class="sd-figure"><img alt="Upload Flow " loading="lazy" src="assets/content/system-design/images/ch15/download-flow.png"/></figure>
+<hr/>
+<h3>Notification Service</h3>
+<ol>
+<li><strong>Mục đích:</strong> Luôn cập nhật cho client về những thay đổi của tập tin.</li>
+<li><strong>Cơ chế:</strong> thực hiện <strong>long polling</strong> cho các thông báo không đồng bộ.</li>
+<li><strong>Ví dụ:</strong> Khi một tệp được thêm, chỉnh sửa hoặc xóa, thông báo sẽ được gửi đến tất cả các client có liên quan.</li>
+</ol>
+<hr/>
+<h3>Tối ưu hóa lưu trữ</h3>
+<ol>
+<li><strong>Khử trùng lặp:</strong> Loại bỏ các khối trùng lặp ở cấp tài khoản bằng cách sử dụng so sánh dựa trên hàm băm.</li>
+<li><strong>Chiến lược phiên bản:</strong><br/>
+   - Giới hạn số lượng bản sửa đổi được lưu.<br/>
+   - Ưu tiên các phiên bản mới nhất cho các tập tin được chỉnh sửa thường xuyên.</li>
+<li><strong>cold storage:</strong> Di chuyển các tệp hiếm khi được truy cập sang giải pháp lưu trữ rẻ hơn (ví dụ: Amazon S3 Glacier).</li>
+</ol>
+<hr/>
+<h3>Xử lý lỗi</h3>
+<ol>
+<li><strong>Lỗi load balancer:</strong> Bộ load balancer thứ cấp sẽ hoạt động.</li>
+<li><strong>Lỗi máy chủ chặn:</strong> Các tác vụ đang chờ xử lý sẽ được gán lại cho các máy chủ khác.</li>
+<li><strong>Lỗi metadata database:</strong><br/>
+   - Nâng cấp nút nô lệ lên nút chủ.<br/>
+   - Chuyển hướng lưu lượng truy cập đến các replica còn lại.</li>
+<li><strong>Lỗi lưu trữ đám mây:</strong> Dùng replica cross-region để fetch các tệp không có sẵn.</li>
+<li><strong>Lỗi Notification Service:</strong> client kết nối lại với các máy chủ thay thế.</li>
+</ol>
+

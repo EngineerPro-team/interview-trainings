@@ -1,0 +1,119 @@
+<h2>Giới thiệu</h2>
+<p>Các cuộc phỏng vấn thiết kế hệ thống là một phần quan trọng của quá trình tuyển dụng, mô phỏng các tình huống giải quyết vấn đề thực tế. Những cuộc phỏng vấn này đánh giá không chỉ các kỹ năng kỹ thuật mà còn cả sự hợp tác, giao tiếp và khả năng xử lý các yêu cầu mơ hồ.</p>
+<p>Chương này giới thiệu <strong>khuôn khổ 4 bước</strong> để điều hướng các cuộc phỏng vấn thiết kế hệ thống một cách hiệu quả.</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<h3>Mục tiêu chính</h3>
+<ul>
+<li>Làm rõ các yêu cầu và giả định.</li>
+<li>Tránh nhảy vào giải pháp quá sớm.</li>
+<li>Thể hiện tư duy phản biện bằng cách đặt những câu hỏi hay.</li>
+</ul>
+<h3>Tiếp cận</h3>
+<ul>
+<li><strong>Đặt câu hỏi làm rõ:</strong></li>
+<li>Các tính năng quan trọng nhất là gì?</li>
+<li>Hệ thống cần xử lý quy mô nào?</li>
+<li>Chúng ta đang xây dựng cho web, thiết bị di động hay cả hai?</li>
+<li>
+<p>Có công nghệ hoặc hạn chế hiện có không?</p>
+</li>
+<li>
+<p><strong>Giả định về tài liệu:</strong> Viết các giả định lên bảng trắng hoặc giấy để tham khảo.</p>
+</li>
+</ul>
+<h3>Ví dụ</h3>
+<p><strong>Vấn đề:</strong> Thiết kế hệ thống cung cấp tin tức.<br/>
+<strong>Câu hỏi:</strong><br/>
+- Đây là ứng dụng dành cho thiết bị di động, ứng dụng web hay cả hai?<br/>
+- Một người dùng có thể có bao nhiêu người bạn?<br/>
+- news feed có nên bao gồm hình ảnh và video không?<br/>
+- news feed có được sắp xếp theo trình tự thời gian đảo ngược không?</p>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<h3>Mục tiêu chính</h3>
+<ul>
+<li>Phát triển kiến trúc cấp cao.</li>
+<li>Phối hợp với người phỏng vấn để hoàn thiện thiết kế.</li>
+</ul>
+<h3>Tiếp cận</h3>
+<ul>
+<li><strong>Soạn thảo bản thiết kế:</strong></li>
+<li>Sử dụng sơ đồ hộp cho các thành phần chính (ví dụ: ứng dụng khách, API, database, cache, CDN).</li>
+<li>
+<p>Hãy coi người phỏng vấn như một người đồng đội để tinh chỉnh thiết kế.</p>
+</li>
+<li>
+<p><strong>Thực hiện các phép tính sau phong bì:</strong></p>
+</li>
+<li>
+<p>Đảm bảo thiết kế có thể xử lý các hạn chế về quy mô.</p>
+</li>
+<li>
+<p><strong>Đi qua các trường hợp sử dụng:</strong> Xác định các trường hợp khó khăn và xác nhận các giả định thiết kế.</p>
+</li>
+</ul>
+<h3>Ví dụ</h3>
+<p>Đối với hệ thống news feed, hãy chia thiết kế thành:<br/>
+1. <strong>Feed publishing flow:</strong> Viết bài đăng vào database và điền vào news feed của friends.<br/>
+2. <strong>News feed retrieval flow:</strong> Tổng hợp và hiển thị bài viết của friends theo trình tự thời gian đảo ngược.</p>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<h3>Mục tiêu chính</h3>
+<ul>
+<li>Đi sâu vào các thành phần quan trọng.</li>
+<li>Thể hiện sự hiểu biết sâu sắc và khả năng thích ứng.</li>
+</ul>
+<h3>Tiếp cận</h3>
+<ul>
+<li><strong>Ưu tiên các thành phần chính:</strong> Tập trung vào các lĩnh vực có liên quan nhất đến vấn đề.</li>
+<li><strong>Thảo luận về nút thắt cổ chai:</strong> Xác định các vấn đề hiệu suất tiềm ẩn và đề xuất giải pháp.</li>
+<li><strong>Chi tiết số dư:</strong> Tránh sử dụng kỹ thuật quá mức hoặc lặn sâu không cần thiết.</li>
+</ul>
+<h3>Chủ đề ví dụ</h3>
+<ul>
+<li><strong>Trình rút ngắn URL:</strong> Tập trung vào thiết kế hàm băm.</li>
+<li><strong>Hệ thống trò chuyện:</strong> Khám phá khả năng giảm độ trễ và xử lý trạng thái trực tuyến/ngoại tuyến.</li>
+<li><strong>News feed system:</strong> Kiểm tra feed publishing và news feed retrieval.</li>
+</ul>
+<hr/>
+<h2>Bước 4: Tóm tắt</h2>
+<h3>Mục tiêu chính</h3>
+<ul>
+<li>Làm nổi bật các lĩnh vực cần cải thiện.</li>
+<li>Tóm tắt lại thiết kế và thảo luận các bước tiếp theo.</li>
+</ul>
+<h3>Tiếp cận</h3>
+<ul>
+<li><strong>Xác định điểm nghẽn:</strong> Thảo luận về những hạn chế tiềm ẩn và chiến lược mở rộng quy mô.</li>
+<li><strong>Tóm tắt thiết kế:</strong> Tóm tắt các quyết định thiết kế chính và sự đánh đổi.</li>
+<li><strong>Đề xuất cải tiến:</strong></li>
+<li>Cách mở rộng quy mô từ 1 triệu đến 10 triệu người dùng.</li>
+<li>Xử lý lỗi đối với lỗi máy chủ hoặc sự cố mạng.</li>
+</ul>
+<hr/>
+<h2>Thực tiễn tốt nhất</h2>
+<h3>Việc nên làm</h3>
+<ul>
+<li><strong>Đặt câu hỏi:</strong> Làm rõ những điểm mơ hồ trước khi đi sâu vào giải pháp.</li>
+<li><strong>Giao tiếp:</strong> Chia sẻ quá trình suy nghĩ của bạn với người phỏng vấn.</li>
+<li><strong>Lặp lại với người phỏng vấn:</strong> Hãy đối xử với họ như một cộng tác viên.</li>
+<li><strong>Thể hiện tính linh hoạt:</strong> Đề xuất các phương pháp thay thế và tinh chỉnh thiết kế của bạn.</li>
+<li><strong>Tập trung vào các thành phần quan trọng:</strong> Ưu tiên các phần quan trọng của hệ thống.</li>
+</ul>
+<h3>Không nên</h3>
+<ul>
+<li><strong>Tránh các giải pháp sớm:</strong> Đừng thiết kế trước khi hiểu được yêu cầu.</li>
+<li><strong>Đừng im lặng:</strong> Trao đổi thường xuyên trong suốt quá trình.</li>
+<li><strong>Tránh sử dụng kỹ thuật quá mức:</strong> Tập trung vào các giải pháp thiết thực, có thể mở rộng.</li>
+</ul>
+<hr/>
+<h2>Quản lý thời gian</h2>
+<h3>Phân bổ thời gian đề xuất (cho các cuộc phỏng vấn 45 phút):</h3>
+<ol>
+<li><strong>Hiểu vấn đề và phạm vi:</strong> 3–10 phút</li>
+<li><strong>Thiết kế cấp cao và mua vào:</strong> 10–15 phút</li>
+<li><strong>Lặn sâu:</strong> 10–25 phút</li>
+<li><strong>Tóm tắt:</strong> 3–5 phút</li>
+</ol>
+

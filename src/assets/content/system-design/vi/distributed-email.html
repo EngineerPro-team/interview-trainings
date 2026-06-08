@@ -1,0 +1,235 @@
+<h2>Giới thiệu</h2>
+<p>Chúng tôi sẽ thiết kế <strong>dịch vụ email phân tán</strong>, tương tự như <strong>Gmail</strong> trong chương này.</p>
+<p>Vào năm 2020, <strong>Gmail</strong> có 1,8 tỷ người dùng hoạt động, trong khi <strong>Triển vọng</strong> có 400 triệu người dùng trên toàn thế giới.</p>
+<hr/>
+<h2>Bước 1: Hiểu vấn đề và thiết lập phạm vi thiết kế</h2>
+<ul>
+<li>C: Có bao nhiêu người dùng sử dụng hệ thống?</li>
+<li>I: 1 tỷ người dùng</li>
+<li>C: Tôi nghĩ các tính năng sau rất quan trọng - xác thực, gửi/nhận email, fetch email, lọc email, tìm kiếm email, bảo vệ chống thư rác.</li>
+<li>I: Danh sách tốt. Đừng lo lắng về auth bây giờ.</li>
+<li>C: Người dùng kết nối mail server bằng cách nào?</li>
+<li>I: Thông thường, các ứng dụng email kết nối qua SMTP, POP, IMAP, nhưng chúng tôi sẽ sử dụng HTTP cho vấn đề này.</li>
+<li>C: Email có thể có tệp đính kèm không?</li>
+<li>I: Vâng</li>
+</ul>
+<h3><strong>Yêu cầu phi chức năng</strong></h3>
+<ul>
+<li><strong>Độ tin cậy</strong> - chúng ta không nên mất dữ liệu</li>
+<li><strong>sẵn có</strong> - Chúng ta nên sử dụng tính năng nhân rộng để ngăn chặn các single point of failure. Chúng ta cũng nên chấp nhận những lỗi hệ thống một phần.</li>
+<li><strong>Khả năng mở rộng</strong> - Khi lượng người dùng phát triển, hệ thống của chúng tôi sẽ có thể xử lý chúng.</li>
+<li><strong>Tính linh hoạt và khả năng mở rộng</strong> - Hệ thống phải linh hoạt và dễ dàng mở rộng với các tính năng mới. Một trong những lý do chúng tôi chọn HTTP thay vì SMTP/các giao thức thư khác.</li>
+</ul>
+<h3><strong>Ước tính back-of-the-envelope</strong></h3>
+<ul>
+<li><strong>1 tỷ người dùng</strong></li>
+<li>Giả sử một người gửi 10 email mỗi ngày -&gt; <strong>100k email mỗi giây</strong>.</li>
+<li>Giả sử một người nhận được 40 email mỗi ngày và trung bình mỗi email có metadata 50kb -&gt; <strong>Dung lượng lưu trữ 730pb mỗi năm</strong>.</li>
+<li>Giả sử 20% email có tệp đính kèm lưu trữ và kích thước trung bình là 500kb -&gt; <strong>1.460pb mỗi năm</strong>.</li>
+</ul>
+<hr/>
+<h2>Bước 2: Propose high-level design và thu được buy-in</h2>
+<h3><strong>Kiến thức email 101</strong></h3>
+<p>Có nhiều giao thức khác nhau được sử dụng để gửi và nhận email:<br/>
+- <strong>SMTP</strong> - giao thức chuẩn để gửi email từ máy chủ này sang máy chủ khác.<br/>
+- <strong>POP3</strong> - giao thức chuẩn để nhận và tải email từ mail server từ xa về Client cục bộ. Sau khi được truy xuất, email sẽ bị xóa khỏi máy chủ từ xa.<br/>
+- <strong>IMAP</strong> - tương tự như POP, nó được sử dụng để nhận và tải email từ máy chủ từ xa, nhưng nó giữ email ở phía máy chủ.<br/>
+- <strong>HTTPS</strong> - về mặt kỹ thuật không phải là một giao thức email, nhưng nó có thể được sử dụng cho các ứng dụng email khách dựa trên web.</p>
+<p>Ngoài giao thức gửi thư, còn có một số bản ghi DNS mà chúng ta cần định cấu hình cho mail server của mình - bản ghi MX:</p>
+<figure class="sd-figure"><img alt="dns-lookup" loading="lazy" src="assets/content/system-design/images/ch23/dns-lookup.png"/></figure>
+<p>Tệp đính kèm email được gửi được mã hóa base64 và thường có giới hạn kích thước là 25mb trên hầu hết các dịch vụ thư.<br/>
+Đây là cấu hình và thay đổi từ tài khoản cá nhân đến tài khoản công ty.</p>
+<h3><strong>mail server truyền thống</strong></h3>
+<p>mail server truyền thống hoạt động tốt khi có số lượng người dùng hạn chế, được kết nối với một máy chủ duy nhất.</p>
+<figure class="sd-figure"><img alt="traditional-mail-server" loading="lazy" src="assets/content/system-design/images/ch23/traditional-mail-server.png"/></figure>
+<ul>
+<li>Alice đăng nhập vào email Outlook của mình và nhấn "gửi". Email được gửi đến mail server Outlook. Giao tiếp được thực hiện thông qua SMTP.</li>
+<li>Máy chủ Outlook truy vấn DNS để tìm bản ghi MX cho gmail.com và chuyển email đến máy chủ của họ. Giao tiếp được thực hiện thông qua SMTP.</li>
+<li>Bob fetch email từ máy chủ gmail của mình qua IMAP/POP.</li>
+</ul>
+<p>Trong các mail server truyền thống, email được lưu trữ trên hệ thống tệp cục bộ. Mỗi email là một tập tin riêng biệt.</p>
+<figure class="sd-figure"><img alt="local-dir-storage" loading="lazy" src="assets/content/system-design/images/ch23/local-dir-storage.png"/></figure>
+<p>Khi quy mô ngày càng tăng, I/O đĩa trở thành nút thắt cổ chai. Ngoài ra, nó không đáp ứng các yêu cầu về độ sẵn sàng và độ tin cậy cao của chúng tôi.<br/>
+Đĩa có thể bị hỏng và máy chủ có thể ngừng hoạt động.</p>
+<h3><strong>mail server phân tán</strong></h3>
+<p>mail server phân tán được thiết kế để hỗ trợ các trường hợp sử dụng hiện đại và giải quyết các vấn đề về khả năng mở rộng hiện đại.</p>
+<p>Các máy chủ này vẫn có thể hỗ trợ IMAP/POP cho ứng dụng email gốc và SMTP để trao đổi thư giữa các máy chủ.</p>
+<p>Nhưng đối với các ứng dụng thư khách dựa trên web phong phú, API RESTful qua HTTP thường được sử dụng.</p>
+<p>API ví dụ:<br/>
+- <code>POST /v1/messages</code> - gửi tin nhắn đến người nhận trong các tiêu đề To, Cc, Bcc.<br/>
+- <code>GET /v1/folders</code> - trả về tất cả các thư mục của tài khoản email</p>
+<p>Sample response:</p>
+<pre><code>[{id: string        Unique folder identifier.
+  name: string      Name of the folder.
+                    According to RFC6154 [9], the default folders can be one of
+                    the following: All, Archive, Drafts, Flagged, Junk, Sent,
+                    and Trash.
+  user_id: string   Reference to the account owner
+}]
+</code></pre>
+<ul>
+<li><code>GET /v1/folders/{:folder_id}/messages</code> - trả về tất cả thư trong một thư mục kèm phân trang</li>
+<li><code>GET /v1/messages/{:message_id}</code> - nhận được tất cả thông tin về một tin nhắn cụ thể</li>
+</ul>
+<p>Sample response:</p>
+<pre><code>{
+  user_id: string                      // Reference to the account owner.
+  from: {name: string, email: string}  // &lt;name, email&gt; pair of the sender.
+  to: [{name: string, email: string}]  // A list of &lt;name, email&gt; paris
+  subject: string                      // Subject of an email
+  body: string                         //  Message body
+  is_read: boolean                     //  Indicate if a message is read or not.
+}
+</code></pre>
+<p>Đây là thiết kế cấp cao của mail server phân tán:</p>
+<figure class="sd-figure"><img alt="high-level-architecture" loading="lazy" src="assets/content/system-design/images/ch23/high-level-architecture.png"/></figure>
+<ul>
+<li><strong>Thư điện tử</strong> - người dùng sử dụng trình duyệt web để gửi/nhận email</li>
+<li><strong>web server</strong> - dịch vụ yêu cầu/phản hồi công khai được sử dụng để quản lý thông tin đăng nhập, đăng ký, hồ sơ người dùng, v.v.</li>
+<li><strong>realtime server</strong> - Được sử dụng để đẩy các cập nhật email mới tới khách hàng trong thời gian thực. Chúng tôi sử dụng websockets để liên lạc theo thời gian thực nhưng dự phòng long polling cho các trình duyệt cũ không hỗ trợ chúng.</li>
+<li><strong>metadata database</strong> - metadata storage email như chủ đề, nội dung, từ, đến, v.v.</li>
+<li><strong>Attachment store</strong> - object store (ví dụ Amazon S3), thích hợp để lưu trữ các file có dung lượng lớn.</li>
+<li><strong>Cache phân phối</strong> - Chúng tôi có thể lưu vào cache các email gần đây trong Redis để cải thiện UX.</li>
+<li><strong>Search store</strong> - kho tài liệu phân tán, được sử dụng để hỗ trợ tìm kiếm toàn văn.</li>
+</ul>
+<p>Đây là quy trình gửi email trông như thế nào:</p>
+<figure class="sd-figure"><img alt="email-sending-flow" loading="lazy" src="assets/content/system-design/images/ch23/email-sending-flow.png"/></figure>
+<ul>
+<li>Người dùng viết email và nhấn "gửi". Email được gửi tới bộ load balancer.</li>
+<li>Load balancer rate limiter số lượng thư gửi và định tuyến quá mức đến một trong các web server.</li>
+<li>web server thực hiện xác thực email cơ bản (ví dụ: kích thước email) và đoản mạch luồng gửi đi nếu miền giống với người gửi. Nhưng trước tiên hãy kiểm tra thư rác.</li>
+<li>Nếu xác thực cơ bản vượt qua, email sẽ được gửi đến message queue (tệp đính kèm được tham chiếu từ object store)</li>
+<li>Nếu xác thực cơ bản không thành công, email sẽ được gửi đến error queue</li>
+<li>outbound SMTP worker của SMTP lấy thư từ outbound queue, kiểm tra thư rác/vi rút và định tuyến đến mail server đích.</li>
+<li>Email được lưu trữ trong thư mục "Email đã gửi"</li>
+</ul>
+<p>Chúng ta cũng cần theo dõi kích thước của message queue gửi đi. Phát triển quá lớn có thể chỉ ra một vấn đề:<br/>
+- mail server của người nhận không khả dụng. Chúng tôi có thể thử gửi lại email sau bằng cách sử dụng thời gian chờ theo cấp số nhân.<br/>
+- Không có đủ consumer để xử lý tải, chúng tôi có thể phải mở rộng quy mô consumer.</p>
+<p>Đây là quy trình nhận email:</p>
+<figure class="sd-figure"><img alt="email-receiving-flow" loading="lazy" src="assets/content/system-design/images/ch23/email-receiving-flkow.png"/></figure>
+<ul>
+<li>Các email đến sẽ đến bộ load balancer SMTP. Thư được phân phối đến máy chủ SMTP, nơi thực hiện chính sách chấp nhận thư (ví dụ: các email không hợp lệ sẽ bị loại bỏ trực tiếp).</li>
+<li>Nếu tệp đính kèm email quá lớn, chúng ta có thể đưa nó vào object store (s3).</li>
+<li>mail worker thực hiện kiểm tra sơ bộ, sau đó thư được forward tới object store, cache, object store và realtime server.</li>
+<li>Người dùng ngoại tuyến sẽ nhận được email mới sau khi họ trực tuyến trở lại thông qua API HTTP.</li>
+</ul>
+<hr/>
+<h2>Bước 3: Thiết kế Deep Dive</h2>
+<p>Bây giờ chúng ta hãy đi sâu hơn vào một số thành phần.</p>
+<h3><strong>metadata database</strong></h3>
+<p>Dưới đây là một số đặc điểm của metadata email:<br/>
+- tiêu đề thường nhỏ và được truy cập thường xuyên<br/>
+- Kích thước cơ thể dao động từ nhỏ đến lớn, nhưng thường được đọc một lần<br/>
+- Hầu hết các hoạt động thư được tách biệt với một người dùng - ví dụ: fetch email, đánh dấu là đã đọc, tìm kiếm.<br/>
+- Dữ liệu gần đây ảnh hưởng đến việc sử dụng dữ liệu. Người dùng thường chỉ đọc những email gần đây<br/>
+- Dữ liệu có yêu cầu độ tin cậy cao. Mất dữ liệu là không thể chấp nhận được.</p>
+<p>Ở quy mô gmail/outlook, database thường được tùy chỉnh để giảm các hoạt động input/output mỗi giây (IOPS).</p>
+<p>Hãy xem xét những tùy chọn database chúng ta có:<br/>
+- <strong>database quan hệ</strong> - chúng tôi có thể xây dựng chỉ mục cho tiêu đề và nội dung, nhưng những database này thường được tối ưu hóa cho các khối dữ liệu nhỏ.<br/>
+- <strong>object store phân tán</strong> - đây có thể là một lựa chọn tốt để lưu trữ backup copy, nhưng không thể hỗ trợ hiệu quả việc tìm kiếm/đánh dấu là đã đọc/v.v.<br/>
+- <strong>NoSQL</strong> - Google BigTable được gmail sử dụng nhưng không có nguồn mở.</p>
+<p>Dựa trên phân tích trên, rất ít giải pháp hiện tại có vẻ phù hợp hoàn hảo với nhu cầu của chúng tôi.<br/>
+Trong bối cảnh phỏng vấn, việc thiết kế một giải pháp database phân tán mới là không khả thi, nhưng điều quan trọng cần đề cập đến là các đặc điểm:<br/>
+- Một cột có thể là MB một chữ số<br/>
+- Tính nhất quán dữ liệu mạnh mẽ<br/>
+- Được thiết kế để giảm I/O đĩa<br/>
+- Tính sẵn sàng cao và khả năng chịu lỗi cao<br/>
+- Nên dễ dàng tạo backup copy gia tăng</p>
+<p>Để partition dữ liệu, chúng ta có thể sử dụng <code>user_id</code> làm khóa partition, để dữ liệu của một người dùng được lưu trữ trên một phân đoạn duy nhất.<br/>
+Điều này cấm chúng tôi chia sẻ email với nhiều người dùng, nhưng đây không phải là yêu cầu bắt buộc đối với cuộc phỏng vấn này.</p>
+<p>Hãy xác định các bảng:<br/>
+- Khóa chính bao gồm khóa partition (phân phối dữ liệu) và khóa phân cụm (sắp xếp dữ liệu)<br/>
+- Truy vấn chúng tôi cần hỗ trợ - lấy tất cả thư mục cho người dùng, hiển thị tất cả email cho một thư mục, tạo/nhận/xóa email, fetch email đã đọc/chưa đọc, nhận chuỗi hội thoại (phần thưởng)</p>
+<p>Chú giải cho các bảng theo sau:</p>
+<figure class="sd-figure"><img alt="legend" loading="lazy" src="assets/content/system-design/images/ch23/legend.png"/></figure>
+<p>Đây là bảng thư mục:</p>
+<figure class="sd-figure"><img alt="folders-table" loading="lazy" src="assets/content/system-design/images/ch23/folders-table.png"/></figure>
+<p>bảng email:</p>
+<figure class="sd-figure"><img alt="emails-table" loading="lazy" src="assets/content/system-design/images/ch23/emails-table.png"/></figure>
+<ul>
+<li>email_id là timeuuid cho phép sắp xếp dựa trên dấu thời gian khi email được tạo</li>
+</ul>
+<p>Các tệp đính kèm được lưu trữ trong một bảng riêng biệt, được xác định theo tên tệp:</p>
+<figure class="sd-figure"><img alt="attachments" loading="lazy" src="assets/content/system-design/images/ch23/attachments.png"/></figure>
+<p>Việc hỗ trợ fetch các email đã đọc/chưa đọc là điều dễ dàng trong database quan hệ truyền thống, nhưng trong Cassandra thì không, vì việc lọc theo khóa không partition/phân cụm bị cấm.<br/>
+Một cách giải quyết khác là fetch tất cả email trong một thư mục và lọc trong bộ nhớ, nhưng cách đó không hiệu quả đối với một ứng dụng đủ lớn.</p>
+<p>Những gì chúng ta có thể làm là không chuẩn hóa bảng email thành các bảng email đã đọc/chưa đọc:</p>
+<figure class="sd-figure"><img alt="read-unread-emails" loading="lazy" src="assets/content/system-design/images/ch23/read-unread-emails.png"/></figure>
+<p>Để hỗ trợ các chuỗi hội thoại, chúng tôi có thể bao gồm một số tiêu đề mà ứng dụng thư khách diễn giải và sử dụng để xây dựng lại chuỗi hội thoại:</p>
+<pre><code>{
+  "headers" {
+     "Message-Id": "&lt;7BA04B2A-430C-4D12-8B57-862103C34501@gmail.com&gt;",
+     "In-Reply-To": "&lt;CAEWTXuPfN=LzECjDJtgY9Vu03kgFvJnJUSHTt6TW@gmail.com&gt;",
+     "References": ["&lt;7BA04B2A-430C-4D12-8B57-862103C34501@gmail.com&gt;"]
+  }
+}
+</code></pre>
+<p>Cuối cùng, chúng ta sẽ đánh đổi tính khả dụng để lấy tính nhất quán cho database phân tán của mình, vì đây là một yêu cầu khó khăn cho vấn đề này.</p>
+<p>Do đó, trong trường hợp chuyển đổi dự phòng hoặc network partition, các hành động sync/cập nhật sẽ không khả dụng trong thời gian ngắn đối với người dùng bị ảnh hưởng.</p>
+<h3><strong>Khả năng gửi email</strong></h3>
+<p>Thật dễ dàng để thiết lập một máy chủ để gửi email, nhưng việc gửi email đến hộp thư đến của người nhận rất khó do các thuật toán chống thư rác.</p>
+<p>Nếu chúng ta chỉ thiết lập một mail server mới và bắt đầu gửi thư qua đó, email của chúng ta có thể sẽ nằm trong thư mục thư rác.</p>
+<p>Đây là những gì chúng ta có thể làm để ngăn chặn điều đó:<br/>
+- <strong>IP chuyên dụng</strong> - sử dụng IP chuyên dụng để gửi email, nếu không, máy chủ người nhận sẽ không tin tưởng bạn.<br/>
+- <strong>Phân loại email</strong> - tránh gửi email tiếp thị từ cùng một máy chủ để ngăn những email quan trọng hơn bị phân loại là thư rác<br/>
+- <strong>Làm nóng địa chỉ IP của bạn</strong> dần dần tạo dựng được danh tiếng tốt với các nhà cung cấp email lớn. Phải mất từ ​​2 đến 6 tuần để khởi động một IP mới<br/>
+- <strong>Cấm người gửi thư rác</strong> nhanh chóng để không làm xấu đi danh tiếng của bạn<br/>
+- <strong>Xử lý phản hồi</strong> - thiết lập vòng phản hồi với ISP để theo dõi tỷ lệ khiếu nại và cấm tài khoản spam một cách nhanh chóng.<br/>
+- <strong>Xác thực email</strong> - sử dụng các kỹ thuật phổ biến để chống lừa đảo như Khung chính sách người gửi, Thư được xác định bằng khóa miền, v.v.</p>
+<p>Bạn không cần phải nhớ tất cả những điều này. Chỉ biết rằng việc xây dựng một mail server tốt đòi hỏi rất nhiều kiến thức về domain.</p>
+<h3><strong>Tìm kiếm</strong></h3>
+<p>Tìm kiếm bao gồm thực hiện tìm kiếm toàn văn bản dựa trên nội dung email hoặc các truy vấn nâng cao hơn dựa trên các bộ lọc từ, to, subject, unread, v.v.</p>
+<p>Một đặc điểm của tìm kiếm email là nó mang tính cục bộ đối với người dùng và nó có nhiều lượt ghi hơn là đọc, bởi vì chúng tôi cần lập chỉ mục lại nó trong mỗi thao tác nhưng người dùng hiếm khi sử dụng tab tìm kiếm.</p>
+<p>Hãy so sánh tìm kiếm google với tìm kiếm email:</p>
+<table class="sd-table">
+<thead>
+<tr>
+<th></th>
+<th>Phạm vi</th>
+<th>Sắp xếp</th>
+<th>Sự chính xác</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tìm kiếm của Google</td>
+<td>Toàn bộ mạng</td>
+<td>Sắp xếp theo mức độ liên quan</td>
+<td>Lập chỉ mục mất một thời gian, do đó không có kết quả ngay lập tức.</td>
+</tr>
+<tr>
+<td>Tìm kiếm email</td>
+<td>Hộp thư điện tử riêng của người dùng</td>
+<td>Sắp xếp theo thuộc tính, ví dụ: thời gian, ngày tháng, v.v.</td>
+<td>Lập chỉ mục phải nhanh chóng và kết quả chính xác.</td>
+</tr>
+</tbody>
+</table>
+<p>Để đạt được chức năng tìm kiếm này, một tùy chọn là sử dụng cụm Elasticsearch. Chúng ta có thể sử dụng <code>user_id</code> làm khóa partition để nhóm dữ liệu trong cùng một nút:</p>
+<figure class="sd-figure"><img alt="elasticsearch" loading="lazy" src="assets/content/system-design/images/ch23/elasticsearch.png"/></figure>
+<p>Các hoạt động đột biến không đồng bộ thông qua Kafka để tách các dịch vụ khỏi luồng lập chỉ mục lại.<br/>
+Trên thực tế việc tìm kiếm dữ liệu diễn ra đồng bộ.</p>
+<p>Elasticsearch là một trong những database công cụ tìm kiếm phổ biến nhất và hỗ trợ tìm kiếm toàn văn cho email rất tốt.</p>
+<p>Ngoài ra, chúng tôi có thể cố gắng phát triển giải pháp tìm kiếm tùy chỉnh của riêng mình để đáp ứng các yêu cầu cụ thể của chúng tôi.</p>
+<p>Việc thiết kế một hệ thống như vậy nằm ngoài phạm vi. Một trong những thách thức cốt lõi khi xây dựng nó là tối ưu hóa nó cho khối lượng công việc ghi nhiều.</p>
+<p>Để đạt được điều đó, chúng ta có thể sử dụng Cây hợp nhất có cấu trúc nhật ký (LSM) để cấu trúc dữ liệu chỉ mục trên đĩa. Đường dẫn ghi chỉ được tối ưu hóa cho việc ghi tuần tự.<br/>
+Kỹ thuật này được sử dụng trong Cassandra, BigTable và RocksDB.</p>
+<p>Ý tưởng cốt lõi của nó là lưu trữ dữ liệu trong bộ nhớ cho đến khi đạt đến ngưỡng xác định trước, sau đó nó được hợp nhất vào lớp (đĩa) tiếp theo:</p>
+<figure class="sd-figure"><img alt="lsm-tree" loading="lazy" src="assets/content/system-design/images/ch23/lsm-tree.png"/></figure>
+<p>Sự đánh đổi chính giữa hai phương pháp:<br/>
+- Elasticsearch mở rộng quy mô ở một mức độ nào đó, trong khi công cụ tìm kiếm tùy chỉnh có thể được tinh chỉnh cho phù hợp với trường hợp sử dụng email, cho phép nó mở rộng quy mô hơn nữa.<br/>
+- Elasticsearch là một dịch vụ riêng biệt mà chúng tôi cần duy trì cùng với Metadata store. Một giải pháp tùy chỉnh có thể là chính kho dữ liệu.<br/>
+- Elasticsearch là một giải pháp sẵn có, trong khi công cụ tìm kiếm tùy chỉnh sẽ đòi hỏi nỗ lực kỹ thuật đáng kể để xây dựng.</p>
+<h3><strong>Khả năng mở rộng và tính sẵn có</strong></h3>
+<p>Vì hoạt động của từng người dùng không xung đột với những người dùng khác nên hầu hết các thành phần đều có thể được điều chỉnh tỷ lệ một cách độc lập.</p>
+<p>Để đảm bảo tính sẵn sàng cao, chúng tôi cũng có thể sử dụng thiết lập nhiều DC với tính năng chuyển đổi dự phòng leader-follower trong trường hợp xảy ra lỗi:</p>
+<figure class="sd-figure"><img alt="multi-dc-example" loading="lazy" src="assets/content/system-design/images/ch23/multi-dc-example.png"/></figure>
+<hr/>
+<h2>Bước 4: Kết thúc</h2>
+<p>Điểm nói chuyện bổ sung:<br/>
+- <strong>Khả năng chịu lỗi</strong> - Nhiều bộ phận của hệ thống có thể bị lỗi. Việc chúng tôi xử lý các lỗi nút là điều đáng giá.<br/>
+- <strong>Sự tuân thủ</strong> - PII cần được lưu trữ một cách hợp lý, theo luật GDPR của Châu Âu.<br/>
+- <strong>Bảo vệ</strong> - mã hóa email, bảo vệ lừa đảo, duyệt web an toàn, v.v.<br/>
+- <strong>Tối ưu hóa</strong> - ví dụ như ngăn chặn sự trùng lặp của các tệp đính kèm giống nhau, được gửi nhiều lần bởi những người dùng khác nhau.</p>
+
