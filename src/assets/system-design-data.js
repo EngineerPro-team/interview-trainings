@@ -1,21 +1,21 @@
 // System Design notes manifest — chapter bodies lazy-loaded from
 // assets/content/system-design/{vi|en}/<slug>.html
-// AUTO-GEN: scripts/build_system_design.py + translate/review scripts
+// Original EngineerPro content (v2). Hand-maintained.
 window.SYSTEM_DESIGN = {
   title: "System Design Notes",
   titleEn: "System Design Notes",
   intro:
-    "23 case study kinh điển — đọc trực tuyến, mỗi chương tải khi cần. Chỉ mang tính tham khảo; để rèn kỹ năng trình bày và đáp ứng chuẩn tuyển dụng theo level, xem khóa học và mock bên dưới.",
+    "21 case study System Design gốc — biên soạn bởi EngineerPro, đọc trực tuyến, mỗi chương tải khi cần. Chỉ mang tính tham khảo; để rèn kỹ năng trình bày và đáp ứng chuẩn tuyển dụng theo level, xem khóa học và mock bên dưới.",
   introEn:
-    "23 classic case studies — read online, one chapter at a time. Reference only; for presentation practice and level-matched hiring-bar prep, see courses & mock below.",
+    "21 original System Design case studies by EngineerPro — read online, one chapter at a time. Reference only; for presentation practice and level-matched hiring-bar prep, see courses & mock below.",
   credit:
-    "Tổng hợp & dịch tiếng Việt bởi Phạm Ngọc Lâm & Lê Quang Hoà (EngineerPro).",
+    "Biên soạn gốc bởi Phạm Ngọc Lâm & Lê Quang Hoà (EngineerPro).",
   creditEn:
-    "Compiled & Vietnamese translation by Phạm Ngọc Lâm & Lê Quang Hoà (EngineerPro).",
+    "Original content by Phạm Ngọc Lâm & Lê Quang Hoà (EngineerPro).",
   attribution:
-    "Nguồn: liquidslr/system-design-notes",
+    "Nội dung & sơ đồ gốc bởi EngineerPro.",
   attributionEn:
-    "Source: liquidslr/system-design-notes",
+    "Original content & diagrams by EngineerPro.",
   authors: [
     {
       name: "Phạm Ngọc Lâm",
@@ -34,28 +34,26 @@ window.SYSTEM_DESIGN = {
     },
   ],
   chapters: [
-    { n: 1, slug: "key-value-store", title: "Thiết kế Key-Value Store", titleEn: "Design a Key-Value Store", available: true },
-    { n: 2, slug: "unique-id-generator", title: "Unique ID Generator phân tán", titleEn: "Design a Unique ID Generator in Distributed Systems", available: true },
-    { n: 3, slug: "url-shortener", title: "Thiết kế URL Shortener", titleEn: "Design a URL Shortener", available: true },
-    { n: 4, slug: "web-crawler", title: "Thiết kế Web Crawler", titleEn: "Design a Web Crawler", available: true },
-    { n: 5, slug: "notification-system", title: "Thiết kế Notification System", titleEn: "Design a Notification System", available: true },
-    { n: 6, slug: "news-feed", title: "Thiết kế News Feed", titleEn: "Design a News Feed System", available: true },
-    { n: 7, slug: "chat-system", title: "Thiết kế Chat System", titleEn: "Design a Chat System", available: true },
-    { n: 8, slug: "search-autocomplete", title: "Thiết kế Search Autocomplete", titleEn: "Design a Search Autocomplete System", available: true },
-    { n: 9, slug: "youtube", title: "Thiết kế YouTube", titleEn: "Design YouTube", available: true },
-    { n: 10, slug: "google-drive", title: "Thiết kế Google Drive", titleEn: "Design Google Drive", available: true },
-    { n: 11, slug: "proximity-service", title: "Proximity Service", titleEn: "Proximity Service", available: true },
-    { n: 12, slug: "nearby-friends", title: "Nearby Friends", titleEn: "Nearby Friends", available: true },
-    { n: 13, slug: "google-maps", title: "Thiết kế Google Maps", titleEn: "Design Google Maps", available: true },
-    { n: 14, slug: "distributed-message-queue", title: "Distributed Message Queue", titleEn: "Distributed Message Queue", available: true },
-    { n: 15, slug: "metrics-monitoring", title: "Metrics Monitoring & Alerting", titleEn: "Metrics Monitoring and Alerting System", available: true },
-    { n: 16, slug: "ad-click-aggregation", title: "Ad Click Event Aggregation", titleEn: "Ad Click Event Aggregation", available: true },
-    { n: 17, slug: "hotel-reservation", title: "Hotel Reservation System", titleEn: "Hotel Reservation System", available: true },
-    { n: 18, slug: "distributed-email", title: "Distributed Email Service", titleEn: "Distributed Email Service", available: true },
-    { n: 19, slug: "s3-object-storage", title: "S3-like Object Storage", titleEn: "S3-like Object Storage", available: true },
-    { n: 20, slug: "gaming-leaderboard", title: "Real-time Gaming Leaderboard", titleEn: "Real-time Gaming Leaderboard", available: true },
-    { n: 21, slug: "payment-system", title: "Payment System", titleEn: "Payment System", available: true },
-    { n: 22, slug: "digital-wallet", title: "Digital Wallet", titleEn: "Digital Wallet", available: true },
-    { n: 23, slug: "stock-exchange", title: "Stock Exchange", titleEn: "Stock Exchange", available: true },
+    { n: 1, slug: "redis-in-memory-store", title: "Redis (In-memory Store)", titleEn: "Redis (In-memory Store)", available: true },
+    { n: 2, slug: "cdn-system", title: "CDN", titleEn: "CDN", available: true },
+    { n: 3, slug: "blob-storage", title: "Blob Storage (S3-like)", titleEn: "Blob Storage (S3-like)", available: true },
+    { n: 4, slug: "coordination-service", title: "Coordination / Lock Service", titleEn: "Coordination / Lock Service", available: true },
+    { n: 5, slug: "distributed-job-scheduler", title: "Distributed Job Scheduler", titleEn: "Distributed Job Scheduler", available: true },
+    { n: 6, slug: "distributed-search-engine", title: "Distributed Search Engine", titleEn: "Distributed Search Engine", available: true },
+    { n: 7, slug: "observability-pipeline", title: "Observability Pipeline", titleEn: "Observability Pipeline", available: true },
+    { n: 8, slug: "llm-inference-platform", title: "LLM Inference Platform", titleEn: "LLM Inference Platform", available: true },
+    { n: 9, slug: "rag-system", title: "RAG System + Vector Search", titleEn: "RAG System + Vector Search", available: true },
+    { n: 10, slug: "agentic-ai-platform", title: "Agentic AI Orchestration", titleEn: "Agentic AI Orchestration", available: true },
+    { n: 11, slug: "ai-coding-agent", title: "AI Coding Agent Platform", titleEn: "AI Coding Agent Platform", available: true },
+    { n: 12, slug: "zoom-video-conferencing", title: "Zoom (Video Conferencing)", titleEn: "Zoom (Video Conferencing)", available: true },
+    { n: 13, slug: "telegram-chat", title: "Telegram (Chat System)", titleEn: "Telegram (Chat System)", available: true },
+    { n: 14, slug: "facebook-news-feed", title: "Facebook News Feed", titleEn: "Facebook News Feed", available: true },
+    { n: 15, slug: "google-docs-collab", title: "Google Docs (Collaborative Editing)", titleEn: "Google Docs (Collaborative Editing)", available: true },
+    { n: 16, slug: "netflix-streaming", title: "Netflix (Video Streaming)", titleEn: "Netflix (Video Streaming)", available: true },
+    { n: 17, slug: "grab-food-delivery", title: "Grab Food (Delivery)", titleEn: "Grab Food (Delivery)", available: true },
+    { n: 18, slug: "uber-ride-hailing", title: "Uber (Ride-Hailing)", titleEn: "Uber (Ride-Hailing)", available: true },
+    { n: 19, slug: "online-auction", title: "Auction System", titleEn: "Auction System", available: true },
+    { n: 20, slug: "flight-booking", title: "Flight Booking", titleEn: "Flight Booking", available: true },
+    { n: 21, slug: "stock-exchange-v2", title: "Stock Exchange", titleEn: "Stock Exchange", available: true },
   ],
 };

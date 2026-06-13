@@ -1,0 +1,200 @@
+<p>Designing a video-conferencing system like <strong>Zoom</strong> is a real-time media problem: move audio and video between many participants with sub-150ms latency. The interesting decisions are about the <strong>media transport topology</strong> (mesh vs MCU vs SFU), signaling, bandwidth adaptation, and scaling a single meeting to hundreds of participants.</p>
+
+<p>The key mental shift: this is <em>not</em> a request/response or store-and-forward system. Media is <strong>real-time UDP that is useless if late</strong> — a video frame that arrives 400ms behind is worse than dropped. So the usual tools (durable queues, retries, strong consistency) are the wrong reflexes; the design optimizes <strong>latency, bandwidth, and graceful degradation under loss</strong>, and the central question is just "who relays the packets and how many copies." Everything else (signaling, recording, chat) is a normal control-plane bolted onto that media core.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Meeting size?</strong> 1:1 and small calls can be peer-to-peer/mesh; large meetings (50-1000) force an SFU and cascading — the size target drives the whole topology.</li>
+<li><strong>Latency class?</strong> Interactive conferencing needs sub-150ms (SFU, UDP); one-to-many webinar/broadcast can tolerate seconds and use HLS/CDN instead.</li>
+<li><strong>Recording / compliance?</strong> Cloud recording, transcription, and retention add a server-side media pipeline and storage that pure relaying doesn't need.</li>
+<li><strong>E2E encryption required?</strong> True end-to-end encryption limits what the SFU and recording can do (it only forwards opaque packets) — a real product trade-off.</li>
+<li><strong>Network conditions?</strong> Mobile/lossy links make simulcast, bandwidth adaptation, and FEC/retransmission first-class, not optional.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>1:1 and <strong>group</strong> calls; join via a meeting link.</li>
+<li><strong>Screen share</strong>, in-call <strong>chat</strong>, mute / camera toggle.</li>
+<li><strong>Recording</strong> to cloud.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low latency:</strong> mouth-to-ear under ~150 ms.</li>
+<li><strong>Scale:</strong> hundreds of participants per meeting; millions of concurrent meetings.</li>
+<li><strong>Resilience</strong> to packet loss and variable bandwidth; global reach.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Bitrate:</strong> ~1-2 Mbps per HD video stream; audio ~50 Kbps.</li>
+<li><strong>Mesh blow-up:</strong> in an N-person mesh each client sends and receives N-1 streams → upload scales with N. At N=10 that is ~9× upload — infeasible on consumer links beyond a handful of people.</li>
+<li><strong>SFU offload:</strong> with an SFU each client sends <strong>1</strong> stream up and receives N-1 down. A 50-person HD meeting pushes ~50-100 Mbps down per viewer — hence simulcast + selective forwarding.</li>
+<li><strong>Server fan-out:</strong> one SFU forwarding 50 participants at ~2 Mbps handles ~50×49×... — capacity-plan by egress Gbps per SFU and shard meetings across SFUs.</li>
+</ul>
+<p><strong>Worked example.</strong> Compare a 10-person HD call (~2 Mbps/stream). In a full mesh each person uploads 9 streams = ~18 Mbps up and downloads ~18 Mbps — most home uplinks (~5-10 Mbps) simply can't, which is why mesh dies past ~4-5 people. With an <strong>SFU</strong> each client uploads exactly <strong>1</strong> stream (~2 Mbps) and downloads N-1; the cost moves to the server. Now scale the server: a 1000-person town hall where 1000 people watch but only ~5 speak — naive forwarding is 1000×~10 active streams, but with <strong>simulcast + last-N active-speaker forwarding</strong> the SFU only relays the few speakers' streams (at a resolution matched to each viewer), so egress is ~1000 viewers × ~2 Mbps ≈ 2 Gbps, which you spread across <strong>cascaded SFUs</strong> (regional edges each fanning out locally). This is why the answer to "scale a big meeting" is always selective forwarding + cascading, not a bigger box.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /meetings</code> → <code>{meeting_id, join_token}</code>.</li>
+<li><code>POST /meetings/{id}/join</code> — returns ICE servers + assigned SFU edge.</li>
+<li><strong>Signaling (WebSocket):</strong> <code>offer</code>, <code>answer</code>, <code>ice_candidate</code>, <code>publish</code>, <code>subscribe</code>, <code>mute</code>.</li>
+<li><strong>Media (WebRTC):</strong> SRTP over UDP, negotiated via the signaling channel.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Clients exchange session metadata over a <strong>signaling</strong> WebSocket, then send media over WebRTC to a regional <strong>SFU</strong> (Selective Forwarding Unit). TURN relays traverse NATs/firewalls; a recording pipeline and a chat sidecar hang off the meeting.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Participant A"] --> SIG["Signaling service (WebSocket)"]
+  B["Participant B"] --> SIG
+  SIG --> ALLOC["Allocator: pick regional SFU"]
+  A --> SFU["SFU (media server, region)"]
+  B --> SFU
+  A -.NAT traversal.-> TURN["TURN / STUN relay"]
+  TURN --> SFU
+  SFU --> REC["Recording pipeline"]
+  REC --> BLOB["Blob storage"]
+  SFU --> CHAT["Chat sidecar"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Signaling sets up the session and assigns a regional SFU; media flows over WebRTC (with TURN for NAT traversal), and recording streams to blob storage.</figcaption>
+</figure>
+
+<h2>Transport topology: mesh vs MCU vs SFU</h2>
+<ul>
+<li><strong>Mesh:</strong> every client sends to every other. No server media cost, but client upload explodes with N. Good only for 2-3 people.</li>
+<li><strong>MCU:</strong> server decodes all streams, composites one mixed stream, re-encodes per client. Cheap client bandwidth, but huge server CPU and added latency.</li>
+<li><strong>SFU:</strong> server <em>forwards</em> streams without decoding. Each client uploads once; the SFU relays to subscribers. Best balance — the modern default.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph MESH["Mesh (no server)"]
+    direction LR
+    M1["A"] --- M2["B"]
+    M2 --- M3["C"]
+    M1 --- M3
+  end
+  subgraph SFU["SFU (forward only)"]
+    direction TB
+    S["SFU"]
+    SA["A"] --> S
+    SB["B"] --> S
+    SC["C"] --> S
+    S --> SA
+    S --> SB
+    S --> SC
+  end
+</pre>
+<figcaption><strong>Figure 2.</strong> Mesh has every peer connected directly (upload grows with N); an SFU receives one upload per client and forwards selectively.</figcaption>
+</figure>
+
+<h2>Joining a meeting</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant SIG as Signaling
+  participant SFU as SFU
+  C->>SIG: join(meeting_id)
+  SIG->>C: ICE servers + SFU address
+  C->>SFU: WebRTC offer (publish my media)
+  SFU-->>C: answer
+  C->>SFU: ICE candidates (connectivity)
+  SFU-->>C: subscribe to other participants
+  Note over C,SFU: media now flows over SRTP/UDP
+</pre>
+<figcaption><strong>Figure 3.</strong> Signaling hands back ICE servers and an SFU; the client publishes its media and subscribes to others, then media flows peer-to-SFU.</figcaption>
+</figure>
+
+<h2>Simulcast and bandwidth adaptation</h2>
+<p>A publisher sends several quality <strong>layers</strong> (simulcast: e.g. high/medium/low). The SFU forwards the layer that fits each subscriber's measured bandwidth, and drops to a lower layer on congestion — so one slow viewer does not degrade everyone. This is the core trick that makes large SFU meetings work.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  PUB["Publisher sends 3 layers"] --> SFU["SFU selective forwarding"]
+  SFU -->|high layer| V1["Viewer on fast link"]
+  SFU -->|low layer| V2["Viewer on slow link"]
+  SFU -->|audio only| V3["Viewer on very poor link"]
+</pre>
+<figcaption><strong>Figure 4.</strong> Simulcast: the publisher emits multiple quality layers and the SFU forwards the one each viewer can sustain.</figcaption>
+</figure>
+
+<h2>Scaling large meetings: cascading SFUs</h2>
+<p>One SFU is bounded by egress bandwidth and CPU. For very large meetings (or globally spread participants), <strong>cascade</strong> SFUs: each region has a local SFU, and SFUs relay between each other. A participant only connects to their nearest SFU, cutting cross-region traffic to one inter-SFU link per stream.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph US["US region"]
+    SFU1["SFU US"]
+    A["A"] --> SFU1
+    B["B"] --> SFU1
+  end
+  subgraph EU["EU region"]
+    SFU2["SFU EU"]
+    C["C"] --> SFU2
+    D["D"] --> SFU2
+  end
+  SFU1 <-->|inter-SFU relay| SFU2
+</pre>
+<figcaption><strong>Figure 5.</strong> Cascading SFUs: participants connect to a nearby SFU; SFUs relay between regions, so each stream crosses the ocean once instead of per-viewer.</figcaption>
+</figure>
+
+<h2>Recording, presence, chat</h2>
+<p>Recording subscribes to the SFU like a silent participant, composites or stores per-stream, and writes to blob storage. Presence and chat ride the signaling channel (or a sidecar) — low-volume compared to media.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Concretely, what runs where — and which datastore for which job:</p>
+<ul>
+<li><strong>API gateway</strong> (e.g. Envoy / NGINX / a managed gateway): TLS termination, auth, rate limiting, and routing the "create/join meeting" REST calls — separate from the realtime media path.</li>
+<li><strong>Signaling:</strong> a stateful WebSocket service; the "which gateway/SFU holds this user" map lives in <strong>Redis</strong> (in-memory, TTL, fast).</li>
+<li><strong>Media (SFU):</strong> dedicated media servers (the open-source landscape: mediasoup, Janus, Jitsi, LiveKit) — CPU/bandwidth machines, no database.</li>
+<li><strong>TURN relay:</strong> coturn-style relays for NAT traversal.</li>
+<li><strong>Meeting metadata</strong> (rooms, participants, settings): a relational DB like <strong>PostgreSQL</strong> — small, structured, transactional.</li>
+<li><strong>Events / analytics</strong> (join/leave, quality samples): produced to <strong>Kafka</strong>, optionally aggregated with a stream processor (<strong>Flink</strong>) for real-time quality dashboards.</li>
+<li><strong>Recordings:</strong> large immutable files → <strong>blob/object storage (S3-like)</strong>, fronted by a <strong>CDN</strong> for playback; never in a database.</li>
+<li><strong>Chat / presence:</strong> low volume — ride the signaling channel; persist chat in a wide-column store (<strong>Cassandra</strong>) keyed by meeting if history is required.</li>
+</ul>
+<p><strong>Why these:</strong> meeting metadata is small + relational → SQL; the session/presence map is hot + ephemeral → Redis; recordings are big + write-once + read-rarely → object storage + CDN; the event firehose is high-throughput append-only → Kafka (+ Flink). Media itself is <em>not</em> stored — it is forwarded.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Best-effort, latency-first media:</strong> media uses UDP (RTP) — packets may be lost or reordered, and late packets are dropped, not retried. The guarantee is "the freshest frame possible," not "every frame." Loss is hidden with FEC, selective retransmission (NACK), and concealment, not by blocking.</li>
+<li><strong>Eventually-consistent control plane:</strong> the participant list, mute state, and presence converge quickly but aren't strongly consistent — two clients may briefly disagree on who's speaking; the signaling server is the tiebreaker.</li>
+<li><strong>Reliable, ordered signaling:</strong> signaling messages (join, offer/answer, ICE) <em>do</em> need reliable ordered delivery — that's why they run over WebSocket/TCP, separate from media.</li>
+<li><strong>Recording is asynchronous:</strong> the recording pipeline is decoupled from the live call; a recording may lag or be assembled after the meeting ends, and its durability is the object store's, not the SFU's.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>SFU when:</strong> interactive multi-party calls (3-1000) needing low latency — the standard answer for conferencing.</li>
+<li><strong>Mesh/P2P when:</strong> 1:1 or tiny calls where you want minimal server cost and lowest latency, and uplinks can handle it.</li>
+<li><strong>MCU when:</strong> clients are too weak to decode many streams (compose one mixed stream server-side) — at high CPU cost; rarely the default now.</li>
+<li><strong>Not this at all:</strong> one-to-many broadcast/webinar with no interactivity is better served by <strong>HLS/DASH over a CDN</strong> (seconds of latency, massive cheap fan-out) — don't pay SFU costs for a passive audience.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Never use mesh beyond ~3 people</strong> — client upload is the wall.</li>
+<li><strong>NAT/firewall:</strong> a meaningful fraction of clients need TURN relay; budget relay capacity.</li>
+<li><strong>One slow viewer:</strong> without simulcast, the SFU is forced to a low common quality — simulcast isolates per-subscriber.</li>
+<li><strong>Region selection:</strong> assign the SFU by client latency, not just geography.</li>
+<li><strong>E2E encryption</strong> conflicts with server-side compositing/recording — a deliberate trade-off.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>The <strong>SFU</strong> (forward, don't decode) is the sweet spot between mesh and MCU.</li>
+<li><strong>Simulcast + selective forwarding</strong> adapt per-subscriber and keep big meetings smooth.</li>
+<li><strong>Cascading SFUs</strong> scale participants and geography.</li>
+<li>Signaling, recording, presence, and chat are cheap sidecars around the media path.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Reference: public WebRTC / SFU material. Diagrams and write-up are original EngineerPro content.</em></p>

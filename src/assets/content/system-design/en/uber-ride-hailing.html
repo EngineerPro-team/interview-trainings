@@ -1,0 +1,192 @@
+<p><strong>Uber</strong>-style ride-hailing matches riders to nearby drivers in real time, tracks the trip, and prices it. It shares geospatial foundations with food delivery but centers on <strong>driver-rider matching</strong>, the <strong>trip lifecycle</strong>, and <strong>surge pricing</strong>.</p>
+
+<p>The defining tension is the same hot-ephemeral-vs-transactional split as delivery, but the <strong>matching</strong> problem is sharper: a driver is a single physical resource that exactly one rider can claim, and a wrong claim means two riders think the same car is coming. So the core is a <strong>real-time geo index</strong> (millions of pings/s, in memory) feeding a <strong>matcher</strong> whose job is to atomically assign one driver to one trip — a distributed single-winner problem — while the trip itself is a durable state machine carrying money. Everything is also inherently <strong>regional</strong>: matching never needs a global view, which is what makes it scale.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Match objective?</strong> Lowest ETA, highest driver utilization, or pooled rides? That changes whether matching is greedy-nearest or batched optimization.</li>
+<li><strong>Pooled / shared rides?</strong> If one car carries multiple riders, matching becomes routing with detour constraints, not 1:1.</li>
+<li><strong>Surge model?</strong> Real-time supply/demand pricing per cell requires a streaming aggregation layer; flat pricing does not.</li>
+<li><strong>Region scope and HA?</strong> Per-city/region sharding (the norm) vs cross-region — and what happens to in-flight trips if a region fails.</li>
+<li><strong>Payment flow?</strong> Authorize at request, capture at completion, handle cancellation fees — defines the trip saga.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Request a ride; match a nearby driver; live-track the trip.</li>
+<li>Fare estimate and <strong>surge</strong>; payment; rating.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low matching latency</strong>; real-time location.</li>
+<li><strong>Consistent trip state</strong> (one driver per trip).</li>
+<li>Regional high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Driver pings:</strong> 5M active drivers every 4s → <strong>~1.25M location writes/s</strong> as a <em>global peak target</em> — the dominant stream; shard by region/cell (matching never queries globally), kept in an in-memory geo store.</li>
+<li><strong>Ride requests:</strong> 5M rides/day ≈ ~60/s average, peaks at rush hour and in dense zones.</li>
+<li><strong>Matching:</strong> a request scans only nearby geo cells — bounded work even though the global driver set is huge.</li>
+<li><strong>Hotspots:</strong> downtown / airport / events concentrate supply and demand — shard cells and rate-limit.</li>
+</ul>
+<p><strong>Worked example.</strong> Look at why matching scales despite a huge location firehose. 5M drivers pinging every 4s is ~1.25M writes/s globally — but it is never one global index: you shard the geo store by region/cell, so each shard holds a city's worth of drivers and a match query reads only the requester's H3 cell + ring of neighbors (a few cells, dozens of candidate drivers). So the per-request work is tiny and constant regardless of the 5M global total — the firehose is partitioned, the query is local. The hard part isn't volume, it's the <strong>claim</strong>: when the matcher offers a driver, it does an atomic conditional write ("set driver→trip only if driver is free") with a short TTL and a fencing token, so if two nearby requests target the same driver, exactly one wins and the other instantly retries the next candidate. Add a <strong>location staleness filter</strong> (ignore pings older than, say, 10s) so you never dispatch to a driver who has gone offline. That combination — partitioned hot geo index + atomic claim — is the whole matching design.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /rides</code> — <code>{rider_id, pickup, dropoff}</code> → <code>{ride_id, state, eta}</code>.</li>
+<li><code>POST /drivers/{id}/location</code> — high-frequency ping.</li>
+<li><code>GET /rides/{id}</code> → trip state + driver location.</li>
+<li><code>GET /fare/estimate?pickup=&dropoff=</code> → fare + surge multiplier.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  R["Rider app"] --> TRIP["Trip service (state machine)"]
+  D["Driver app"] --> LOC["Location service (geo cache)"]
+  TRIP --> MATCH["Matching / dispatch service"]
+  MATCH --> LOC
+  TRIP --> PRICE["Pricing / surge service"]
+  TRIP --> PAY["Payment"]
+  TRIP --> NOTIF["Notification"]
+  TRIP --> ETA["ETA / routing service"]
+</pre>
+<figcaption><strong>Figure 1.</strong> The location service ingests driver pings; matching pulls nearby drivers; the trip service owns the ride state machine and coordinates pricing and payment.</figcaption>
+</figure>
+
+<h2>Geo index and nearest driver</h2>
+<p>Driver positions update constantly, so they live in an in-memory geo store keyed by <strong>cell id</strong> (H3 / geohash / QuadTree). A ride request maps pickup to a cell and reads that cell plus neighbors to get candidate drivers — turning "nearest driver" into a few key lookups instead of a global scan.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  PING["Driver pings: lat/lng"] --> CELL["Bucket into cell id"]
+  CELL --> GEO["In-memory geo store: cell to drivers"]
+  REQ["Pickup location"] --> LOOK["Read pickup cell + neighbors"]
+  GEO --> LOOK
+  LOOK --> CAND["Candidate drivers nearby"]
+</pre>
+<figcaption><strong>Figure 2.</strong> Drivers are bucketed into geo cells; a pickup reads its cell and neighbors to get nearby candidates cheaply.</figcaption>
+</figure>
+
+<h2>Matching and dispatch</h2>
+<p>Matching scores nearby drivers (distance, ETA, direction, rating) and offers the ride. To avoid assigning one driver to two requests, the dispatch <strong>locks/claims</strong> a driver during the offer; a decline or timeout releases them. Batching requests over a short window enables better global assignments in dense areas.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant T as Trip service
+  participant M as Matching
+  participant L as Location
+  participant DR as Driver
+  T->>M: ride request
+  M->>L: candidate drivers near pickup
+  L-->>M: candidates
+  M->>M: score and pick best
+  M->>DR: offer ride (claim driver)
+  alt accepts
+    DR-->>M: accept
+    M-->>T: matched
+  else declines / timeout
+    DR-->>M: release, try next candidate
+  end
+</pre>
+<figcaption><strong>Figure 3.</strong> Matching scores candidates and offers with a claim; a decline/timeout releases the driver and tries the next.</figcaption>
+</figure>
+
+<p>The <strong>claim</strong> must be atomic: a conditional write on the driver's <code>available</code> state with a short <strong>TTL</strong> and a <strong>fencing token</strong>, so if the driver app disconnects or ignores the offer, the claim expires and the driver is re-offered — and a stale acceptance carrying an old token is rejected. Candidate drivers are also filtered by <code>last_ping</code> age, heading, and availability so stale pings do not cause bad matches.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant M as Matching
+  participant DS as Driver state store
+  participant DR as Driver
+  M->>DS: conditional claim if available, set TTL + fencing token
+  DS-->>M: claimed (token 7)
+  M->>DR: offer ride (token 7)
+  alt accepts in time
+    DR-->>M: accept (token 7)
+    M->>DS: commit assignment
+  else timeout / disconnect
+    Note over DS: TTL expires, driver auto-released
+    M->>M: offer next candidate
+  end
+</pre>
+<figcaption><strong>Figure 4.</strong> Driver claim is a conditional write with a TTL and fencing token; a timeout auto-releases the driver and a stale acceptance is rejected.</figcaption>
+</figure>
+
+<h2>Ride-specific concerns</h2>
+<p>Beyond the shared geo/dispatch core, ride-hailing has its own depth: <strong>pickup ETA and routing</strong> (turn-by-turn, re-route on traffic), <strong>cancellation / no-show</strong> handling and fees, <strong>pooled rides</strong> (matching multiple riders on one route), <strong>payment auth at request then capture at completion</strong>, <strong>driver repositioning / supply shaping</strong> toward demand, and <strong>airport/event queues</strong> (FIFO driver lines). These distinguish it from food delivery, where the route is merchant-to-eater and there is no shared trip.</p>
+
+<h2>Trip lifecycle</h2>
+<p>A trip is a state machine; transitions are persisted and idempotent so retries and reconnects are safe.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Requested
+  Requested --> Matched: driver accepts
+  Matched --> EnRoute: driver heading to pickup
+  EnRoute --> InProgress: rider picked up
+  InProgress --> Completed: dropoff
+  Completed --> [*]
+  Requested --> Cancelled: no driver / rider cancels
+  Matched --> Cancelled: cancel before pickup
+</pre>
+<figcaption><strong>Figure 5.</strong> The trip state machine from request to completion, with cancellation paths.</figcaption>
+</figure>
+
+<h2>Surge pricing</h2>
+<p>When demand exceeds supply in a cell, a <strong>surge</strong> multiplier raises the price to balance the market (and attract drivers). Surge is computed per geo cell from the live supply/demand ratio and applied at fare-estimate time. It is intentionally local and time-windowed.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing across rider/driver apps.</li>
+<li><strong>Driver locations + claims:</strong> <strong>Redis</strong> (geo + conditional claim with TTL/fencing) — the ~1.25M pings/s hot, ephemeral store; an <strong>H3</strong> index keys the cells.</li>
+<li><strong>Trips:</strong> the trip state machine is a consistency boundary → prefer <strong>PostgreSQL / sharded SQL</strong> for transitions and idempotency. Cassandra/Scylla is great for append-only <strong>trip history</strong>, and acceptable for the state machine only with conditional writes/LWT, a single writer per trip, or event-sourced state.</li>
+<li><strong>Events / pricing:</strong> <strong>Kafka</strong> for location and trip events; a stream processor (<strong>Flink</strong>) computes per-cell supply/demand for surge.</li>
+<li><strong>Routing / ETA:</strong> a routing service over a road graph (OSRM-style) + map tiles.</li>
+<li><strong>Payments:</strong> a payment service (auth at request, capture at completion); <strong>blob storage</strong> for receipts.</li>
+</ul>
+<p><strong>Why these:</strong> location is a firehose + needs atomic claim → Redis; trip state needs reliable transitions → a transactional DB; surge is a real-time aggregation → Kafka + Flink. Same access-pattern split as a delivery system — the difference is the ride-specific routing/ETA and trip lifecycle, not the storage shapes.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>One driver per trip (single-winner):</strong> the claim is an atomic conditional write with a TTL and fencing token — exactly one rider can hold a given driver; a stale or late acceptance is rejected by the fencing token.</li>
+<li><strong>Strongly consistent trip state:</strong> trip transitions (requested → matched → en route → started → completed) go through one authoritative store; reconnecting a dropped client resumes the same trip rather than creating a new one.</li>
+<li><strong>Idempotent payments:</strong> authorize at request, capture at completion, with idempotency keys so retries and cancellations don't double-charge; cancellation fees are a defined compensation.</li>
+<li><strong>Best-effort, eventually-consistent location:</strong> driver positions are last-write-wins with TTL and a staleness filter; lost pings are simply replaced, never recovered.</li>
+<li><strong>Regional availability over global consistency:</strong> matching and trips are sharded per region, so one region's failure doesn't stop others; there is no need for a globally consistent driver view.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Fits:</strong> real-time matching of mobile supply to demand — ride-hailing, courier, roadside assistance — anywhere "find the nearest available unit and assign it exactly once" is the core.</li>
+<li><strong>Simplify when:</strong> scheduled/pre-booked rides with no live matching — a reservation system + batch assignment is enough, no geo firehose.</li>
+<li><strong>Different design when:</strong> there's no physical location to match (any non-spatial marketplace) — you don't need H3/geo indexes; or when matching is many-to-many optimization (logistics fleet planning), which is an offline solver, not real-time nearest-claim.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Ping write storm:</strong> 1M+ pings/s never hit a database — in-memory geo store, persist sparsely.</li>
+<li><strong>Double assignment:</strong> claim/lock a driver during an offer; release on decline/timeout.</li>
+<li><strong>Hotspots:</strong> airport/events overload a cell — shard and rate-limit.</li>
+<li><strong>Trip consistency:</strong> persist idempotent state transitions; reconnect resumes the trip.</li>
+<li><strong>Surge fairness:</strong> compute locally and transparently; avoid oscillation with smoothing.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>An in-memory <strong>geo cell store</strong> makes nearest-driver lookups cheap.</li>
+<li>Matching <strong>claims a driver</strong> during the offer to prevent double assignment.</li>
+<li>The trip is an <strong>idempotent state machine</strong>.</li>
+<li><strong>Surge</strong> is a per-cell, time-windowed supply/demand signal.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Uber Engineering on H3 hexagonal indexing and on the dispatch / Marketplace platform; Uber ringpop; public material on real-time matching and ETA/routing. Diagrams and write-up are original EngineerPro content.</em></p>

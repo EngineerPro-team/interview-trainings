@@ -1,0 +1,192 @@
+<p>Ride-hailing kiểu <strong>Uber</strong> match rider với driver gần real-time, track trip, và định giá. Nó chia sẻ nền tảng geospatial với food delivery nhưng tập trung vào <strong>driver-rider matching</strong>, <strong>trip lifecycle</strong>, và <strong>surge pricing</strong>.</p>
+
+<p>Căng thẳng định nghĩa là cùng split hot-ephemeral-vs-transactional như delivery, nhưng bài toán <strong>matching</strong> sắc hơn: một driver là một tài nguyên vật lý đơn mà đúng một rider được claim, và một claim sai nghĩa là hai rider tưởng cùng một xe đang tới. Nên core là một <strong>real-time geo index</strong> (hàng triệu ping/s, in memory) nuôi một <strong>matcher</strong> mà việc của nó là atomically gán một driver cho một trip — một bài single-winner phân tán — trong khi trip là một durable state machine mang tiền. Mọi thứ cũng vốn <strong>regional</strong>: matching không bao giờ cần view global, đó là cái làm nó scale.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Mục tiêu match?</strong> ETA thấp nhất, utilization driver cao nhất, hay pooled ride? Điều đó đổi việc matching là greedy-nearest hay batched optimization.</li>
+<li><strong>Pooled / shared ride?</strong> Nếu một xe chở nhiều rider, matching thành routing với ràng buộc detour, không phải 1:1.</li>
+<li><strong>Model surge?</strong> Định giá supply/demand real-time theo cell cần một lớp streaming aggregation; flat pricing thì không.</li>
+<li><strong>Phạm vi region và HA?</strong> Sharding per-city/region (chuẩn) vs cross-region — và điều gì xảy ra với trip đang chạy nếu một region fail.</li>
+<li><strong>Luồng payment?</strong> Authorize lúc request, capture lúc completion, xử lý phí cancel — định nghĩa trip saga.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Request một ride; match một driver gần; live-track trip.</li>
+<li>Fare estimate và <strong>surge</strong>; payment; rating.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Matching latency thấp</strong>; location real-time.</li>
+<li><strong>Trip state nhất quán</strong> (một driver mỗi trip).</li>
+<li>Regional high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Driver pings:</strong> 5M driver active mỗi 4s → <strong>~1.25M location write/s</strong> như một <em>global peak target</em> — luồng áp đảo; shard theo region/cell (matching không query global), giữ trong in-memory geo store.</li>
+<li><strong>Ride requests:</strong> 5M ride/ngày ≈ ~60/s trung bình, peak giờ cao điểm và vùng dày đặc.</li>
+<li><strong>Matching:</strong> một request chỉ scan vài geo cell gần — công việc có giới hạn dù tập driver toàn cục khổng lồ.</li>
+<li><strong>Hotspots:</strong> downtown / sân bay / sự kiện dồn cung và cầu — shard cell và rate-limit.</li>
+</ul>
+<p><strong>Worked example.</strong> Xem vì sao matching scale dù có một location firehose khổng lồ. 5M driver ping mỗi 4s là ~1.25M write/s global — nhưng không bao giờ là một index global: bạn shard geo store theo region/cell, nên mỗi shard giữ lượng driver cỡ một thành phố và một match query chỉ đọc cell H3 của requester + ring neighbor (vài cell, vài chục candidate driver). Nên công việc per-request nhỏ xíu và hằng số bất kể tổng 5M global — firehose được partition, query là local. Phần khó không phải volume, mà là <strong>claim</strong>: khi matcher offer một driver, nó làm một conditional write atomic ("set driver→trip chỉ khi driver free") với một TTL ngắn và một fencing token, nên nếu hai request gần nhắm cùng một driver, đúng một cái win và cái kia retry ngay candidate kế. Thêm một <strong>location staleness filter</strong> (bỏ ping cũ hơn, ví dụ, 10s) để không bao giờ dispatch tới một driver đã offline. Tổ hợp đó — geo index hot partitioned + atomic claim — là toàn bộ thiết kế matching.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /rides</code> — <code>{rider_id, pickup, dropoff}</code> → <code>{ride_id, state, eta}</code>.</li>
+<li><code>POST /drivers/{id}/location</code> — ping tần suất cao.</li>
+<li><code>GET /rides/{id}</code> → trip state + driver location.</li>
+<li><code>GET /fare/estimate?pickup=&dropoff=</code> → fare + surge multiplier.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  R["Rider app"] --> TRIP["Trip service (state machine)"]
+  D["Driver app"] --> LOC["Location service (geo cache)"]
+  TRIP --> MATCH["Matching / dispatch service"]
+  MATCH --> LOC
+  TRIP --> PRICE["Pricing / surge service"]
+  TRIP --> PAY["Payment"]
+  TRIP --> NOTIF["Notification"]
+  TRIP --> ETA["ETA / routing service"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Location service nhận driver ping; matching pull driver gần; trip service sở hữu ride state machine và điều phối pricing và payment.</figcaption>
+</figure>
+
+<h2>Geo index và nearest driver</h2>
+<p>Vị trí driver update liên tục, nên chúng nằm trong một in-memory geo store key theo <strong>cell id</strong> (H3 / geohash / QuadTree). Một ride request map pickup tới một cell và đọc cell đó cộng neighbor để lấy candidate driver — biến "nearest driver" thành vài key lookup thay vì một global scan.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  PING["Driver ping: lat/lng"] --> CELL["Bucket vào cell id"]
+  CELL --> GEO["In-memory geo store: cell to drivers"]
+  REQ["Pickup location"] --> LOOK["Đọc pickup cell + neighbor"]
+  GEO --> LOOK
+  LOOK --> CAND["Candidate driver gần"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Driver được bucket vào geo cell; một pickup đọc cell và neighbor để lấy candidate gần một cách rẻ.</figcaption>
+</figure>
+
+<h2>Matching và dispatch</h2>
+<p>Matching score driver gần (distance, ETA, hướng, rating) và offer ride. Để tránh gán một driver cho hai request, dispatch <strong>lock/claim</strong> một driver trong lúc offer; decline hoặc timeout release họ. Batch request trong một cửa sổ ngắn cho assignment toàn cục tốt hơn ở vùng dày.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant T as Trip service
+  participant M as Matching
+  participant L as Location
+  participant DR as Driver
+  T->>M: ride request
+  M->>L: candidate driver gần pickup
+  L-->>M: candidate
+  M->>M: score và chọn tốt nhất
+  M->>DR: offer ride (claim driver)
+  alt accept
+    DR-->>M: accept
+    M-->>T: matched
+  else decline / timeout
+    DR-->>M: release, thử candidate kế
+  end
+</pre>
+<figcaption><strong>Hình 3.</strong> Matching score candidate và offer kèm claim; decline/timeout release driver và thử cái kế.</figcaption>
+</figure>
+
+<p><strong>Claim</strong> phải atomic: một conditional write trên state <code>available</code> của driver kèm một <strong>TTL</strong> ngắn và một <strong>fencing token</strong>, nên nếu driver app disconnect hoặc bỏ qua offer, claim hết hạn và driver được re-offer — và một acceptance cũ mang token cũ bị reject. Candidate driver cũng được filter theo tuổi <code>last_ping</code>, heading, và availability để ping cũ không gây match xấu.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant M as Matching
+  participant DS as Driver state store
+  participant DR as Driver
+  M->>DS: conditional claim nếu available, set TTL + fencing token
+  DS-->>M: claimed (token 7)
+  M->>DR: offer ride (token 7)
+  alt accept kịp
+    DR-->>M: accept (token 7)
+    M->>DS: commit assignment
+  else timeout / disconnect
+    Note over DS: TTL hết hạn, driver auto-release
+    M->>M: offer candidate kế
+  end
+</pre>
+<figcaption><strong>Hình 4.</strong> Driver claim là một conditional write kèm TTL và fencing token; timeout auto-release driver và acceptance cũ bị reject.</figcaption>
+</figure>
+
+<h2>Ride-specific concerns</h2>
+<p>Ngoài core geo/dispatch dùng chung, ride-hailing có chiều sâu riêng: <strong>pickup ETA và routing</strong> (turn-by-turn, re-route khi kẹt xe), xử lý <strong>cancellation / no-show</strong> và phí, <strong>pooled ride</strong> (match nhiều rider trên một route), <strong>payment auth lúc request rồi capture lúc completion</strong>, <strong>driver repositioning / supply shaping</strong> về phía demand, và <strong>airport/event queue</strong> (hàng driver FIFO). Những thứ này phân biệt nó với food delivery, nơi route là merchant-tới-eater và không có shared trip.</p>
+
+<h2>Trip lifecycle</h2>
+<p>Một trip là một state machine; transition được persist và idempotent nên retry và reconnect an toàn.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Requested
+  Requested --> Matched: driver accept
+  Matched --> EnRoute: driver tới pickup
+  EnRoute --> InProgress: đón rider
+  InProgress --> Completed: dropoff
+  Completed --> [*]
+  Requested --> Cancelled: không driver / rider cancel
+  Matched --> Cancelled: cancel trước pickup
+</pre>
+<figcaption><strong>Hình 5.</strong> Trip state machine từ request tới completion, với path cancel.</figcaption>
+</figure>
+
+<h2>Surge pricing</h2>
+<p>Khi cầu vượt cung trong một cell, một multiplier <strong>surge</strong> nâng giá để cân bằng thị trường (và hút driver). Surge tính theo từng geo cell từ tỉ lệ supply/demand live và áp lúc fare-estimate. Nó cố ý local và time-windowed.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing qua app rider/driver.</li>
+<li><strong>Driver location + claim:</strong> <strong>Redis</strong> (geo + conditional claim kèm TTL/fencing) — store hot, ephemeral ~1.25M ping/s; một index <strong>H3</strong> key các cell.</li>
+<li><strong>Trips:</strong> trip state machine là một consistency boundary → ưu tiên <strong>PostgreSQL / sharded SQL</strong> cho transition và idempotency. Cassandra/Scylla tuyệt cho append-only <strong>trip history</strong>, và chỉ chấp nhận cho state machine khi có conditional write/LWT, một writer mỗi trip, hoặc event-sourced state.</li>
+<li><strong>Events / pricing:</strong> <strong>Kafka</strong> cho location và trip event; một stream processor (<strong>Flink</strong>) tính supply/demand per-cell cho surge.</li>
+<li><strong>Routing / ETA:</strong> một routing service trên road graph (kiểu OSRM) + map tile.</li>
+<li><strong>Payments:</strong> một payment service (auth lúc request, capture lúc completion); <strong>blob storage</strong> cho receipt.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> location là firehose + cần atomic claim → Redis; trip state cần transition tin cậy → một transactional DB; surge là real-time aggregation → Kafka + Flink. Cùng split access-pattern như hệ delivery — khác biệt là routing/ETA và trip lifecycle ride-specific, không phải hình dạng storage.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Một driver mỗi trip (single-winner):</strong> claim là một conditional write atomic với một TTL và fencing token — đúng một rider giữ được một driver; một acceptance cũ hoặc trễ bị fencing token reject.</li>
+<li><strong>Trip state strongly consistent:</strong> transition trip (requested → matched → en route → started → completed) đi qua một store authoritative; reconnect một client rớt thì resume cùng trip thay vì tạo trip mới.</li>
+<li><strong>Payment idempotent:</strong> authorize lúc request, capture lúc completion, với idempotency key để retry và cancel không double-charge; phí cancel là một compensation được định nghĩa.</li>
+<li><strong>Location best-effort, eventually-consistent:</strong> vị trí driver là last-write-wins với TTL và một staleness filter; ping mất đơn giản bị thay, không bao giờ recover.</li>
+<li><strong>Regional availability hơn global consistency:</strong> matching và trip shard theo region, nên một region fail không dừng các region khác; không cần một global driver view nhất quán.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hợp:</strong> match real-time supply di động với demand — ride-hailing, courier, cứu hộ — bất cứ đâu "tìm unit available gần nhất và gán exactly once" là core.</li>
+<li><strong>Đơn giản hoá khi:</strong> ride đặt trước/scheduled không có live matching — một hệ reservation + batch assignment là đủ, không cần geo firehose.</li>
+<li><strong>Thiết kế khác khi:</strong> không có location vật lý để match (marketplace phi-không-gian bất kỳ) — không cần geo index H3; hoặc khi matching là optimization many-to-many (logistics fleet planning), vốn là một offline solver, không phải real-time nearest-claim.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Ping write storm:</strong> 1M+ ping/s không bao giờ đập database — in-memory geo store, persist thưa.</li>
+<li><strong>Double assignment:</strong> claim/lock một driver trong lúc offer; release khi decline/timeout.</li>
+<li><strong>Hotspots:</strong> sân bay/sự kiện làm quá tải một cell — shard và rate-limit.</li>
+<li><strong>Trip consistency:</strong> persist state transition idempotent; reconnect resume trip.</li>
+<li><strong>Surge fairness:</strong> tính local và minh bạch; tránh dao động bằng smoothing.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Một in-memory <strong>geo cell store</strong> làm nearest-driver lookup rẻ.</li>
+<li>Matching <strong>claim một driver</strong> trong lúc offer để chống double assignment.</li>
+<li>Trip là một <strong>idempotent state machine</strong>.</li>
+<li><strong>Surge</strong> là một signal supply/demand per-cell, time-windowed.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Uber Engineering về H3 hexagonal indexing và về dispatch / Marketplace platform; Uber ringpop; tài liệu công khai về real-time matching và ETA/routing. Diagram và nội dung là content gốc của EngineerPro.</em></p>

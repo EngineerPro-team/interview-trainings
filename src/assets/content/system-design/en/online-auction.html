@@ -1,0 +1,194 @@
+<p>An <strong>online auction</strong> (eBay-style, or live real-time bidding) is a concurrency-and-consistency problem: many bidders race on the same item, the highest valid bid must always win, and the auction must close correctly at a precise time. This chapter focuses on <strong>bid concurrency</strong>, <strong>correct close/settlement</strong>, and anti-sniping.</p>
+
+<p>Unlike most "scale" questions, an auction is a <strong>correctness-first</strong> design where the load is highly concentrated: 99% of items are quiet, but a hot item in its final seconds is a thundering race where the wrong answer (a lost bid, two winners, a double charge) is unacceptable. The central idea is to <strong>serialize all writes for a single item</strong> (so bids on one item have a single, total order) while letting the far larger read/watch traffic scale out separately. Money makes durability and exactly-once settlement non-negotiable — you cannot trade them for latency.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Auction style?</strong> Ascending (eBay), proxy/max-bid auto-bidding, or sealed-bid? Proxy bidding changes the "accept" logic (resolve against the other party's max).</li>
+<li><strong>Hard close or anti-snipe?</strong> Does a last-second bid extend the end time? That changes the close scheduler and fairness model.</li>
+<li><strong>How hot can one item get?</strong> Tens vs thousands of bids/s in the final seconds decides whether one writer per item suffices or needs extra care.</li>
+<li><strong>Consistency vs availability on bids?</strong> Bids must be strongly consistent and durable (it's money) — confirm we favor correctness over raw throughput.</li>
+<li><strong>Settlement?</strong> Charge the winner exactly once, handle payment failure / second-chance offers — defines the settlement saga.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Create an auction with a start/end time and starting price.</li>
+<li>Place a bid; see the current highest bid in real time.</li>
+<li><strong>Proxy / max bid</strong> (auto-bid up to a limit).</li>
+<li>Auto-close at end time; notify winner; settle payment.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Strong consistency</strong> for bids — no lost or out-of-order accepted bids.</li>
+<li><strong>Low latency</strong> bid acknowledgement and live price updates.</li>
+<li>Handle <strong>bid spikes</strong> at auction close.</li>
+<li><strong>Exactly-once settlement</strong>.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Items:</strong> 10M active auctions; most get few bids, a few get thousands.</li>
+<li><strong>Bid spike:</strong> a hot item in its final 10 seconds can take hundreds of bids/s on one item — the per-item write path must be serialized and fast.</li>
+<li><strong>Reads:</strong> watchers vastly outnumber bidders — current price is a fan-out read, cache and push it.</li>
+<li><strong>Close events:</strong> 10M auctions closing across a day, clustered at round hours — the close scheduler must handle bursts.</li>
+</ul>
+<p><strong>Worked example.</strong> Picture one hot item in its final 10 seconds taking ~500 bids/s. If you used a plain "read price, compare, write" with row locks, the contention on that one row serializes everyone anyway but with lock waits and retries — and an optimistic compare-and-set would make hundreds of bidders retry in a tight loop. The clean model is a <strong>single writer per item</strong>: route every bid for item X to one owner (an in-memory actor / partition) that processes them in arrival order, so 500 bids/s is just 500 sequential compares — trivial for one core — and the order is unambiguous. The subtlety the example forces: that writer must <strong>durably commit each accepted bid before acking</strong> (group-commit to a WAL or a conditional DB write), because a crash after acking a winning bid but before persisting would lose money. Meanwhile the close burst is a separate problem: 10M auctions clustered at round hours means the <strong>close scheduler</strong> faces a thundering herd of expirations — spread them with jitter and use a partitioned timer/queue, not one global timer.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /auctions</code> — <code>{item, start_price, ends_at}</code> → <code>{auction_id}</code>.</li>
+<li><code>POST /auctions/{id}/bids</code> — <code>{user_id, amount, idempotency_key}</code> → <code>{accepted, current_high}</code>.</li>
+<li><code>GET /auctions/{id}</code> → current high bid + time left (cacheable, pushed via WebSocket).</li>
+<li><code>POST /auctions/{id}/proxy</code> — <code>{user_id, max_amount}</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["Bidder"] --> GW["API gateway"]
+  GW --> BID["Bid service (serialized per item)"]
+  BID --> DB["Auction DB: BidLog (source of truth) + AuctionState (high-bid projection + version)"]
+  BID --> BUS["Event bus"]
+  BUS --> PUSH["Live price push (WebSocket)"]
+  BUS --> NOTIF["Notifications"]
+  SCH["Close scheduler / timer"] --> SETTLE["Settlement service"]
+  SETTLE --> LEDGER["Ledger / payment"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Bids are serialized per item; each accepted bid is appended to the durable <strong>BidLog</strong> and updates the <strong>AuctionState</strong> high-bid projection; a scheduler triggers settlement at close; live prices are pushed to watchers.</figcaption>
+</figure>
+
+<h2>Bid concurrency</h2>
+<p>The core race: two bids for the same item arrive at once. We must accept only bids that beat the current high, and never lose one. Two robust approaches:</p>
+<ul>
+<li><strong>Optimistic concurrency:</strong> a conditional update — <code>UPDATE ... SET high = new WHERE id = ? AND high &lt; new</code>. If the row changed under us, the update affects 0 rows and the bid is rejected/retried. The conditional row update is the <strong>arbiter for the current high-bid projection</strong>; the accepted bid event must still be durably recorded in the <strong>BidLog</strong> (the source of truth) before ack — ideally in the same local transaction.</li>
+<li><strong>Single-writer per item:</strong> route all bids for an item to one partition/actor (e.g. by hashing auction_id) and process them in a queue — serialized, no contention.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B1 as Bidder 1
+  participant B2 as Bidder 2
+  participant BID as Bid service
+  participant DB as Auction DB
+  B1->>BID: bid 100
+  B2->>BID: bid 100 (same moment)
+  BID->>DB: conditional update high to 100 where current high below 100
+  DB-->>BID: applied (1 row)
+  BID->>DB: conditional update high to 100 where current high below 100
+  DB-->>BID: 0 rows (already 100)
+  BID-->>B1: accepted
+  BID-->>B2: rejected, current high is 100
+</pre>
+<figcaption><strong>Figure 2.</strong> A conditional update makes the database row the arbiter: the first bid wins, the racing equal bid affects 0 rows and is rejected.</figcaption>
+</figure>
+
+<h2>Closing and settlement</h2>
+<p>At the end time, the auction must atomically freeze the winner and settle. A <strong>scheduler</strong> (durable timer) fires a close job; settlement is <strong>idempotent</strong> (keyed by auction_id) so a retried or duplicated close cannot double-charge. The auction is a state machine.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Open
+  Open --> Open: bid accepted
+  Open --> Extended: bid in final seconds (anti-snipe)
+  Extended --> Open
+  Open --> Closing: end time reached
+  Closing --> Settled: charge winner (idempotent)
+  Settled --> [*]
+  Closing --> NoSale: no valid bids
+  NoSale --> [*]
+</pre>
+<figcaption><strong>Figure 3.</strong> Auction state machine: bids keep it open, a last-second bid can extend it, then a scheduled close drives idempotent settlement.</figcaption>
+</figure>
+
+<h2>Anti-sniping</h2>
+<p>A "snipe" is a bid in the final instant that leaves no time to respond. The common rule: <strong>if a bid lands within the final window (e.g. last 10s), extend the end time</strong> by that window. This keeps the close fair and spreads the spike out.</p>
+
+<h2>Scaling a hot item</h2>
+<p>Most items are cold; a few are extremely hot at close. Because correctness requires serializing writes per item, a single hot item is bounded by one writer's throughput — still thousands/s when the writer keeps the high bid in memory but <strong>durably commits each accepted bid</strong> — appending to the append-only BidLog and updating the high-bid projection in one step (group-commit to a replicated log) — before acking. Durability is not skipped for speed; it is batched. Watchers (reads) scale separately: the current price is cached and pushed, never recomputed per viewer.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  BIDS["Bids for item X"] --> W["Single-writer for item X (in-memory high bid)"]
+  W --> COMMIT["Durable commit (one local txn, same store): append accepted bid to BidLog + update high-bid projection in AuctionState"]
+  COMMIT -->|committed| ACK["Ack bidder + update cache"]
+  ACK --> PUSH["Push new high to watchers"]
+  ACK --> NOTIFY["Emit event to Kafka (notify/analytics)"]
+  PUSH --> WATCH["Thousands of watchers (read-only)"]
+  COMMIT -.->|on crash| REPLAY["Recovery: replay BidLog / re-read AuctionState"]
+</pre>
+<figcaption><strong>Figure 4.</strong> Writes for one item are serialized through a single fast writer; an accepted bid is durably committed — <strong>append to the append-only BidLog and update the high-bid projection in one step</strong> — before the ack/push, so a crash cannot lose a winning bid and the full history is replayable. Kafka is only the notification/analytics fanout, not the authoritative log; watchers are a separate cached, pushed read path.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant SCH as Close scheduler
+  participant ST as Settlement service
+  participant L as Ledger / payment
+  SCH->>ST: close auction (auction_id, idempotency_key)
+  ST->>ST: check if already settled (idempotency_key)
+  alt not settled
+    ST->>L: charge winner + record sale
+    L-->>ST: ok
+    ST->>ST: mark settled
+  else already settled
+    ST-->>SCH: no-op (duplicate close)
+  end
+</pre>
+<figcaption><strong>Figure 5.</strong> Settlement is idempotent on auction_id, so a retried or duplicated close charges the winner exactly once.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting (bid spikes), routing.</li>
+<li><strong>BidLog (source of truth):</strong> an <strong>append-only</strong> log of accepted/rejected bid events keyed by <code>auction_id</code>, ordered by <code>bid_seq</code> — this is what makes replay, audit, dispute resolution, proxy-bid reasoning, and outbid-notification reconstruction possible.</li>
+<li><strong>AuctionState (projection):</strong> a row holding the current high bid + state-machine status with a version, a fast projection of the BidLog (not a substitute). To avoid a cross-system atomic write, keep <strong>BidLog and AuctionState in the same transactional store/partition</strong> (e.g. the same <strong>PostgreSQL</strong> DB, or one single-writer-per-item partition) so the bid event append and the high-bid update commit in <strong>one local transaction</strong> — a <strong>conditional update</strong> is the arbiter. (Alternatively, make BidLog the only source of truth and derive/reconcile AuctionState from it, so the ack depends only on the durable BidLog append.)</li>
+<li><strong>Live price push:</strong> <strong>Redis</strong> (pub/sub + cached current high) fanned out to watchers over WebSocket.</li>
+<li><strong>Events:</strong> <strong>Kafka</strong> carries bid/outbid/settlement events to notifications and analytics — a fanout transport, <em>not</em> the authoritative bid log (unless you explicitly design its retention/replay/compaction/audit to be audit-grade).</li>
+<li><strong>Close scheduling:</strong> a durable <strong>scheduler/timer</strong> (a delay queue or a workflow engine) fires the close job at the end time.</li>
+<li><strong>Settlement / ledger:</strong> a transactional ledger (<strong>PostgreSQL</strong>) with idempotent settlement keyed by auction_id; payment via a PSP.</li>
+</ul>
+<p><strong>Why these:</strong> bids demand correctness under contention → a transactional DB with conditional writes (the one place you must <em>not</em> use an eventually-consistent cache as the source of truth); the read-heavy watcher path is cache + push → Redis; close is a scheduled job → a durable timer; money → a transactional ledger. Reads and writes use different stores on purpose.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Strongly consistent, durable bids:</strong> accepted bids are totally ordered per item and committed to the append-only <strong>BidLog</strong> (with the high-bid projection updated in the same step) before the ack — the highest valid bid always wins, an acknowledged bid is never lost, and the full history is auditable/replayable on crash.</li>
+<li><strong>Single-winner per item:</strong> either a single writer per item or a conditional/compare-and-set update arbitrates, so concurrent bids can never both "win" or skip the current high.</li>
+<li><strong>Exactly-once settlement:</strong> close-and-charge is idempotent keyed by auction_id, so a retried close or duplicate event charges the winner once; payment failure triggers a defined fallback (second-chance offer), not a silent loss.</li>
+<li><strong>Eventually-consistent watcher view:</strong> the live price shown to watchers is a cached, pushed value that may lag the authoritative high by milliseconds — fine for display, never used as the bid arbiter.</li>
+<li><strong>Deterministic close:</strong> the auction closes against the durable <strong>BidLog</strong> at the end time; anti-snipe extensions are part of that authoritative timeline, not a client-side guess. The winner is reconstructable from the log, not just from the current high-bid projection.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Fits:</strong> any "highest/first valid action wins on a contended item" problem — auctions, limited-stock flash sales, seat/ticket grabs, ad real-time bidding.</li>
+<li><strong>Simplify when:</strong> bids are rare and items never get hot — a single conditional update on a row is enough; you don't need per-item single writers or a close-scheduler fleet.</li>
+<li><strong>Different design when:</strong> the matching is two-sided continuous (buyers and sellers with a live order book) — that's a <strong>matching engine</strong> (see the stock exchange), not a one-sided ascending auction.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Lost bid:</strong> never read-then-write without a version/condition — use conditional update or a per-item single writer.</li>
+<li><strong>Double settlement:</strong> close + charge must be idempotent (key on auction_id).</li>
+<li><strong>Clock at close:</strong> use a durable scheduler; do not rely on a single in-process timer.</li>
+<li><strong>Snipe spike:</strong> anti-snipe extension both improves fairness and flattens the burst.</li>
+<li><strong>Proxy bids:</strong> resolve auto-bids server-side atomically so two proxies do not ratchet incorrectly.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Bids need <strong>serialized, conditional writes</strong> — DB row arbiter or per-item single writer.</li>
+<li>Close is a <strong>durable scheduled job</strong> driving <strong>idempotent settlement</strong>.</li>
+<li><strong>Anti-snipe</strong> extension keeps closes fair and spreads load.</li>
+<li>Reads (watchers) scale independently via cache + push.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: optimistic concurrency control literature; database conditional-update / compare-and-set docs; public eBay/auction engineering material on bidding and anti-sniping. Diagrams and write-up are original EngineerPro content.</em></p>

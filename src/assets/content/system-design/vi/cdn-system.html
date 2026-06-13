@@ -1,0 +1,183 @@
+<p>Một <strong>Content Delivery Network (CDN)</strong> serve content từ server gần user, cắt latency và offload origin. Nó là building block đằng sau streaming, download lớn, và web asset nhanh. Các bài cốt lõi là <strong>request routing</strong>, một <strong>cache hierarchy</strong>, và <strong>invalidation</strong>.</p>
+
+<p>Toàn bộ giá trị gói trong một con số — <strong>edge cache hit ratio</strong> — vì mọi thứ khác (latency, tải origin, chi phí) đều suy ra từ nó. Nên một thiết kế mạnh thực ra là lập luận về cách giữ hit ratio cao (routing, hierarchy, cache-key hygiene) và cách giữ đúng đắn khi content đổi (invalidation) mà không làm tụt nó.</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<ul>
+<li><strong>Static, dynamic, hay cả hai?</strong> Static asset cache hàng giờ/ngày; dynamic/personalized cần micro-TTL, edge compute, hoặc bypass cache — câu trả lời rất khác.</li>
+<li><strong>Public hay private content?</strong> Private buộc signed URL/cookie và access-aware cache key để response của một user không bao giờ serve cho người khác.</li>
+<li><strong>Update phải fresh tới mức nào?</strong> "Eventually (vài phút)" → TTL; "tức thì" → active purge hoặc versioned URL.</li>
+<li><strong>Profile kích thước object?</strong> Nhiều web asset nhỏ vs vài video segment khổng lồ đổi cách eviction, tiering, và xử lý range request.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Cache và serve content static (và một phần dynamic) từ edge location.</li>
+<li><strong>Invalidate / purge</strong> content; origin shielding; TLS termination.</li>
+<li>Signed URL cho access control.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Latency toàn cầu thấp</strong>; high availability.</li>
+<li><strong>Cache hit ratio cao</strong> (bảo vệ origin); egress bandwidth khổng lồ.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Hit ratio economics:</strong> edge hit ratio 95% nghĩa origin chỉ thấy 5% traffic — khác biệt giữa một origin và một meltdown.</li>
+<li><strong>PoP count:</strong> hàng trăm edge PoP toàn cầu để đa số user trong tầm vài chục ms.</li>
+<li><strong>Object mix:</strong> một tập nhỏ object hot serve đa số request (cache khắp nơi); một long tail pull on demand.</li>
+<li><strong>Egress:</strong> CDN serve phần lớn bytes internet — capacity là bandwidth ở edge, không phải compute.</li>
+</ul>
+<p><strong>Ví dụ có số — vì sao hit ratio chi phối.</strong> Giả sử tổng demand 10 Tbps. Ở hit ratio 95%, origin chỉ cần serve ~5% = ~500 Gbps; đẩy lên 99% thì origin tụt còn ~100 Gbps — giảm 5× chi phí origin/transit chỉ từ 4 điểm hit ratio. Đó là lý do vài phần trăm hit ratio đáng để bỏ nhiều effort (cache key tốt hơn, shielding, pre-positioning), và vì sao một lỗi cache-busting (vd query param theo user trong cache key) là thảm hoạ: nó có thể kéo ratio về 0 và làm cháy origin.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /{asset}</code> — serve bởi edge gần nhất (trong suốt với client).</li>
+<li><code>POST /purge</code> — <code>{url | tag}</code> invalidate content cached.</li>
+<li>Origin pull config: cache-control TTL, cache key, signed-URL rule.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Một request client được route tới một <strong>edge PoP</strong> gần; khi miss, edge fetch từ một <strong>regional shield</strong>, cái này lại fetch từ <strong>origin</strong> — nên origin thấy rất ít traffic. Một control plane push config và purge khắp network.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User"] --> ROUTE["Request routing (Anycast / GeoDNS)"]
+  ROUTE --> EDGE["Edge PoP cache (gần nhất)"]
+  EDGE -->|miss| SHIELD["Regional shield cache"]
+  SHIELD -->|miss| ORIGIN["Origin"]
+  CTRL["Control plane: config + purge"] -.-> EDGE
+  CTRL -.-> SHIELD
+</pre>
+<figcaption><strong>Hình 1.</strong> Route tới edge gần nhất; miss cascade edge tới shield tới origin, nên origin được shield. Một control plane phân phối config và purge.</figcaption>
+</figure>
+
+<h2>Request routing</h2>
+<p>Đưa user tới một edge gần và healthy là việc đầu tiên. Hai kỹ thuật phổ biến:</p>
+<ul>
+<li><strong>Anycast:</strong> nhiều PoP announce cùng một IP; network route user tới cái gần nhất về topology. Đơn giản, failover nhanh, ít kiểm soát chính xác.</li>
+<li><strong>GeoDNS:</strong> DNS trả một edge IP khác dựa trên location / latency / health của resolver. Kiểm soát nhiều hơn, nhưng DNS caching làm thay đổi chậm.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  REQ["User request"] --> M{"Routing method"}
+  M -->|Anycast| AN["Cùng IP từ nhiều PoP; network chọn gần nhất"]
+  M -->|GeoDNS| GD["DNS trả edge IP gần nhất, healthy"]
+  AN --> EDGE["Edge PoP gần nhất"]
+  GD --> EDGE
+</pre>
+<figcaption><strong>Hình 2.</strong> Anycast (gần nhất ở network-level) vs GeoDNS (gần nhất ở DNS-level) route user tới một edge gần, healthy.</figcaption>
+</figure>
+
+<h2>Cache hierarchy</h2>
+<p>Một tier duy nhất sẽ stampede origin khi miss. Một <strong>hierarchy</strong> — edge rồi regional shield rồi origin — nghĩa nhiều edge share một shield, nên origin thấy một fetch mỗi object mỗi region, không phải mỗi edge. Mỗi tier áp cache key, TTL, và LRU eviction.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  E1["Edge A"] --> SH["Regional shield"]
+  E2["Edge B"] --> SH
+  E3["Edge C"] --> SH
+  SH --> O["Origin (một fetch mỗi object mỗi region)"]
+</pre>
+<figcaption><strong>Hình 3.</strong> Nhiều edge dồn miss qua một shield chung, gom origin fetch xuống một lần mỗi object mỗi region.</figcaption>
+</figure>
+
+<h2>Private content và signed URL</h2>
+<p>Không phải mọi thứ đều public. Với content private, edge verify một <strong>signed URL hoặc signed cookie</strong> (HMAC kèm expiry) trước khi serve, và response được đánh dấu <code>private</code>/<code>no-store</code> hoặc cache dưới một cache key access-aware — nên một object private không bao giờ được serve cho user khác từ cache. Cache key chỉ gồm dimension access-safe; header user-specific để ngoài trừ khi response là private.</p>
+
+<h2>Cache miss flow</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant E as Edge PoP
+  participant S as Shield
+  participant O as Origin
+  U->>E: GET /asset
+  alt edge hit
+    E-->>U: cached object (nhanh)
+  else edge miss
+    E->>S: fetch /asset
+    alt shield hit
+      S-->>E: object
+    else shield miss
+      S->>O: fetch /asset
+      O-->>S: object (set TTL)
+    end
+    E-->>U: object (giờ cached ở edge)
+  end
+</pre>
+<figcaption><strong>Hình 4.</strong> Hit serve ngay; miss cascade edge tới shield tới origin, cache trên đường về.</figcaption>
+</figure>
+
+<h2>Invalidation và purge</h2>
+<p>Khi content thay đổi, copy cached cũ phải đi. Lựa chọn: <strong>TTL expiry</strong> (đơn giản, eventual), hoặc active <strong>purge</strong> mà control plane propagate tới mọi PoP (nhanh, nhiều việc hơn). Một purge đi tới control plane, fanout tới mọi PoP, và <strong>eventually consistent</strong> với ack/retry và một version/tag — nên global purge có latency và có thể fail một phần, đó là lý do <strong>versioned URL</strong> (content hash trong path) được ưu tiên: version mới là URL mới, nên cache không bao giờ serve bytes cũ và không cần purge.</p>
+<p>Khi miss, edge áp <strong>request coalescing (single-flight)</strong>: nhiều miss đồng thời cho cùng object gom thành một upstream fetch, ngăn cache stampede lên shield/origin.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  CHANGE["Content updated"] --> STRAT{"Invalidation strategy"}
+  STRAT -->|TTL| TTL["Chờ TTL hết hạn (eventual)"]
+  STRAT -->|active purge| PURGE["Control plane purge mọi PoP"]
+  STRAT -->|versioned URL| VER["Hash mới trong URL = object mới"]
+</pre>
+<figcaption><strong>Hình 5.</strong> Ba cách tránh serve content cũ: TTL expiry, active purge, hoặc versioned URL (sạch nhất).</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Một nhầm lẫn thường gặp: "CDN thực ra lưu data ở đâu?" Một CDN <em>không có một database duy nhất</em> — nó là một tiered cache đứng trước durable store của người khác. Data nằm ở nhiều tầng riêng biệt, mỗi tầng chọn theo access pattern:</p>
+<ul>
+<li><strong>Edge cache (storage của data plane):</strong> mỗi PoP giữ object cached trong một <strong>tiered local store</strong> — object hot trong <strong>RAM</strong>, tập warm lớn hơn trên <strong>SSD/NVMe</strong> — quản bởi cache engine (<strong>Varnish / NGINX / Apache Traffic Server</strong>) với eviction policy LRU/LFU. Đây là ephemeral và rebuild được: mất một PoP không mất data, chỉ mất cache warmth.</li>
+<li><strong>Origin (source of truth):</strong> bản durable nằm trong <strong>blob/object storage (S3-like / GCS)</strong> cho media và file lớn, hoặc origin server/DB của chính ứng dụng cho response dynamic. CDN không bao giờ sở hữu durability — nó cache cái origin sở hữu.</li>
+<li><strong>Cache index/metadata:</strong> một structure in-memory mỗi edge map cache key → vị trí object + TTL + ETag; đây là lookup "tôi có nó không và còn fresh không?", không phải một DB persisted.</li>
+<li><strong>Config &amp; routing state:</strong> cache rule, origin mapping, và PoP health được phân phối tới edge qua một <strong>config store / control plane</strong> (kiểu etcd/Consul hoặc một push system proprietary); config GeoDNS/Anycast lái routing.</li>
+<li><strong>TLS certificate:</strong> cert per-domain lưu ở edge (và một secret store ở control plane) để PoP terminate HTTPS.</li>
+<li><strong>Logs &amp; analytics:</strong> access log stream khỏi edge vào <strong>Kafka</strong> → một data warehouse / time-series store cho hit-ratio, billing, và traffic analytics — giữ ngoài request hot path.</li>
+</ul>
+<p><strong>Phần còn lại của landscape:</strong> đa số team <em>mua</em> một managed CDN (Cloudflare, Fastly, Akamai, AWS CloudFront, Google Cloud CDN) thay vì build; self-host nghĩa là chạy Varnish/NGINX/ATS ở mỗi PoP. Cho content dynamic/personalized, <strong>edge compute</strong> (Cloudflare Workers, Lambda@Edge, Fastly Compute) chạy logic tại PoP. Origin/app set <code>Cache-Control</code> và phát versioned URL để điều khiển tất cả những thứ trên.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<p>CDN về bản chất là một cache <strong>eventually-consistent</strong>, và nói rõ điều đó là chiều sâu interviewer muốn:</p>
+<ul>
+<li><strong>Freshness là best-effort:</strong> tới khi TTL hết hạn hoặc purge tới, một edge có thể serve copy cũ. Cần freshness nghiêm ngặt thì câu trả lời là <em>versioned URL</em> (content mới = URL mới), không phải purge nhanh hơn.</li>
+<li><strong>Purge eventually consistent:</strong> global purge fanout với ack/retry và có thể fail một phần; thiết kế cho "đa số PoP trong vài giây, đuôi muộn hơn", không phải global truth tức thì.</li>
+<li><strong>Read-your-writes không giữ</strong> xuyên edge mặc định — user vừa upload có thể đập một PoP khác với object cũ; bind read đó vào versioned URL hoặc bypass cache.</li>
+<li><strong>Routing là xấp xỉ:</strong> Anycast theo BGP (có thể rơi vào PoP không lý tưởng do network policy); GeoDNS phụ thuộc location resolver và bị DNS caching làm chậm. Không cái nào đảm bảo PoP gần nhất thật sự.</li>
+</ul>
+
+<h2>Tradeoffs &amp; khi nào không dùng CDN</h2>
+<ul>
+<li><strong>Tốt cho:</strong> static asset, media segment, download lớn, software update, API response cacheable — thứ gì read nhiều hơn write rất nhiều.</li>
+<li><strong>Biên cho:</strong> content cá nhân hoá cao hoặc đổi nhanh (hit ratio thấp) — dùng micro-TTL + stale-while-revalidate hoặc edge compute, hoặc chấp nhận origin serve.</li>
+<li><strong>Sai cho:</strong> write path và strongly-consistent read — chúng đi origin/DB, không phải cache.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Cache stampede / thundering herd:</strong> nhiều miss cho cùng object đập origin cùng lúc — dùng request coalescing ở edge.</li>
+<li><strong>Hot vs long tail:</strong> push object hot khắp nơi; pull tail on demand.</li>
+<li><strong>Cache key design:</strong> chỉ gồm dimension có ý nghĩa; một key tệ (vd thứ tự query) phân mảnh cache.</li>
+<li><strong>Invalidation khó:</strong> ưu tiên versioned URL hơn global purge khi có thể.</li>
+<li><strong>Dynamic content:</strong> cache micro-TTL hoặc dùng edge compute; không phải mọi thứ cacheable.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>Routing</strong> (Anycast / GeoDNS) đưa user tới một edge gần, healthy.</li>
+<li>Một <strong>cache hierarchy</strong> (edge tới shield tới origin) bảo vệ origin và nâng hit ratio.</li>
+<li><strong>Invalidation</strong> qua TTL, purge, hoặc — tốt nhất — versioned URL.</li>
+<li>Capacity là <strong>edge bandwidth và hit ratio</strong>, không phải origin compute — vài điểm hit ratio đổi chi phí origin theo cấp số nhân.</li>
+<li>CDN là một <strong>cache eventually-consistent</strong>: freshness best-effort, purge eventual — ưu tiên versioned URL cho đúng đắn.</li>
+<li><strong>Cache-key hygiene</strong> là chi tiết sống còn: một dimension theo user trong key phá hit ratio.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Cloudflare / Fastly / Akamai engineering docs và blog; RFC 9111 (HTTP caching) và <code>Cache-Control</code>; tài liệu Anycast / GeoDNS công khai; signed-URL / signed-cookie docs. Diagram và nội dung là content gốc của EngineerPro.</em></p>

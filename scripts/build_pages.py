@@ -35,11 +35,14 @@ Outputs:
   docs/contact/index.html
 """
 
+import datetime
 import html
 import json
 import os
 import re
+import subprocess
 import sys
+from functools import lru_cache
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
@@ -57,6 +60,37 @@ from site_config import (  # noqa: E402
     OG_IMAGE,
     SYSTEM_DESIGN_URL_SLUG,
 )
+
+# First publish date of the original v2 System Design set (used as datePublished
+# in Article schema; dateModified is derived from each chapter's git history).
+SD_V2_PUBLISHED = "2026-06-08"
+_SD_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+@lru_cache(maxsize=None)
+def _git_last_date(path_rel: str) -> str | None:
+    """Date (YYYY-MM-DD) of the last commit touching ``path_rel``, or None."""
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%cs", "--", path_rel],
+            cwd=ROOT, capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    d = out.stdout.strip()
+    return d if _SD_DATE_RE.match(d) else None
+
+
+def content_last_mod(*path_rels: str) -> str:
+    """Most-recent git commit date among the given sources; falls back to mtime/today."""
+    dates = [d for p in path_rels if (d := _git_last_date(p))]
+    if dates:
+        return max(dates)
+    for p in path_rels:
+        ap = os.path.join(ROOT, p)
+        if os.path.exists(ap):
+            return datetime.date.fromtimestamp(os.path.getmtime(ap)).isoformat()
+    return datetime.date.today().isoformat()
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -470,7 +504,7 @@ SD_AUTHORS = [
     {"name": "Lê Quang Hoà", "url": "https://www.linkedin.com/in/harry-le-quang-hoa-32210066/"},
 ]
 
-SD_SOURCE_NOTE = "Nguồn: liquidslr/system-design-notes"
+SD_SOURCE_NOTE = "Nội dung gốc bởi EngineerPro"
 
 
 def sd_author_schema() -> list[dict]:
@@ -481,8 +515,8 @@ def sd_chapter_description(ch: dict) -> str:
     n = ch.get("n", "")
     title_vi = ch.get("title", "")
     return truncate(
-        f"Chương {n}: {title_vi} — ghi chú System Design Interview (VI & EN). "
-        f"Tổng hợp EngineerPro. {SD_SOURCE_NOTE}.",
+        f"Chương {n}: {title_vi} — case study System Design Interview (VI & EN). "
+        f"Biên soạn gốc bởi EngineerPro.",
         160,
     )
 
@@ -789,17 +823,25 @@ def build_sd_chapter(template: str, ch: dict) -> str:
         og_type="article",
     )
 
+    date_modified = content_last_mod(
+        f"src/assets/content/system-design/vi/{slug}.html",
+        f"src/assets/content/system-design/en/{slug}.html",
+        "src/assets/system-design-data.js",
+    )
     extra = [{
-        "@type": "Article",
+        "@type": "TechArticle",
         "@id": canonical + "#article",
         "headline": title_vi,
         "alternativeHeadline": title_en,
         "description": description,
         "url": canonical,
+        "image": og_image,
+        "datePublished": SD_V2_PUBLISHED,
+        "dateModified": date_modified,
         "author": sd_author_schema(),
         "publisher": {"@id": f"{SITE_BASE}/#org"},
         "isPartOf": {"@id": f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/#chapters"},
-        "inLanguage": "vi",
+        "inLanguage": ["vi", "en"],
     }, {
         "@type": "BreadcrumbList",
         "itemListElement": [
@@ -831,8 +873,8 @@ ROUTE_DESCRIPTIONS_VI = {
     "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
     SYSTEM_DESIGN_URL_SLUG: (
-        "23 case study System Design Interview — đọc từng chương (VI & EN). "
-        "Tổng hợp & dịch EngineerPro. Nguồn: liquidslr/system-design-notes."
+        "21 case study System Design Interview gốc — đọc từng chương (VI & EN). "
+        "Nội dung gốc bởi EngineerPro."
     ),
     "mock":          "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
     "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech, playlist review CV.",

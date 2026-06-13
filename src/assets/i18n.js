@@ -140,7 +140,7 @@ window.I18N = {
 
     // ============== SYSTEM DESIGN ==============
     "sd.eyebrow":           "🏗 System Design · Ghi chú tham khảo",
-    "sd.chapters.head":     "23 case study — đọc từng chương",
+    "sd.chapters.head":     "21 case study gốc — đọc từng chương",
     "sd.chapters.intro":    "Mỗi chương có bản tiếng Việt và tiếng Anh. Bấm để đọc chi tiết.",
     "sd.errataNote.html":
       'Trong quá trình tổng hợp và dịch không thể tránh khỏi sai sót. Nếu bạn phát hiện lỗi hoặc muốn góp ý, vui lòng <a href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">nhắn tin fanpage EngineerPro</a>.',
@@ -585,7 +585,7 @@ window.I18N = {
     "book.author.portfolio": "Portfolio",
 
     "sd.eyebrow":           "🏗 System Design · Reference notes",
-    "sd.chapters.head":     "23 case studies — read chapter by chapter",
+    "sd.chapters.head":     "21 original case studies — read chapter by chapter",
     "sd.chapters.intro":    "Each chapter is available in Vietnamese and English. Click to read.",
     "sd.errataNote.html":
       'Errors may occur during compilation and translation. If you spot mistakes or want to share feedback, please <a href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">message us on the EngineerPro Fanpage</a>.',

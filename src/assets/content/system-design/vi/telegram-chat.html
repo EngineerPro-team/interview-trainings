@@ -1,0 +1,250 @@
+<p>Thiết kế một chat system như <strong>Telegram</strong> là bài toán chuyển các message nhỏ giữa hàng trăm triệu thiết bị với latency thấp, ordering đúng, và multi-device sync mượt mà. Chương này dựng một messenger kiểu Telegram từ first principles: connection layer, lưu trữ và ordering message, multi-device sync, group fanout, presence, và secret chat mã hoá end-to-end.</p>
+
+<p>Mấu chốt thiết kế chat là hai guarantee tưởng dễ mà khó, nằm trên một hệ "store-and-forward" vốn đơn giản: <strong>ordering theo từng chat</strong> (mọi thiết bị thấy cùng thứ tự message) và <strong>multi-device sync</strong> (message đọc trên điện thoại hiện đã đọc trên laptop). Mẹo làm cả hai khả thi là một <strong>sequence number tăng đơn điệu theo từng chat</strong> — một khi mỗi message có vị trí authoritative, ordering, dedup, và "tôi chưa thấy cái nào" sync đều quy về so sánh số nguyên.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>1:1, group nhỏ, hay channel khổng lồ?</strong> Một broadcast channel triệu member là bài toán khác (shared log, pull) so với chat 1:1 (push) — làm rõ size group lớn nhất.</li>
+<li><strong>Cần multi-device?</strong> Nếu một account trải điện thoại + desktop + web, bạn cần một sync cursor per-device server-side, không chỉ per-user.</li>
+<li><strong>End-to-end encryption?</strong> Nếu secret chat là E2E, server không đọc hay fan out content được — chỉ route ciphertext giữa hai thiết bị (không multi-device, không server search).</li>
+<li><strong>Độ mạnh ordering?</strong> Total order theo từng chat là câu trả lời thường thấy; global ordering qua các chat là không cần và đắt.</li>
+<li><strong>Retention?</strong> History lưu mãi vs message ephemeral/hết hạn đổi mô hình storage và cost.</li>
+</ul>
+
+<h2>Requirements</h2>
+
+<h3>Functional</h3>
+<ul>
+<li>Chat 1:1 và <strong>group</strong> với text và media.</li>
+<li><strong>Delivery và read receipt</strong> (sent, delivered, seen).</li>
+<li><strong>Multi-device sync</strong> — cùng một account nhất quán trên điện thoại, desktop, web.</li>
+<li><strong>Offline delivery</strong> — message được xếp hàng khi người nhận offline.</li>
+<li><strong>Presence</strong> (online / last seen) và typing indicator.</li>
+<li><strong>Secret chat</strong> mã hoá end-to-end (device-to-device).</li>
+</ul>
+
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Latency thấp</strong> khi giao message (vài chục ms trong cùng region).</li>
+<li><strong>Ordering</strong> — message trong một chat hiển thị cùng thứ tự trên mọi thiết bị.</li>
+<li><strong>Durability</strong> — message đã ack thì không bao giờ mất.</li>
+<li><strong>Scale</strong> — 100M+ user mỗi ngày, hàng triệu connection đồng thời.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Users:</strong> 100M DAU, ~40 message gửi/user/ngày → ~4B message/ngày ≈ <strong>46k writes/s</strong> trung bình, peak ~5x ≈ <strong>230k writes/s</strong>.</li>
+<li><strong>Storage:</strong> ~300 bytes/message (metadata + text) × 4B/ngày ≈ 1.2 TB/ngày; với 3x replication ≈ <strong>3.6 TB/ngày</strong> (media đi blob storage riêng).</li>
+<li><strong>Connections:</strong> ~10-20M device đồng thời; ~50k connection/gateway → <strong>~200-400 gateway</strong>.</li>
+<li><strong>Fanout:</strong> chat 1:1 là ~1 delivery, nhưng channel 100k member biến một write thành 100k read — lý do group lớn dùng shared log.</li>
+</ul>
+<p><strong>Worked example.</strong> Lấy quyết định fanout cụ thể. Một message 1:1 là một write + một push — tầm thường. Một group 50 member push-on-write là 1 write → 50 delivery; ở 230k writes/s traffic group đó là hàng triệu push/s, nhưng vẫn rẻ vì "inbox" của mỗi member chỉ là một pointer advance. Giờ một <strong>channel 1.000.000 member</strong>: push-on-write nghĩa là 1 message → 1M inbox write — một write amplification làm chảy hệ thống và phí công cho ~90% member đang offline hoặc không bao giờ mở. Nên channel lớn lật sang <strong>pull / shared log</strong>: message được ghi <em>một lần</em> vào log của channel, và mỗi client đọc từ sequence number last-seen khi mở chat. Đây là split fanout-on-write (chat nhỏ, latency thấp) vs fanout-on-read (channel khổng lồ, tránh amplification) kinh điển — cùng trade-off như social feed, quyết định theo từng chat dựa trên size membership.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /sendMessage</code> — <code>{chat_id, client_msg_id, text | media_ref}</code> → <code>{seq, date}</code> (client_msg_id làm send idempotent).</li>
+<li><code>GET /getUpdates</code> — <code>{pts, limit}</code> → <code>{updates[], new_pts}</code> (multi-device sync).</li>
+<li><code>GET /getHistory</code> — <code>{chat_id, from_seq, limit}</code> → danh sách message.</li>
+<li><code>POST /markRead</code> — <code>{chat_id, up_to_seq}</code>.</li>
+<li><code>POST /sendTyping</code> — <code>{chat_id}</code> (ephemeral, TTL ngắn).</li>
+<li><strong>WebSocket events (server tới client):</strong> <code>new_message</code>, <code>read_receipt</code>, <code>presence</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<p>Client giữ một <strong>persistent connection</strong> (WebSocket / TCP sống lâu) tới một <strong>gateway</strong> stateless. Gateway forward tới message service; service này persist vào store theo từng chat và fanout tới người nhận. Một session registry theo dõi gateway nào đang giữ mỗi device, để có thể push message tới người nhận đang online; push service lo trường hợp offline.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Sender device"] --> GW1["Gateway A (stateless)"]
+  B["Recipient device"] --> GW2["Gateway B (stateless)"]
+  GW1 --> MS["Message service"]
+  MS --> STORE["Message store (per-chat)"]
+  MS --> SESS["Session registry: device to gateway"]
+  MS --> FAN["Fanout"]
+  FAN --> GW2
+  FAN --> PUSH["Push service (APNs / FCM)"]
+  PUSH -.offline.-> B
+</pre>
+<figcaption><strong>Hình 1.</strong> Gateway stateless giữ các connection sống lâu; message service persist, tra gateway của người nhận trong session registry, rồi fanout (hoặc fallback sang push khi offline).</figcaption>
+</figure>
+
+<h2>Connection layer và session</h2>
+
+<p>Connection thì <em>stateful</em> nhưng gateway thì <em>logically stateless</em>: gateway nào cũng phục vụ được user nào, và ánh xạ "device này đang nối tới gateway kia" nằm trong một <strong>session registry</strong> dùng chung (vd Redis). Khi device connect, gateway đăng ký nó; khi message service cần giao, nó tra gateway và forward. Một heartbeat giữ entry tươi mới và phát hiện connection chết.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant D as Device
+  participant GW as Gateway
+  participant REG as Session registry
+  D->>GW: connect + auth token
+  GW->>REG: register device -> this gateway (TTL)
+  loop mỗi N giây
+    D->>GW: heartbeat
+    GW->>REG: refresh TTL
+  end
+  Note over GW,REG: khi disconnect hoặc TTL hết, entry bị xoá
+</pre>
+<figcaption><strong>Hình 2.</strong> Device đăng ký gateway của nó vào registry dùng chung với TTL được heartbeat refresh, nên delivery luôn tìm được device đang online.</figcaption>
+</figure>
+
+<h2>Gửi một message</h2>
+
+<p>Mỗi message mang một <strong>client-generated id</strong> (idempotency key) nên retry không tạo duplicate. Phần tinh tế là <em>ai</em> gán thứ tự: dưới các send đồng thời từ nhiều message-service instance, bạn cần một <strong>ordering authority duy nhất mỗi chat</strong> — một <strong>chat sequencer / partition owner</strong> (một owner mỗi <code>chat_id</code>, hoặc một log partition theo <code>chat_id</code> với một consumer duy nhất, hoặc một conditional counter qua LWT). Owner đó dedup theo <code>client_msg_id</code>, cấp <code>seq</code> đơn điệu kế tiếp, rồi persist vào durable message store trước khi ack cho sender. Một wide-column store đơn thuần (clustering theo <code>seq</code>) chỉ <em>lưu</em> một thứ tự đã được gán — nó không cấp thứ tự an toàn dưới contention.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant S as Sender
+  participant MS as Message service
+  participant SEQ as Chat sequencer (owner of chat_id)
+  participant ST as Message store
+  participant R as Recipient (online)
+  S->>MS: send(chatId, clientMsgId, text)
+  MS->>SEQ: route theo chat_id
+  SEQ->>SEQ: dedup clientMsgId, cấp seq kế tiếp
+  SEQ->>ST: persist message tại seq = 42
+  ST-->>SEQ: stored (durable)
+  SEQ-->>MS: seq = 42
+  MS-->>S: ack (seq = 42)
+  MS->>R: deliver(seq = 42)
+  R-->>MS: delivered / seen receipt
+</pre>
+<figcaption><strong>Hình 3.</strong> Một <strong>sequencer</strong> theo chat (một owner mỗi chat) dedup client message id và cấp <code>seq</code> đơn điệu, rồi persist durable trước khi ack — store giữ thứ tự, sequencer tạo ra thứ tự.</figcaption>
+</figure>
+
+<h2>Lưu trữ và ordering</h2>
+
+<p>Một khi sequencer đã gán mỗi message một <code>seq</code> theo chat, message được lưu theo key là chat và sắp theo sequence number đó. Một wide-column store (vd Cassandra) partition theo <code>chat_id</code> với <code>seq</code> làm clustering key cho phép append rẻ và đọc hiệu quả kiểu "lấy N message cuối" / "lấy từ seq X". Clustering key chỉ sắp một thứ tự đã tồn tại — nó không phải cái cấp thứ tự.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph CHAT["Partition: chat_id = 777"]
+    direction TB
+    M1["seq 40 | from A | hello"]
+    M2["seq 41 | from B | hi"]
+    M3["seq 42 | from A | how are you"]
+    M1 --> M2 --> M3
+  end
+  Q1["fetch last N"] --> CHAT
+  Q2["fetch since seq 41"] --> CHAT
+</pre>
+<figcaption><strong>Hình 4.</strong> Một partition cho mỗi chat, clustered theo sequence number — append rẻ và range read ("since seq X") chỉ là một lần quét partition.</figcaption>
+</figure>
+
+<h2>Multi-device sync</h2>
+
+<p>Account Telegram là <strong>cloud-based</strong>: message nằm trên server, và mọi device reconcile về cùng một state. Mỗi account giữ một <strong>update sequence</strong> toàn cục (Telegram gọi là <code>pts</code> — "points"). Device lưu <code>pts</code> cuối cùng nó thấy; khi reconnect, nó gọi "cho tôi update từ <code>pts</code>" và replay phần đã lỡ. Sự kiện mới làm <code>pts</code> tăng, nên các device hội tụ bất kể lần cuối online là khi nào.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  EV["Event mới (message, read, edit)"] --> SEQ["Tăng account update seq (pts)"]
+  SEQ --> LOG["Per-account update log"]
+  P["Phone: last pts = 100"] -->|getUpdates since 100| LOG
+  W["Web: last pts = 95"] -->|getUpdates since 95| LOG
+  LOG -->|replay 96..105| W
+  LOG -->|replay 101..105| P
+</pre>
+<figcaption><strong>Hình 5.</strong> Update sequence theo account (pts) giúp mỗi device kéo đúng các event nó đã lỡ, nên phone, web, desktop hội tụ cùng state.</figcaption>
+</figure>
+
+<h2>Group chat</h2>
+
+<p>Hai mô hình, phản chiếu fanout của news feed:</p>
+<ul>
+<li><strong>Fanout on write (group nhỏ):</strong> copy message vào delivery path của từng member khi gửi. Read nhanh, write amplification cao hơn.</li>
+<li><strong>Shared log (group lớn / channel):</strong> lưu một bản trong message log của group; member đọc từ đó. Tránh write amplification khổng lồ cho channel có hàng triệu subscriber.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  SENDER["Member gửi vào group 9"] --> GLOG["Group message log (chat_id = 9)"]
+  GLOG --> F1["Member online: push qua gateway"]
+  GLOG --> F2["Member offline: push notification"]
+  GLOG --> F3["Khi mở app: getUpdates since pts"]
+</pre>
+<figcaption><strong>Hình 6.</strong> Group lớn giữ một shared log; member online được push, member offline nhận notification và sync khi mở — tránh tạo bản copy cho từng member.</figcaption>
+</figure>
+
+<h2>Presence và typing</h2>
+
+<p>Presence khối lượng lớn nhưng giá trị mỗi event thấp, nên giữ rẻ: device gửi <strong>heartbeat</strong> định kỳ; lỡ vài nhịp thì đánh dấu offline ("last seen"). Typing indicator là event fanout ephemeral với TTL ngắn — không bao giờ persist.</p>
+
+<h2>Secret chat (end-to-end encryption)</h2>
+
+<p>"Cloud chat" thường được mã hoá khi truyền và khi lưu nhưng server đọc được (cần cho multi-device sync). <strong>Secret chat</strong> mã hoá end-to-end và buộc vào hai device: key được derive bằng trao đổi Diffie-Hellman, server chỉ relay ciphertext mờ đục — không đọc được nội dung và không sync secret chat sang device khác.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Device A
+  participant SRV as Server (chỉ relay)
+  participant B as Device B
+  A->>SRV: DH public part
+  SRV->>B: forward
+  B->>SRV: DH public part
+  SRV->>A: forward
+  Note over A,B: cả hai derive ra cùng shared key
+  A->>SRV: encrypted blob (opaque)
+  SRV->>B: relay encrypted blob
+  Note over SRV: server không giải mã được
+</pre>
+<figcaption><strong>Hình 7.</strong> Secret chat: server chỉ relay phần handshake Diffie-Hellman và ciphertext mờ đục; key không bao giờ rời khỏi hai device.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Datastore nào cho việc gì là phần lớn của thiết kế:</p>
+<ul>
+<li><strong>API gateway</strong> (Envoy / NGINX): auth, rate limiting, route cho bề mặt REST/login, đứng trước các WebSocket gateway.</li>
+<li><strong>Connection gateway:</strong> WebSocket server stateful; <strong>session registry</strong> device→gateway nằm trong <strong>Redis</strong> (TTL refresh bằng heartbeat).</li>
+<li><strong>Ordering authority:</strong> một <strong>sequencer theo chat</strong> gán <code>seq</code> đơn điệu — một partition owner duy nhất mỗi <code>chat_id</code>, hoặc một <strong>log partition theo <code>chat_id</code></strong> (Kafka/Pulsar) với một consumer mỗi partition, hoặc một conditional counter row (LWT). Đây là mảnh làm ordering đúng dưới send đồng thời; message store <em>không</em> cấp thứ tự.</li>
+<li><strong>Messages:</strong> một <strong>wide-column store (Cassandra / ScyllaDB)</strong> partition theo <code>chat_id</code>, cluster theo <code>seq</code> — nó <em>lưu</em> message theo đúng thứ tự sequencer đã gán: append rẻ, range read "fetch since seq" hiệu quả, scale ngang. Đây là store chủ lực, không phải sequencer.</li>
+<li><strong>Account / contacts / settings:</strong> một DB quan hệ (<strong>PostgreSQL</strong>) — kích thước vừa, quan hệ, transactional.</li>
+<li><strong>Fanout / update stream:</strong> <strong>Kafka</strong> mang event post-và-fanout tới gateway và push service.</li>
+<li><strong>Media (ảnh, video, file):</strong> <strong>blob/object storage (S3-like)</strong> + <strong>CDN</strong>; message chỉ lưu reference, không bao giờ bytes.</li>
+<li><strong>Push tới device offline:</strong> APNs / FCM qua một push service.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> message append-heavy, ordered theo chat, và khổng lồ tổng → wide-column store hơn một DB quan hệ đơn; presence/session map hot + ephemeral → Redis; media lớn + bất biến → object storage + CDN; account data nhỏ + quan hệ → SQL. Ciphertext secret-chat chỉ là bytes mờ đục server relay và lưu mà không có key.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Total order theo từng chat, không global:</strong> một <strong>sequencer</strong> theo chat (một owner mỗi chat) cấp <code>seq</code> đơn điệu sau khi dedup client message id, nên mọi thiết bị render cùng thứ tự trong một chat. Wide-column store giữ thứ tự đó; nó không tạo ra. Không có guarantee ordering cross-chat, và thế là ổn.</li>
+<li><strong>At-least-once delivery + apply idempotent:</strong> một message có thể được giao hơn một lần (retry, reconnect), nên client dedup theo <code>(chat_id, seq)</code> / message id. Sender đính một id client-generated để resend không tạo bản trùng.</li>
+<li><strong>Durability trước ack:</strong> message được persist (và replicate) trước khi sender nhận "sent" — message đã ack không bao giờ mất, kể cả khi người nhận offline nhiều ngày (được pull theo seq khi reconnect).</li>
+<li><strong>Read-your-writes qua sync cursor:</strong> mỗi thiết bị track seq last-applied; khi reconnect nó pull mọi thứ sau đó, nên multi-device nhất quán (read receipt và delete lan truyền cùng cách).</li>
+<li><strong>Secret chat E2E đánh đổi feature lấy privacy:</strong> end-to-end encryption nghĩa là không fanout server-side, không search, không multi-device cloud history — server chỉ route ciphertext giữa hai thiết bị cụ thể.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hợp:</strong> messaging consumer/team cần latency thấp, multi-device, history, và pha trộn 1:1, group, và channel lớn.</li>
+<li><strong>Đơn giản hoá khi:</strong> chỉ cần chat 1:1 ephemeral (vd in-app support) — một push channel đơn không cần wide-column log và bộ máy channel/pull có thể là đủ.</li>
+<li><strong>Thiết kế khác khi:</strong> sản phẩm thực ra là live broadcast tới hàng triệu (dùng feed/log + CDN), hoặc nó là event bus giữa các service (dùng Kafka trực tiếp) — semantics chat (read state per-recipient, presence) thêm chi phí bạn không cần ở đó.</li>
+</ul>
+
+<h2>Scaling và pitfalls</h2>
+<ul>
+<li><strong>Connection scaling:</strong> hàng triệu persistent connection — shard ra nhiều gateway stateless; giữ memory mỗi connection nhỏ.</li>
+<li><strong>Hot group / channel:</strong> channel hàng triệu member phải dùng shared-log + read fanout, không phải write fanout.</li>
+<li><strong>Ordering khi retry:</strong> client message id dedup; sequence number theo chat là single source of truth cho thứ tự.</li>
+<li><strong>Thundering herd khi reconnect:</strong> sau một cú rớt mạng, nhiều device cùng gọi getUpdates — giới hạn cửa sổ replay và rate-limit.</li>
+<li><strong>Media:</strong> không bao giờ đẩy bytes qua message path — upload lên blob storage / CDN và gửi reference.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>Gateway</strong> stateless + <strong>session registry</strong> dùng chung tách "ai đang nối ở đâu" khỏi việc delivery.</li>
+<li><strong>Client message id</strong> (idempotency) cộng <strong>sequence number theo chat</strong> cho dedup và một authority duy nhất về ordering.</li>
+<li><strong>Update sequence (pts)</strong> theo account là xương sống của multi-device sync.</li>
+<li>Group lớn dùng <strong>shared log + read fanout</strong>; chat nhỏ có thể fanout on write.</li>
+<li><strong>Secret chat</strong> đánh đổi multi-device sync lấy end-to-end encryption thật sự.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: tài liệu công khai Telegram / MTProto và tài liệu distributed-systems tổng quát. Diagram và nội dung là content gốc của EngineerPro.</em></p>

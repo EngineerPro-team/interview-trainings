@@ -1,0 +1,188 @@
+<p>A <strong>stock exchange</strong> matches buy and sell orders fairly, with <strong>microsecond-scale latency</strong> and absolute correctness — a lost or reordered order is unacceptable. The heart is an in-memory <strong>matching engine</strong> fed by a <strong>sequencer</strong>, made recoverable by <strong>event sourcing</strong>.</p>
+
+<p>This is the purest "correctness + latency, both non-negotiable" design in the set. The defining trick is <strong>determinism</strong>: assign every order a single total order via a sequencer, write that ordered stream to a durable replicated log, then feed it to a <strong>single-threaded, in-memory matching engine</strong> per symbol. Because matching is a deterministic function of the input sequence, the log <em>is</em> the database — any replica or a recovered node replays the same log and reaches the identical book and fills. There is deliberately <strong>no database on the matching hot path</strong>; persistence happens by appending to the log, not by writing rows mid-match.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Latency class?</strong> True microsecond HFT-grade matching (kernel bypass, no GC) vs a "fast but millisecond" venue — the bar changes the implementation drastically.</li>
+<li><strong>Matching rules?</strong> Price-time priority (most common), pro-rata, or auction phases (open/close)? This is the core algorithm.</li>
+<li><strong>Order types?</strong> Limit and market only, or stop/iceberg/IOC etc.? More types = more matching logic.</li>
+<li><strong>Pre-trade risk checks?</strong> Must orders pass credit/risk limits before matching? That adds a gate on the critical path.</li>
+<li><strong>Market data depth?</strong> L1 (top of book) vs full L2/L3 depth, and the fan-out to thousands of subscribers, drives the publishing design.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Place / cancel orders (limit, market); receive executions (fills).</li>
+<li>Publish <strong>market data</strong> (order book L1/L2, candlesticks).</li>
+<li>Download historical data.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Ultra-low latency</strong> on the critical path (micro to milliseconds).</li>
+<li><strong>Fairness and total ordering</strong> of orders.</li>
+<li><strong>Durability</strong> and fast recovery; high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Order rate:</strong> a busy exchange peaks at hundreds of thousands to millions of orders/s, partitioned by symbol.</li>
+<li><strong>Per-symbol matching:</strong> one symbol's order book is single-threaded in memory — modern CPUs match millions of orders/s, so a core per hot symbol suffices.</li>
+<li><strong>Market data fan-out:</strong> one execution fans out to many subscribers — multicast, not per-subscriber unicast.</li>
+<li><strong>Critical-path hygiene:</strong> no locks, no GC pauses on the matching path. Durability is not skipped — the sequencer writes each order to a durable, replicated <strong>input log</strong> before matching; an order is "committed" once it is in that replicated log, so matching state and fills can always be replayed.</li>
+</ul>
+<p><strong>Worked example.</strong> Trace one order's microsecond budget to see why the architecture exists. At, say, 1M orders/s on a hot symbol, that's ~1 microsecond of headroom per order on that book — so any lock, allocation, or GC pause (milliseconds!) would be catastrophic. That rules out a database write per order: a disk/DB round-trip is ~hundreds of microseconds to milliseconds, 100-1000x the budget. The resolution: the <strong>sequencer</strong> appends the order to a replicated in-memory/log-structured input log (microseconds, and durable once a quorum of replicas has it), then the matching engine — single-threaded, pre-allocated data structures, no locks because there's one writer per symbol — processes it in well under a microsecond. Partitioning by <strong>symbol</strong> is what gives horizontal scale: 5000 symbols across N cores, each book independent, so aggregate throughput is millions/s while each book stays single-threaded and deterministic. Market data fan-out (one fill → thousands of subscribers) is handled by <strong>multicast</strong>, never per-subscriber unicast, off the matching path.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /orders</code> — <code>{symbol, side, type, price, quantity}</code> → <code>{order_id, status}</code> (often FIX, not REST).</li>
+<li><code>DELETE /orders/{id}</code> — cancel.</li>
+<li><code>GET /marketdata/orderbook?symbol=&depth=</code> → bids / asks.</li>
+<li><code>GET /marketdata/candles?symbol=&resolution=</code> → OHLC candles.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Orders enter through a <strong>client gateway</strong>, are stamped into a single total order by the <strong>sequencer</strong>, and flow to the per-symbol <strong>matching engine</strong>. Orders/cancels are committed to the <strong>Input command log</strong> before matching (the commit point and replay source); the resulting fills and book updates are appended to a separate <strong>Output event log</strong> that a market-data publisher and a reporter consume.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  BR["Broker / client"] --> GW["Client gateway"]
+  GW --> RISK["Risk / pre-trade + self-trade check"]
+  RISK --> SEQ["Sequencer: append to durable replicated Input command log (total order)"]
+  SEQ --> ME["Matching engine (per-symbol order book)"]
+  ME --> ES["Output event log (fills, book updates; append-only)"]
+  ES --> MD["Market data publisher"]
+  ES --> RPT["Reporter"]
+  MD --> SUBS["Market-data gateways (internal multicast) then client protocols"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Risk/pre-trade checks run before the sequencer; the sequencer appends each order/cancel to the durable, replicated <strong>Input command log</strong> (the commit point) before matching; the matching engine emits fills/book updates to the <strong>Output event log</strong>, from which market data and reports derive.</figcaption>
+</figure>
+
+<h2>Matching engine and the order book</h2>
+<p>Each symbol has an <strong>order book</strong>: bids sorted high-to-low, asks low-to-high. A new order matches against the best opposite price; leftover quantity rests in the book. Kept entirely in memory and processed <strong>single-threaded per symbol</strong>, matching is both fast and inherently free of race conditions.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  NEW["New buy order: 100 at 50.2"] --> ME["Matching engine for symbol"]
+  subgraph BOOK["Order book"]
+    direction LR
+    BIDS["Bids: 50.1, 50.0, 49.9"]
+    ASKS["Asks: 50.2, 50.3, 50.4"]
+  end
+  ME --> BOOK
+  ME --> MATCH{"Crosses best ask?"}
+  MATCH -->|yes| FILL["Execute fill at 50.2"]
+  MATCH -->|no| REST["Rest order in book"]
+</pre>
+<figcaption><strong>Figure 2.</strong> The matching engine crosses an incoming order against the best opposite price; unmatched quantity rests in the in-memory book.</figcaption>
+</figure>
+
+<h2>Sequencer and event sourcing</h2>
+<p>Fairness needs a single <strong>total order</strong> of input. A sequencer assigns a monotonic sequence number to every order/cancel and appends it to the <strong>Input command log</strong> before matching — this log is the commit point and the replay source. Because matching is a deterministic function of that ordered input, the engine is rebuildable: <strong>event sourcing</strong> means recovery is "replay the Input command log", and a replica is kept hot by consuming the same committed input.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  IN["Orders / cancels"] --> SEQ["Sequencer assigns seq 1,2,3..."]
+  SEQ --> LOG["Input command log (ordered, append-only, replicated)"]
+  LOG --> ME["Matching engine state"]
+  LOG --> REPLAY["Recovery: replay Input command log to rebuild"]
+  LOG --> HOT["Hot replica: consume same committed input"]
+  ME --> OEL["Output event log (fills / book updates)"]
+</pre>
+<figcaption><strong>Figure 3.</strong> The sequencer creates one total order of <em>input</em>; the <strong>Input command log</strong> is the commit point and replay source for matching, while fills/book updates go to the separate <strong>Output event log</strong> consumed downstream.</figcaption>
+</figure>
+
+<h2>Order flow</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Broker
+  participant GW as Gateway
+  participant RK as Risk
+  participant SEQ as Sequencer
+  participant ICL as Input command log
+  participant ME as Matching engine
+  participant OEL as Output event log
+  participant MD as Market data
+  B->>GW: new order
+  GW->>RK: pre-trade risk check
+  RK->>SEQ: forward
+  SEQ->>ICL: append (quorum) = commit point
+  ICL->>ME: deliver committed command
+  ME->>ME: match against book
+  ME->>OEL: append fill + book update
+  OEL-->>GW: execution report
+  GW-->>B: fill
+  OEL->>MD: market data
+</pre>
+<figcaption><strong>Figure 4.</strong> The commit point is the durable append to the <strong>Input command log</strong>; the matching engine consumes the committed command, appends the fill/book update to the <strong>Output event log</strong>, and the execution report returns via the gateway while market data is published from the output log.</figcaption>
+</figure>
+
+<h2>High availability</h2>
+<p>The matching engine is a single logical writer per symbol — so HA is primary plus hot replicas fed by the <strong>Input command log</strong>, with <strong>leader election</strong> (e.g. Raft) to promote a replica on failure. The replica has replayed the same committed input, so failover loses no committed orders or fills.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  PRIMARY["Primary matching engine"] -->|input command log| R1["Hot replica 1"]
+  PRIMARY -->|input command log| R2["Hot replica 2"]
+  RAFT["Leader election (Raft)"] -.elects.-> PRIMARY
+  RAFT -.->|on failure promote| R1
+</pre>
+<figcaption><strong>Figure 5.</strong> Hot replicas replay the same Input command log; leader election promotes one on failure with no committed-order loss.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>Client gateway:</strong> usually the <strong>FIX</strong> protocol (or a binary protocol) over TCP, not REST — latency matters; risk/pre-trade checks sit here.</li>
+<li><strong>Sequencer + Input command log:</strong> a durable, replicated <strong>ordered log of orders/cancels</strong> (an Aeron/LMAX-style replicated journal, or Kafka where µs latency is not required) — the commit point and the replay source for matching.</li>
+<li><strong>Output event log:</strong> a separate append-only log of <strong>fills / book updates / trades</strong> — the downstream source for execution reports, market data, and reporting (distinct from the input log so the commit point stays unambiguous).</li>
+<li><strong>Matching engine:</strong> the order book is <strong>in-memory, single-threaded per symbol</strong> (LMAX Disruptor ring buffer) — no database on the hot path.</li>
+<li><strong>Market data:</strong> a <strong>time-series database</strong> (kdb+ / a columnar TSDB) for candles and analytics; real-time fan-out via internal multicast.</li>
+<li><strong>Historical / reporting:</strong> events archived to <strong>blob/object storage</strong> + a columnar warehouse for compliance and backtesting.</li>
+<li><strong>HA:</strong> primary + hot replicas replaying the same log, with <strong>Raft</strong>-style leader election.</li>
+</ul>
+<p><strong>Why these:</strong> correctness + µs latency forbid a database on the matching path → the durable <em>log</em> is the store and the in-memory engine derives state from it; market data is time-series → a TSDB; history is bulk immutable → object storage + a warehouse. This is the clearest example of "the log is the database".</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Total order + determinism:</strong> the sequencer assigns one global order per symbol; matching is a deterministic function of that sequence, so every replica reaches byte-identical book state and fills — fairness (price-time priority) is enforced by the ordering itself.</li>
+<li><strong>Durable commit before match:</strong> an order is committed once it's in the replicated input log (quorum); fills and acks derive from committed state, so a crash can never lose an acknowledged order or fill — recovery replays the log.</li>
+<li><strong>Exactly-once effect via replay:</strong> because state is a pure replay of the ordered log, failover produces no duplicate or missing fills — the recovered engine continues from the last applied sequence number.</li>
+<li><strong>Strong consistency over availability (CP):</strong> on failover the system waits for a consistent leader replaying the authoritative log rather than accepting divergent matches — correctness wins over a few milliseconds of availability.</li>
+<li><strong>Eventually-consistent market data:</strong> the published book/feed is derived and fanned out after matching; subscribers may see it microseconds later, but the matched fills are already authoritative.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Fits:</strong> any continuous two-sided matching with strict ordering and ultra-low latency — securities, crypto, futures exchanges, and internal matching/crossing engines.</li>
+<li><strong>Overkill when:</strong> volumes are low or latency is lax — a transactional DB with row locks or a simple queue + worker is far simpler than a sequencer + in-memory engine + multicast.</li>
+<li><strong>Different design when:</strong> it's one-sided (highest bid wins) — that's an <strong>auction</strong>, not an order book; or when you only need request/response trades against a liquidity provider (no public book), which doesn't need a deterministic replicated log.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Commit point:</strong> an order is durable once in the replicated input log (before matching); fills/acks derive from committed state, so a crash never loses an acknowledged fill.</li>
+<li><strong>Critical path purity:</strong> no locks, no GC on the matching path; the durable write is the sequenced input log, kept off the per-symbol matching hot loop.</li>
+<li><strong>Multicast is internal:</strong> the publisher fans out via internal multicast / a ring buffer to market-data gateways, which then deliver over client protocols (not raw multicast on the public internet).</li>
+<li><strong>Fairness:</strong> a single sequencer per symbol is the ordering authority — no parallel matching of one symbol.</li>
+<li><strong>Recovery:</strong> event sourcing makes recovery deterministic (replay), but the log must be durable and ordered.</li>
+<li><strong>Market data fan-out:</strong> use multicast and a ring buffer; do not unicast to thousands.</li>
+<li><strong>Self-trade / risk checks</strong> belong before matching, in the gateway/risk layer.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>A <strong>sequencer</strong> gives total order; the per-symbol <strong>matching engine</strong> runs single-threaded in memory.</li>
+<li><strong>Event sourcing</strong> makes the engine recoverable and replicable by replay.</li>
+<li><strong>Leader election + hot replicas</strong> give HA without losing committed events.</li>
+<li>Keep the matching path free of disk, locks, and GC.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: LMAX Disruptor (Thompson et al.); event sourcing (Martin Fowler); the FIX protocol; public material on exchange matching engines and low-latency systems. Diagrams and write-up are original EngineerPro content.</em></p>

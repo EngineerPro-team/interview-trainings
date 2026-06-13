@@ -1,0 +1,189 @@
+<p>Một nền tảng food-delivery như <strong>Grab Food</strong> là marketplace ba bên — eater, merchant, driver — gắn kết bởi <strong>geospatial search</strong>, một <strong>order lifecycle</strong>, và <strong>driver dispatch</strong> real-time. Chương này thiết kế từ first principles.</p>
+
+<p>Điều làm nó hơn một app CRUD là sự va chạm của hai workload rất khác nhau: một <strong>order state machine quan trọng về correctness</strong> (tiền, không double order, không mất order) nằm cạnh một <strong>location stream ephemeral khối lượng lớn</strong> (hàng trăm nghìn driver ping/s vô giá trị sau vài giây). Một câu trả lời tốt giữ chúng trên path riêng — durable, transactional storage cho order; in-memory geo index cho location — và coi <strong>dispatch</strong> (gán một driver cho một order, exactly once) là bài toán concurrency khó ở trung tâm.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Tối ưu cho gì?</strong> Giao nhanh nhất, rẻ nhất, hay utilization của driver? Mục tiêu matching đổi thuật toán dispatch.</li>
+<li><strong>Batching / pooled delivery?</strong> Một driver có thể mang nhiều order không? Điều đó biến dispatch thành bài routing/optimization, không phải 1:1.</li>
+<li><strong>Phạm vi địa lý?</strong> Theo từng thành phố (shard theo region) vs một hệ thống global — delivery vốn cục bộ, đơn giản hoá sharding.</li>
+<li><strong>Ai được gán một order?</strong> Driver gần <em>merchant</em> (không phải eater), available, và đi đúng hướng — làm rõ ràng buộc matching.</li>
+<li><strong>Thời điểm payment?</strong> Authorize lúc order, capture lúc giao? Điều này định hình order saga và path refund/compensation.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Duyệt restaurant gần; đặt order.</li>
+<li>Merchant accept và chuẩn bị; một driver được gán.</li>
+<li>Live tracking driver; payment; rating.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Latency thấp</strong> cho search gần và matching.</li>
+<li><strong>Order state tin cậy</strong> — không mất hoặc double order.</li>
+<li><strong>Real-time</strong> location update; regional high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Orders:</strong> 10M order/ngày ≈ <strong>~115 order/s</strong> trung bình, peak giờ ăn ~5x ≈ ~600/s.</li>
+<li><strong>Driver pings:</strong> 1M driver active gửi location mỗi 4s → <strong>~250k location write/s</strong> — luồng nặng nhất; giữ trong memory.</li>
+<li><strong>Search:</strong> query gần chỉ quét vài geo cell, không phải cả thành phố — index theo H3/geohash.</li>
+<li><strong>Storage:</strong> order nhỏ (~1 KB) và có giới hạn; location hot-nhưng-ephemeral (TTL trong geo cache).</li>
+</ul>
+<p><strong>Worked example.</strong> Hai workload size hoàn toàn khác. Order: 10M/ngày ≈ 115/s trung bình, ~600/s peak — nhỏ xíu; đây là phần cần ACID transaction, một saga, và idempotency key, và một sharded SQL store kham thoải mái. Location: 1M driver active ping mỗi 4s = <strong>~250k write/s</strong>, mỗi cái nhỏ xíu và lỗi thời trong vài giây. Ghi 250k/s vào một DB durable là vô lý và vô nghĩa — nên location nằm trong một <strong>in-memory geo index</strong> (vd Redis với cell H3/geohash), last-write-wins, với TTL; bạn không bao giờ replicate cho durability vì một ping mất được thay trong 4 giây. Search: query "nhà hàng gần tôi" chỉ đọc cell H3 của viewer + neighbor (vài cell), nên quét vài chục candidate, không phải cả thành phố. Bài học ví dụ dạy: <strong>khớp storage với giá trị và vòng đời của data</strong> — durability ở chỗ có tiền, throughput-rồi-quên ở chỗ có location.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /restaurants?lat=&lng=&radius=</code> → restaurant gần.</li>
+<li><code>POST /orders</code> — <code>{eater_id, restaurant_id, items[], payment}</code> → <code>{order_id, state}</code>.</li>
+<li><code>POST /orders/{id}/accept</code> (merchant), <code>POST /orders/{id}/assign</code> (dispatch).</li>
+<li><code>GET /orders/{id}/track</code> → live driver location + ETA.</li>
+<li><strong>Driver stream:</strong> <code>POST /drivers/{id}/location</code> (tần suất cao).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  E["Eater app"] --> SRCH["Search service (geo index)"]
+  E --> ORD["Order service (state machine)"]
+  M["Merchant app"] --> ORD
+  D["Driver app"] --> LOC["Location service (geo cache)"]
+  ORD --> DISP["Dispatch / matching service"]
+  DISP --> LOC
+  ORD --> PAY["Payment"]
+  ORD --> NOTIF["Notification"]
+  DISP --> ETA["ETA service"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Search và order service đứng trước eater; location service nhận driver ping; dispatch match order với driver gần.</figcaption>
+</figure>
+
+<h2>Geospatial index</h2>
+<p>"Restaurant gần tôi" và "driver gần restaurant này" đều cần radius query nhanh. Index lat/lng thô thì chậm; thay vào đó ánh xạ địa cầu thành các <strong>cell phân cấp</strong> (H3 hexagon hoặc geohash). Một điểm map tới một cell id; radius query đọc cell của nó cộng các neighbor cell. Driver được bucket vào cell trong một in-memory store key theo cell id.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  PT["lat/lng"] --> CELL["Map tới cell id (H3 / geohash)"]
+  CELL --> Q{"Radius query"}
+  Q --> C0["Center cell"]
+  Q --> C1["Neighbor cells"]
+  C0 --> RES["Candidate driver / restaurant trong cell"]
+  C1 --> RES
+</pre>
+<figcaption><strong>Hình 2.</strong> Điểm map tới cell phân cấp; radius query đọc center cell cộng neighbor, biến geo search thành key lookup rẻ.</figcaption>
+</figure>
+
+<h2>Order lifecycle (state machine)</h2>
+<p>Một order là một <strong>state machine</strong>: mỗi transition được validate và persist, các bước ngoài (payment, merchant accept) được bọc lại để một lỗi không để order ở trạng thái bất nhất. Idempotency key trên transition làm retry an toàn.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Created
+  Created --> Paid: payment authorized
+  Paid --> Accepted: merchant accept
+  Accepted --> Assigned: driver matched
+  Assigned --> PickedUp: driver lấy hàng
+  PickedUp --> Delivered: giao cho eater
+  Delivered --> [*]
+  Created --> Cancelled: timeout / reject
+  Paid --> Cancelled: refund
+</pre>
+<figcaption><strong>Hình 3.</strong> Order state machine — transition được validate, persist, với path bù (cancel/refund) cho lỗi.</figcaption>
+</figure>
+
+<h2>Dispatch và matching</h2>
+<p>Khi order sẵn sàng assign, dispatch query location service tìm driver available gần, score họ (distance, ETA, tải hiện tại, hướng đi), và offer order. Matching thường được <strong>batch</strong> trong một cửa sổ ngắn để tối ưu toàn cục (assign tập order cho driver sao cho tổng thời gian chờ nhỏ nhất) thay vì greedy.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant O as Order service
+  participant DP as Dispatch
+  participant L as Location service
+  participant CS as Claim store (Order DB)
+  participant DR as Driver
+  O->>DP: order sẵn sàng assign
+  DP->>L: driver available gần trong cell
+  L-->>DP: candidate driver + vị trí
+  DP->>DP: score và chọn tốt nhất (batched window)
+  DP->>CS: conditional claim (WHERE order.status = unassigned), set claim token + TTL
+  alt claim thắng
+    CS-->>DP: claimed (token)
+    DP->>DR: offer order (claim token)
+    DR-->>DP: accept
+    DP->>CS: confirm claim -> status = assigned
+    DP-->>O: assigned
+  else thua / decline / TTL hết
+    CS-->>DP: claim failed / released
+    DP->>DP: thử candidate kế
+  end
+</pre>
+<figcaption><strong>Hình 4.</strong> Dispatch score candidate, rồi làm một <strong>atomic conditional claim</strong> trên order (chỉ khi còn unassigned) với claim token + TTL trước khi offer; accept confirm claim, decline/timeout release nó và thử driver kế. Conditional write là cái bảo đảm đúng một driver mỗi order kể cả khi các dispatch worker đua nhau.</figcaption>
+</figure>
+
+<h2>Live tracking</h2>
+<p>Driver app stream location tới location service; eater app subscribe (WebSocket / long-poll) vào vị trí của driver được gán để vẽ pin di chuyển và tính lại ETA. Ping thô nằm trong hot geo cache với TTL; chỉ vài waypoint thưa được persist cho history.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DR["Driver app"] -->|location mỗi 4s| LOC["Location service (geo cache, TTL)"]
+  LOC --> SUB["Tracking subscription"]
+  SUB --> EA["Eater app: pin di chuyển + ETA"]
+  LOC -->|waypoint thưa| HIST["History store"]
+</pre>
+<figcaption><strong>Hình 5.</strong> Ping tần suất cao nằm trong TTL geo cache và stream tới eater đang subscribe; chỉ waypoint thưa được persist.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing qua app eater/merchant/driver.</li>
+<li><strong>Restaurant search:</strong> <strong>Elasticsearch</strong> cho text + filter, với một geo index <strong>H3/geohash</strong> cho "gần tôi".</li>
+<li><strong>Driver location:</strong> <strong>Redis</strong> (geo command / in-memory cell bucket) — stream hot, ephemeral 250k ping/s; chỉ persist waypoint thưa vào một wide-column store.</li>
+<li><strong>Orders:</strong> order state machine là một consistency boundary, nên ưu tiên <strong>PostgreSQL / sharded SQL</strong> (transactional, booking saga + idempotency key nằm đây). Một wide-column DB (Cassandra) chỉ ổn nếu làm transition an toàn tường minh — conditional write/LWT, một writer mỗi order, hoặc event-sourced state — còn lại nên dành cho append-only trip/order history.</li>
+<li><strong>Events / dispatch:</strong> <strong>Kafka</strong> cho order và location event; một stream processor (<strong>Flink</strong>) cho real-time supply/demand và surge.</li>
+<li><strong>Payments:</strong> một payment service / PSP riêng; <strong>blob storage</strong> cho receipt/invoice.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> driver location là firehose không bao giờ được đập DB disk → Redis geo; order cần state transition kiểu ACID → một transactional DB; search cần text + geo → Elasticsearch + H3; lớp analytics/surge là stream → Kafka + Flink. Split theo access pattern: hot-ephemeral vs transactional vs search vs streaming.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Order state strongly consistent:</strong> transition (placed → accepted → assigned → picked up → delivered) đi qua một store authoritative với update transactional/conditional, nên một order không bao giờ ở hai state hoặc xử lý hai lần.</li>
+<li><strong>Đúng một driver mỗi order:</strong> dispatch gán driver bằng một conditional write atomic (claim chỉ khi còn unassigned) — cùng pattern single-winner như một distributed lock — nên hai driver không cùng "win" một order.</li>
+<li><strong>Payment idempotent qua saga:</strong> luồng order/payment là một saga với idempotency key và compensation; một retry sau timeout không bao giờ double-charge, và một step fail thì rollback (refund/void).</li>
+<li><strong>Location best-effort, eventually-consistent:</strong> vị trí driver là last-write-wins với TTL; một ping miss đơn giản bị thay — không có guarantee durability hay ordering trên location, theo thiết kế.</li>
+<li><strong>Event at-least-once:</strong> event order/location trên Kafka là at-least-once; consumer (surge, analytics, tracking) phải idempotent.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hợp:</strong> marketplace real-time, location-based (food, grocery, courier) với match ba bên và một order lifecycle mang tiền.</li>
+<li><strong>Đơn giản hoá khi:</strong> delivery theo lịch (không real-time) hoặc một region đơn volume thấp — có thể không cần in-memory geo firehose hay stream processor; một DB quan hệ + batch matching định kỳ là đủ.</li>
+<li><strong>Thiết kế khác khi:</strong> không có live location/dispatch (vd e-commerce mail-order) — đó là bài catalog + checkout + fulfillment, không có core geospatial real-time.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Location write storm:</strong> 250k ping/s không được đập vào database — in-memory geo cache, persist thưa.</li>
+<li><strong>Hot zone:</strong> downtown giờ trưa là một hotspot cell — shard cell và cap công việc mỗi cell.</li>
+<li><strong>Order consistency:</strong> bọc payment + accept trong một saga với idempotency key; không bao giờ double-charge.</li>
+<li><strong>Greedy vs batched matching:</strong> batch một cửa sổ ngắn cho assignment toàn cục tốt hơn first-come.</li>
+<li><strong>Boundary effect:</strong> driver vừa qua mép cell — luôn search neighbor cell.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Marketplace ba bên = search + order state machine + dispatch.</li>
+<li><strong>Geo cell phân cấp</strong> biến radius query thành key lookup.</li>
+<li>Order là một <strong>state machine được validate</strong> với compensation kiểu saga.</li>
+<li>Driver location <strong>hot và ephemeral</strong> — memory + TTL, persist thưa.</li>
+<li><strong>Batched matching</strong> thắng greedy assignment.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Uber H3 hexagonal grid docs và tài liệu geohash; bài viết engineering công khai về on-demand dispatch / delivery; saga pattern (Garcia-Molina &amp; Salem) cho order flow. Diagram và nội dung là content gốc của EngineerPro.</em></p>

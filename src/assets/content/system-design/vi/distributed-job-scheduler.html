@@ -1,0 +1,180 @@
+<p>Một <strong>distributed job scheduler</strong> (kiểu cron + Airflow ở scale) chạy job đúng giờ và theo thứ tự dependency trên một dàn worker, tin cậy — <strong>không miss run, không duplicate ngoài ý muốn</strong>. Phần thú vị là scheduler high availability, DAG dependency, và task execution gần như exactly-once.</p>
+
+<p>Toàn bộ bài toán quy về hai guarantee kéo ngược nhau: <strong>liveness</strong> (mỗi run đến hạn cuối cùng phải fire) và <strong>safety</strong> (không run nào fire hai lần với effect nhìn thấy). Distributed systems làm exactly-once bất khả thi một cách rẻ, nên thiết kế thực là "at-least-once delivery + idempotent execution", và phần lớn việc thú vị là làm điều đó an toàn dưới leader failover và zombie worker.</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<ul>
+<li><strong>Cron-style hay DAG?</strong> Job định kỳ độc lập thì đơn giản; một DAG task phụ thuộc cần dependency resolution điều khiển bởi completion và xử lý partial-failure.</li>
+<li><strong>Duplicate run tệ tới mức nào?</strong> Task idempotent (overwrite partition) chịu được duplicate; task có side-effect (gửi email, charge) cần idempotency key hoặc dedup bên ngoài.</li>
+<li><strong>Miss/late run tệ tới mức nào?</strong> Đặt SLA, catch-up/backfill policy, và mức độ quyết liệt re-dispatch khi worker fail.</li>
+<li><strong>Spread thời lượng task?</strong> Task dưới giây vs job nhiều giờ đổi lease/heartbeat timeout và có cần preemption không.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Định nghĩa job: cron schedule và/hoặc một <strong>DAG</strong> các task phụ thuộc.</li>
+<li>Chạy task tôn trọng dependency; <strong>retry</strong> khi fail.</li>
+<li>Xem status; <strong>backfill</strong> run quá khứ.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Reliability:</strong> không miss logical run nào; duplicate <em>dispatch</em> có thể xảy ra, nhưng duplicate <em>side effect</em> phải được ngăn (idempotency / run_id).</li>
+<li><strong>Scale:</strong> hàng triệu task/ngày trên nhiều worker.</li>
+<li><strong>Scheduler HA</strong>; worker fault-tolerant.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Tasks:</strong> 1M task/ngày ≈ ~12/s trung bình, nhưng bursty vào đầu giờ (ai cũng schedule lúc 00:00) → thiết kế cho burst ~100x.</li>
+<li><strong>Scheduler tick:</strong> quét task đến hạn mỗi vài giây trên hàng triệu definition phải dùng query indexed "next_run_at", không phải full scan.</li>
+<li><strong>Queue:</strong> task dispatch đi qua một durable dispatch queue — một task queue (SQS/RabbitMQ/Temporal) cho per-task ack/delay/DLQ, hoặc Kafka như một dispatch log với ack/retry/lease state giữ trong state store — size theo burst, không phải trung bình.</li>
+<li><strong>State:</strong> mỗi task run là một row nhỏ; history tăng, nên retain/compact.</li>
+</ul>
+<p><strong>Ví dụ có số — thundering herd đầu giờ.</strong> Nếu 1M job/ngày trung bình ~12/s nhưng một phần lớn là <code>@hourly</code>/<code>@daily</code> với schedule <code>0 * * * *</code>, tất cả đến hạn cùng đầu giờ. Scheduler ngây thơ cố enqueue, ví dụ, 200k task trong cùng một giây — spike 16,000× so với trung bình. Hai phòng thủ: (1) scheduler đọc due work bằng query indexed <code>next_run_at &lt;= now</code> và enqueue theo batch, không scan toàn bộ definition; (2) thêm <strong>jitter</strong> theo job để dàn run khắp phút. Size durable queue và worker pool cho spike đó, không phải trung bình 12/s.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /jobs</code> — <code>{name, schedule | dag, params}</code> → <code>{job_id}</code>.</li>
+<li><code>GET /runs?job_id=</code> → run history + state.</li>
+<li><code>POST /jobs/{id}/trigger</code> — run thủ công; <code>POST /jobs/{id}/backfill</code> — <code>{from, to}</code>.</li>
+<li><strong>Worker:</strong> pull task, report <code>heartbeat</code> và <code>result</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Một <strong>scheduler</strong> được leader-elect tính task nào đến hạn (tôn trọng dep), enqueue vào một <strong>task queue</strong> durable; một pool <strong>worker</strong> pull và execute; một <strong>state store</strong> ghi mọi run. Heartbeat phát hiện worker chết để task của nó được retry.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DEF["Job / DAG definitions"] --> SCH["Scheduler (leader-elected)"]
+  SCH --> QUEUE["Durable dispatch queue (SQS/RabbitMQ/Temporal, hoặc Kafka + state-store leases)"]
+  QUEUE --> WK["Worker pool (W1..Wn)"]
+  WK --> STATE["State store: run status"]
+  STATE --> SCH
+  WK -->|heartbeat| HB["Health monitor"]
+  HB --> STATE
+  STATE --> ALERT["Alerting khi miss SLA"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Leader scheduler enqueue task đến hạn; worker pull và execute; state store khép vòng để dependency và retry được điều khiển bởi result đã ghi.</figcaption>
+</figure>
+
+<h2>Scheduler high availability</h2>
+<p>Nếu hai scheduler chạy cùng lúc, mọi task có thể bị schedule hai lần. Chạy vài scheduler replica nhưng elect một <strong>leader</strong> duy nhất (qua coordination service hoặc một lease); chỉ leader schedule. Nếu nó chết, một standby acquire lease và tiếp tục. Quyết định scheduling được ghi vào state store nên leader mới resume sạch.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  S1["Scheduler A"] --> LEASE["Leader lease (coordination service)"]
+  S2["Scheduler B (standby)"] --> LEASE
+  S3["Scheduler C (standby)"] --> LEASE
+  LEASE -->|giữ lease| ACTIVE["Chỉ leader schedule"]
+  ACTIVE -->|khi leader chết| FAILOVER["Standby acquire lease, resume"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Nhiều scheduler replica, một leader theo lease — chỉ leader schedule, và standby tiếp quản khi lỗi.</figcaption>
+</figure>
+
+<h2>DAG dependency resolution</h2>
+<p>Một task chỉ chạy sau khi task upstream của nó succeed. Scheduler theo dõi state mỗi run và release task downstream khi tất cả parent của nó <code>Succeeded</code> — một topological walk điều khiển bởi completion event.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  E["Extract"] --> T["Transform"]
+  T --> LV["Load to warehouse"]
+  T --> LC["Load to cache"]
+  LV --> R["Report"]
+  LC --> R
+  R --> DONE["DAG complete"]
+</pre>
+<figcaption><strong>Hình 3.</strong> Một task chỉ dispatch khi tất cả task upstream đã succeed; completion event đẩy topological walk.</figcaption>
+</figure>
+
+<h2>Execution gần exactly-once</h2>
+<p>Distributed system cho <em>at-least-once</em> delivery một cách rẻ; exactly-once thật thì khó. Câu trả lời thực dụng: <strong>at-least-once dispatch + task idempotent</strong>. Mỗi run có một <code>run_id</code> duy nhất; worker ghi "started/finished run_id" nên task được re-deliver bị phát hiện và skip, và side effect task được ghi idempotent (key theo run_id).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant Q as Task queue
+  participant W as Worker
+  participant ST as State store
+  Q->>W: deliver task (run_id=R)
+  W->>ST: claim run_id=R (conditional)
+  alt claim thành công
+    W->>W: execute (side effect idempotent)
+    W->>ST: mark R succeeded
+  else đã claimed/done
+    W->>W: skip duplicate
+  end
+</pre>
+<figcaption><strong>Hình 4.</strong> At-least-once delivery làm cho an toàn: conditional claim trên run_id cộng side effect idempotent biến duplicate thành no-op.</figcaption>
+</figure>
+
+<h2>Retry, backoff, và backfill</h2>
+<p>Task fail retry với exponential <strong>backoff</strong> tới một giới hạn, rồi alert. <strong>Backfill</strong> chạy lại một job trên một khoảng thời gian quá khứ (vd sau khi fix bug) bằng cách sinh các logical run bị thiếu. Xử lý thời gian phải rõ ràng: schedule theo UTC, lưu logical run timestamp, và quyết định catch-up policy cho các window bị miss. Worker claim một task lấy một <strong>lease</strong>; nếu ngừng heartbeat, lease hết hạn và task được re-dispatch (nên zombie worker không làm kẹt một run).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Pending
+  Pending --> Running: worker claim (lease + run_id)
+  Running --> Succeeded: result recorded
+  Running --> Failed: error
+  Running --> Pending: lease hết hạn (zombie) re-dispatch
+  Failed --> Pending: retry với backoff
+  Failed --> DeadLetter: hết số attempt
+  Succeeded --> [*]
+  DeadLetter --> [*]
+</pre>
+<figcaption><strong>Hình 5.</strong> Vòng đời task-attempt: lease + run_id chống zombie và duplicate; fail retry với backoff tới giới hạn, rồi dead-letter và alert.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Quyết định storage tách <em>authoritative state</em> khỏi dispatch transport — làm đúng split này là cái khiến "không miss run, không double-effect" khả thi:</p>
+<ul>
+<li><strong>Job definitions:</strong> schedule/DAG/owner trong một DB quan hệ (<strong>PostgreSQL</strong>) — nhỏ, query được, catalog của cái gì nên chạy.</li>
+<li><strong>Run / attempt state (source of truth):</strong> một transactional table key theo <code>run_id</code> + attempt giữ status (pending/running/succeeded/failed) — authority mà worker claim qua một <strong>conditional write</strong>, nên một run execute một lần kể cả qua retry.</li>
+<li><strong>Lease / heartbeat records:</strong> lease worker với TTL + fencing token để run của một worker chết được retry an toàn mà không có hai worker chạy cùng lúc.</li>
+<li><strong>Dispatch queue (transport, không phải truth):</strong> một <strong>task queue (SQS/RabbitMQ/Temporal)</strong> cho per-task ack/delay/DLQ, hoặc <strong>Kafka</strong> như một dispatch log với ack/retry/lease giữ trong state store — queue chuyển việc, không sở hữu status của run.</li>
+<li><strong>History / retention:</strong> run history hoàn tất với compaction/retention; một <strong>DLQ</strong> cho run cạn retry.</li>
+<li><strong>Leader election:</strong> một <strong>coordination service</strong> (etcd/ZooKeeper) để một scheduler duy nhất quyết cái gì đến hạn.</li>
+<li><strong>Implementations:</strong> Airflow/Dagster/Prefect (DAG + UI), Temporal/Cadence (durable execution), Quartz/cron/K8s <code>CronJob</code> (periodic đơn giản).</li>
+</ul>
+
+<h2>Guarantees &amp; consistency</h2>
+<ul>
+<li><strong>Delivery là at-least-once:</strong> failover và retry có thể dispatch cùng một logical run hai lần — nên contract là "không miss run + idempotent side effect", không bao giờ exactly-once thật.</li>
+<li><strong>Scheduling là single-writer:</strong> một leader lease đảm bảo chỉ một scheduler quyết định cái gì đến hạn, nên một run được enqueue một lần khi bình thường; duplicate đến từ crash window, bắt bởi run_id claim.</li>
+<li><strong>Ordering là per-DAG, không global:</strong> một task chạy chỉ sau khi parent succeed; không có global ordering giữa các job không liên quan.</li>
+<li><strong>Thời gian là explicit:</strong> <em>logical</em> run timestamp (không phải wall-clock dispatch time) là identity dùng cho idempotency, backfill, catch-up — schedule theo UTC.</li>
+</ul>
+
+<h2>Tradeoffs &amp; khi nào không dùng</h2>
+<ul>
+<li><strong>Tốt cho:</strong> batch job định kỳ, ETL/ML pipeline có dependency, cron ở scale, backfill.</li>
+<li><strong>Sai cho:</strong> request/response latency thấp (dùng service), stream processing per-event (dùng stream processor), hoặc fan-out dưới giây (dùng queue/worker trực tiếp).</li>
+<li><strong>Chọn queue:</strong> Kafka cho durable ordered stream nhưng không có ack/delay/dead-letter per-task — nếu cần, layer chúng trong state store hoặc dùng task queue (SQS/RabbitMQ/Temporal).</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Hai leader = double run</strong> — leader election là bắt buộc.</li>
+<li><strong>Exactly-once là huyền thoại</strong> — thiết kế task idempotent key theo run_id.</li>
+<li><strong>Burst đầu giờ:</strong> ai cũng schedule lúc 00:00 — jitter và size queue cho spike.</li>
+<li><strong>Zombie worker:</strong> worker treo sau khi claim — dùng heartbeat + lease timeout để re-dispatch.</li>
+<li><strong>Backfill storm:</strong> backfill rộng có thể làm ngập worker — rate-limit nó.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Một <strong>leader scheduler</strong> duy nhất tránh double scheduling.</li>
+<li>Dependency là một <strong>topological walk</strong> điều khiển bởi task result đã ghi.</li>
+<li><strong>At-least-once + idempotent (run_id)</strong> là "exactly-once" thực dụng.</li>
+<li><strong>Heartbeat, backoff, và backfill</strong> làm nó tin cậy và vận hành được.</li>
+<li><strong>Liveness vs safety:</strong> thiết kế là "không miss run + idempotent side effect" — exactly-once là huyền thoại, nên làm task an toàn để re-run.</li>
+<li><strong>Identity là logical run time</strong> (UTC), không phải dispatch time — nó điều khiển idempotency, backfill, catch-up.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Apache Airflow scheduler docs; Temporal durable-execution docs; Quartz Scheduler / cron; Kafka và SQS docs cho queue semantics. Diagram và nội dung là content gốc của EngineerPro.</em></p>

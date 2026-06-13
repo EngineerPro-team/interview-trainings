@@ -1,0 +1,194 @@
+<p>Một <strong>online auction</strong> (kiểu eBay, hoặc real-time bidding) là bài toán concurrency-và-consistency: nhiều bidder đua trên cùng một item, bid hợp lệ cao nhất phải luôn thắng, và auction phải close đúng tại một thời điểm chính xác. Chương này tập trung vào <strong>bid concurrency</strong>, <strong>close/settlement đúng</strong>, và anti-sniping.</p>
+
+<p>Khác phần lớn câu hỏi "scale", auction là một thiết kế <strong>correctness-first</strong> nơi tải cực kỳ tập trung: 99% item im ắng, nhưng một item hot trong vài giây cuối là một cuộc đua ầm ầm mà câu trả lời sai (mất bid, hai winner, double charge) là không chấp nhận được. Ý tưởng trung tâm là <strong>serialize mọi write cho một item</strong> (để bid trên một item có một total order duy nhất) trong khi để traffic read/watch lớn hơn nhiều scale riêng. Tiền làm durability và exactly-once settlement không thể thương lượng — bạn không thể đổi chúng lấy latency.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Kiểu auction?</strong> Ascending (eBay), proxy/max-bid auto-bidding, hay sealed-bid? Proxy bidding đổi logic "accept" (resolve lên max của bên kia).</li>
+<li><strong>Hard close hay anti-snipe?</strong> Một bid phút chót có extend end time không? Điều đó đổi close scheduler và model fairness.</li>
+<li><strong>Một item hot tới đâu?</strong> Vài chục vs vài nghìn bid/s ở giây cuối quyết định một writer mỗi item đủ hay cần thêm cẩn thận.</li>
+<li><strong>Consistency vs availability trên bid?</strong> Bid phải strongly consistent và durable (là tiền) — xác nhận ta ưu tiên correctness hơn throughput thô.</li>
+<li><strong>Settlement?</strong> Charge winner đúng một lần, xử lý payment fail / second-chance offer — định nghĩa settlement saga.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Tạo auction với start/end time và starting price.</li>
+<li>Đặt bid; thấy high bid hiện tại real-time.</li>
+<li><strong>Proxy / max bid</strong> (auto-bid tới một giới hạn).</li>
+<li>Auto-close lúc end time; notify winner; settle payment.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Strong consistency</strong> cho bid — không mất hay accept sai thứ tự.</li>
+<li><strong>Latency thấp</strong> khi ack bid và update giá live.</li>
+<li>Chịu được <strong>bid spike</strong> lúc close.</li>
+<li><strong>Exactly-once settlement</strong>.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Items:</strong> 10M auction active; đa số ít bid, vài cái cả nghìn.</li>
+<li><strong>Bid spike:</strong> một item hot trong 10 giây cuối có thể nhận hàng trăm bid/s trên một item — write path mỗi item phải serialize và nhanh.</li>
+<li><strong>Reads:</strong> watcher nhiều hơn bidder rất nhiều — giá hiện tại là một fan-out read, cache và push nó.</li>
+<li><strong>Close events:</strong> 10M auction close trong ngày, dồn vào giờ tròn — close scheduler phải chịu burst.</li>
+</ul>
+<p><strong>Worked example.</strong> Hình dung một item hot trong 10 giây cuối nhận ~500 bid/s. Nếu bạn dùng "read price, compare, write" thường với row lock, contention trên một row đó vẫn serialize mọi người nhưng kèm lock wait và retry — và một optimistic compare-and-set sẽ làm hàng trăm bidder retry trong một vòng lặp chặt. Model sạch là <strong>single writer mỗi item</strong>: route mọi bid của item X tới một owner (một in-memory actor / partition) xử lý chúng theo thứ tự tới, nên 500 bid/s chỉ là 500 compare tuần tự — tầm thường cho một core — và thứ tự rõ ràng. Điểm tinh tế ví dụ buộc ra: writer đó phải <strong>durably commit mỗi bid được accept trước khi ack</strong> (group-commit vào WAL hoặc một conditional DB write), vì một crash sau khi ack một winning bid nhưng trước khi persist sẽ mất tiền. Trong khi đó close burst là một bài riêng: 10M auction dồn vào giờ tròn nghĩa là <strong>close scheduler</strong> đối mặt một thundering herd các expiration — trải chúng bằng jitter và dùng một timer/queue partitioned, không phải một global timer.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /auctions</code> — <code>{item, start_price, ends_at}</code> → <code>{auction_id}</code>.</li>
+<li><code>POST /auctions/{id}/bids</code> — <code>{user_id, amount, idempotency_key}</code> → <code>{accepted, current_high}</code>.</li>
+<li><code>GET /auctions/{id}</code> → high bid hiện tại + time left (cacheable, push qua WebSocket).</li>
+<li><code>POST /auctions/{id}/proxy</code> — <code>{user_id, max_amount}</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["Bidder"] --> GW["API gateway"]
+  GW --> BID["Bid service (serialize theo item)"]
+  BID --> DB["Auction DB: BidLog (source of truth) + AuctionState (high-bid projection + version)"]
+  BID --> BUS["Event bus"]
+  BUS --> PUSH["Live price push (WebSocket)"]
+  BUS --> NOTIF["Notifications"]
+  SCH["Close scheduler / timer"] --> SETTLE["Settlement service"]
+  SETTLE --> LEDGER["Ledger / payment"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Bid được serialize theo từng item; mỗi bid được accept được append vào <strong>BidLog</strong> durable và update <strong>AuctionState</strong> high-bid projection; scheduler trigger settlement lúc close; giá live được push tới watcher.</figcaption>
+</figure>
+
+<h2>Bid concurrency</h2>
+<p>Race cốt lõi: hai bid cho cùng item tới cùng lúc. Phải chỉ accept bid vượt high hiện tại, và không bao giờ mất bid. Hai cách robust:</p>
+<ul>
+<li><strong>Optimistic concurrency:</strong> conditional update — <code>UPDATE ... SET high = new WHERE id = ? AND high &lt; new</code>. Nếu row đã đổi dưới chân ta, update ảnh hưởng 0 row và bid bị reject/retry. Conditional row update là <strong>trọng tài cho high-bid projection hiện tại</strong>; bid event được accept vẫn phải được ghi durable vào <strong>BidLog</strong> (source of truth) trước ack — lý tưởng trong cùng một local transaction.</li>
+<li><strong>Single-writer mỗi item:</strong> route mọi bid của một item về một partition/actor (vd hash auction_id) và xử lý trong một queue — serialize, không contention.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B1 as Bidder 1
+  participant B2 as Bidder 2
+  participant BID as Bid service
+  participant DB as Auction DB
+  B1->>BID: bid 100
+  B2->>BID: bid 100 (cùng lúc)
+  BID->>DB: conditional update high lên 100 where current high below 100
+  DB-->>BID: applied (1 row)
+  BID->>DB: conditional update high lên 100 where current high below 100
+  DB-->>BID: 0 row (đã là 100)
+  BID-->>B1: accepted
+  BID-->>B2: rejected, high hiện tại là 100
+</pre>
+<figcaption><strong>Hình 2.</strong> Conditional update biến row database thành trọng tài: bid đầu thắng, bid bằng giá vào sau ảnh hưởng 0 row và bị reject.</figcaption>
+</figure>
+
+<h2>Close và settlement</h2>
+<p>Tại end time, auction phải atomically freeze winner và settle. Một <strong>scheduler</strong> (durable timer) fire close job; settlement <strong>idempotent</strong> (key theo auction_id) nên close bị retry hay lặp không thể double-charge. Auction là một state machine.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Open
+  Open --> Open: bid accepted
+  Open --> Extended: bid trong giây cuối (anti-snipe)
+  Extended --> Open
+  Open --> Closing: tới end time
+  Closing --> Settled: charge winner (idempotent)
+  Settled --> [*]
+  Closing --> NoSale: không có bid hợp lệ
+  NoSale --> [*]
+</pre>
+<figcaption><strong>Hình 3.</strong> Auction state machine: bid giữ nó Open, một bid giây cuối có thể extend, rồi close theo lịch dẫn tới settlement idempotent.</figcaption>
+</figure>
+
+<h2>Anti-sniping</h2>
+<p>"Snipe" là bid vào khoảnh khắc cuối khiến không còn thời gian phản hồi. Luật thường dùng: <strong>nếu một bid rơi vào cửa sổ cuối (vd 10s cuối), extend end time</strong> thêm cửa sổ đó. Cách này giữ close công bằng và dàn spike ra.</p>
+
+<h2>Scale một item hot</h2>
+<p>Đa số item nguội; vài cái cực hot lúc close. Vì correctness đòi serialize write theo item, một item hot bị giới hạn bởi throughput của một writer — vẫn hàng nghìn/s khi writer giữ high bid trong memory nhưng <strong>durably commit mỗi bid được accept</strong> — append vào append-only BidLog và update high-bid projection trong một bước (group-commit vào một replicated log) — trước khi ack. Durability không bị bỏ để lấy tốc độ; nó được batch. Watcher (read) scale riêng: giá hiện tại được cache và push, không tính lại theo từng viewer.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  BIDS["Bid cho item X"] --> W["Single-writer cho item X (high bid in-memory)"]
+  W --> COMMIT["Durable commit (một local txn, cùng store): append accepted bid vào BidLog + update high-bid projection trong AuctionState"]
+  COMMIT -->|committed| ACK["Ack bidder + update cache"]
+  ACK --> PUSH["Push high mới tới watcher"]
+  ACK --> NOTIFY["Emit event tới Kafka (notify/analytics)"]
+  PUSH --> WATCH["Hàng nghìn watcher (read-only)"]
+  COMMIT -.->|khi crash| REPLAY["Recovery: replay BidLog / đọc lại AuctionState"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Write cho một item được serialize qua một writer nhanh; một bid được accept được durably commit — <strong>append vào append-only BidLog và update high-bid projection trong một bước</strong> — trước ack/push, nên crash không thể mất winning bid và toàn bộ history replay được. Kafka chỉ là fanout notification/analytics, không phải log authoritative; watcher là một read path cache + push riêng biệt.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant SCH as Close scheduler
+  participant ST as Settlement service
+  participant L as Ledger / payment
+  SCH->>ST: close auction (auction_id, idempotency_key)
+  ST->>ST: check đã settled chưa (idempotency_key)
+  alt chưa settled
+    ST->>L: charge winner + record sale
+    L-->>ST: ok
+    ST->>ST: mark settled
+  else đã settled
+    ST-->>SCH: no-op (duplicate close)
+  end
+</pre>
+<figcaption><strong>Hình 5.</strong> Settlement idempotent theo auction_id, nên close bị retry hay lặp charge winner đúng một lần.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting (bid spike), routing.</li>
+<li><strong>BidLog (source of truth):</strong> một log <strong>append-only</strong> các bid event accepted/rejected key theo <code>auction_id</code>, sắp theo <code>bid_seq</code> — đây là cái làm replay, audit, giải quyết tranh chấp, reasoning proxy-bid, và reconstruct outbid-notification khả thi.</li>
+<li><strong>AuctionState (projection):</strong> một row giữ high bid hiện tại + status state-machine kèm version, một projection nhanh của BidLog (không thay thế). Để tránh một cross-system atomic write, giữ <strong>BidLog và AuctionState trong cùng một transactional store/partition</strong> (vd cùng một DB <strong>PostgreSQL</strong>, hoặc một partition single-writer-per-item) để việc append bid event và update high-bid commit trong <strong>một local transaction</strong> — một <strong>conditional update</strong> là trọng tài. (Hoặc, để BidLog là source of truth duy nhất và derive/reconcile AuctionState từ nó, nên ack chỉ phụ thuộc vào lần append durable vào BidLog.)</li>
+<li><strong>Live price push:</strong> <strong>Redis</strong> (pub/sub + cache current high) fanout tới watcher qua WebSocket.</li>
+<li><strong>Events:</strong> <strong>Kafka</strong> mang event bid/outbid/settlement tới notification và analytics — một fanout transport, <em>không</em> phải log bid authoritative (trừ khi bạn cố ý thiết kế retention/replay/compaction/audit của nó đạt mức audit-grade).</li>
+<li><strong>Close scheduling:</strong> một <strong>scheduler/timer</strong> durable (delay queue hoặc workflow engine) fire close job lúc end time.</li>
+<li><strong>Settlement / ledger:</strong> một transactional ledger (<strong>PostgreSQL</strong>) với settlement idempotent key theo auction_id; payment qua PSP.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> bid đòi correctness dưới contention → một transactional DB với conditional write (chỗ duy nhất bạn <em>không</em> được dùng cache eventually-consistent làm source of truth); read-heavy watcher path là cache + push → Redis; close là scheduled job → một durable timer; tiền → một transactional ledger. Read và write dùng store khác nhau có chủ đích.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Bid strongly consistent, durable:</strong> bid được accept được total order theo từng item và commit vào append-only <strong>BidLog</strong> (với high-bid projection update cùng bước) trước ack — bid hợp lệ cao nhất luôn thắng, một bid đã ack không bao giờ mất, và toàn bộ history audit/replay được khi crash.</li>
+<li><strong>Single-winner mỗi item:</strong> hoặc một single writer mỗi item hoặc một conditional/compare-and-set update làm trọng tài, nên bid đồng thời không bao giờ cùng "win" hoặc skip high hiện tại.</li>
+<li><strong>Exactly-once settlement:</strong> close-and-charge idempotent key theo auction_id, nên một close retry hoặc event trùng charge winner một lần; payment fail trigger một fallback định nghĩa sẵn (second-chance offer), không phải mất âm thầm.</li>
+<li><strong>Watcher view eventually-consistent:</strong> giá live hiện cho watcher là một giá trị cached, pushed có thể trễ vài millisecond so với high authoritative — ổn cho hiển thị, không bao giờ dùng làm trọng tài bid.</li>
+<li><strong>Close deterministic:</strong> auction close dựa trên durable <strong>BidLog</strong> tại end time; anti-snipe extension là một phần của timeline authoritative đó, không phải đoán client-side. Winner reconstruct được từ log, không chỉ từ high-bid projection.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hợp:</strong> bất kỳ bài "action hợp lệ cao nhất/đầu tiên thắng trên một item contended" — auction, flash sale stock giới hạn, grab ghế/vé, ad real-time bidding.</li>
+<li><strong>Đơn giản hoá khi:</strong> bid hiếm và item không bao giờ hot — một conditional update trên một row là đủ; không cần single writer mỗi item hay một fleet close-scheduler.</li>
+<li><strong>Thiết kế khác khi:</strong> matching là two-sided liên tục (buyer và seller với một order book live) — đó là một <strong>matching engine</strong> (xem stock exchange), không phải một ascending auction một phía.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Lost bid:</strong> không bao giờ read-rồi-write thiếu version/condition — dùng conditional update hoặc single writer mỗi item.</li>
+<li><strong>Double settlement:</strong> close + charge phải idempotent (key theo auction_id).</li>
+<li><strong>Clock lúc close:</strong> dùng durable scheduler; đừng dựa vào một in-process timer đơn lẻ.</li>
+<li><strong>Snipe spike:</strong> anti-snipe extension vừa tăng fairness vừa làm phẳng burst.</li>
+<li><strong>Proxy bid:</strong> giải auto-bid phía server một cách atomic để hai proxy không ratchet sai.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Bid cần <strong>write serialize, conditional</strong> — DB row trọng tài hoặc single writer mỗi item.</li>
+<li>Close là một <strong>durable scheduled job</strong> dẫn tới <strong>idempotent settlement</strong>.</li>
+<li><strong>Anti-snipe</strong> extension giữ close công bằng và dàn tải.</li>
+<li>Read (watcher) scale độc lập qua cache + push.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: tài liệu optimistic concurrency control; conditional-update / compare-and-set của database; tài liệu engineering công khai về auction/bidding và anti-sniping. Diagram và nội dung là content gốc của EngineerPro.</em></p>

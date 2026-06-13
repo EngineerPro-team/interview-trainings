@@ -1,0 +1,292 @@
+<p><strong>Redis</strong> is an in-memory data-structure store used as a cache, database, and message broker. In an interview, "design Redis" is a <em>building-block</em> question: instead of assembling existing services, you design the internals of one. This chapter builds a Redis-like store from first principles — the data model, the single-threaded execution engine, persistence, replication, failover, horizontal scaling, and the consistency guarantees that fall out of those choices.</p>
+
+<p>The reason this question is popular is that it forces you to reason about <strong>memory layout, the CPU/IO boundary, and the durability–availability–latency trade space</strong> directly, without hiding behind a managed service. A strong answer is not "Redis has these features" — it is "here is <em>why</em> each design decision is made and what it costs."</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<p>Before designing, pin down the use case — the answer changes a lot depending on it:</p>
+<ul>
+<li><strong>Cache or system of record?</strong> A pure cache can lose data on crash (cheap, fast); a primary datastore needs real durability and changes the persistence/replication answer.</li>
+<li><strong>Read-heavy or write-heavy?</strong> Read-heavy favors replicas and client-side caching; write-heavy stresses the single thread and persistence I/O.</li>
+<li><strong>One dataset bigger than one machine's RAM?</strong> If yes, you need Cluster (sharding); if no, a single primary + replicas is simpler.</li>
+<li><strong>Latency target and consistency tolerance?</strong> Sub-ms p99 and "stale reads OK" point to async replicas; "read-your-writes" points to the primary or <code>WAIT</code>.</li>
+</ul>
+
+<h2>Requirements</h2>
+
+<h3>Functional</h3>
+<ul>
+<li><code>GET</code> / <code>SET</code> / <code>DEL</code> with optional <strong>TTL</strong> (per-key expiry).</li>
+<li>Rich data structures: <code>string</code>, <code>hash</code>, <code>list</code>, <code>set</code>, <code>sorted set (zset)</code>, plus <code>streams</code>.</li>
+<li><strong>Atomic</strong> operations (e.g. <code>INCR</code>, <code>LPUSH</code>) and multi-command transactions / Lua scripts.</li>
+<li><strong>Pub/Sub</strong> messaging.</li>
+<li>Optional <strong>persistence</strong> so data survives a restart.</li>
+</ul>
+
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Sub-millisecond</strong> latency for point operations; very high throughput (100k+ ops/s per node).</li>
+<li><strong>High availability</strong> — survive a node failure with automatic failover.</li>
+<li><strong>Horizontal scalability</strong> beyond a single machine's RAM.</li>
+<li><strong>Tunable durability</strong> — from "pure cache, lose-on-crash" to "fsync every write".</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<p>Sizing a cache cluster for a busy web backend:</p>
+<ul>
+<li><strong>Working set:</strong> 100M keys, avg value ~1 KB → ~100 GB of data; with ~20% overhead ~120 GB.</li>
+<li><strong>Memory per node:</strong> on 64 GB nodes, shard across ~3-4 primaries (~30-40 GB each), each with 1-2 replicas → ~8-10 nodes total.</li>
+<li><strong>Throughput:</strong> one node sustains ~100k-200k ops/s; a 1M ops/s peak needs ~6-10 shards.</li>
+<li><strong>Network:</strong> 1M ops/s × ~1 KB ≈ 1 GB/s — plan for 10 GbE and use pipelining to amortize round-trips.</li>
+<li><strong>Persistence I/O:</strong> AOF everysec writes ~ write-QPS × value size to disk; budget disk space and IOPS for the rewrite spike.</li>
+</ul>
+<p><strong>Worked example.</strong> Say each value is ~1 KB and we hold 100M keys: that is ~100 GB of payload. Redis per-key overhead (the dictionary entry, the object header, the expiry entry) is roughly tens of bytes per key, so 100M keys adds a few GB of bookkeeping on top — never size memory at exactly the payload size, always leave 20-30% headroom for overhead, fragmentation, and the fork copy-on-write spike during snapshots. At 1M ops/s with ~1 KB values the wire traffic is ~1 GB/s each way, so the NIC (10 GbE ≈ 1.25 GB/s) becomes the limit before the CPU does — which is exactly why pipelining (batching many commands per round-trip) and client-side caching matter more than raw command speed.</p>
+
+<h2>Core APIs</h2>
+<p>Redis exposes commands over RESP (TCP), not REST. The surface a client relies on:</p>
+<ul>
+<li><strong>Strings / counters:</strong> <code>SET key val [EX ttl]</code>, <code>GET key</code>, <code>DEL key</code>, <code>INCR key</code>, <code>EXPIRE key ttl</code></li>
+<li><strong>Hash:</strong> <code>HSET key field val</code>, <code>HGET key field</code> — store objects.</li>
+<li><strong>List:</strong> <code>LPUSH key val</code>, <code>RPOP key</code> — queues.</li>
+<li><strong>Sorted set:</strong> <code>ZADD key score member</code>, <code>ZRANGE key a b</code>, <code>ZREVRANK key member</code> — leaderboards.</li>
+<li><strong>Pub/Sub:</strong> <code>SUBSCRIBE ch</code>, <code>PUBLISH ch msg</code>.</li>
+<li><strong>Cluster / durability:</strong> <code>CLUSTER SLOTS</code>, <code>WAIT numreplicas timeout</code> (block until replicated).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<p>A single Redis node is conceptually simple: clients speak a compact wire protocol (RESP) over TCP to a server whose heart is a <strong>single-threaded command processor</strong> operating on an in-memory keyspace. Around that core sit the persistence engine, the replication stream, and (in a cluster) the slot-routing layer.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph SRV["Redis node"]
+    EL["Event loop (single thread)"] --> KS["In-memory keyspace + expiry"]
+    KS --> PERS["Persistence engine: RDB + AOF"]
+    KS --> REPL["Replication stream"]
+  end
+  C1["Client A"] --> EL
+  C2["Client B"] --> EL
+  C3["Client C"] --> EL
+  PERS --> DISK["Disk: dump.rdb / appendonly.aof"]
+  REPL --> RPL["Replica nodes"]
+</pre>
+<figcaption><strong>Figure 1.</strong> One node — many client connections multiplexed onto a single-threaded event loop that mutates an in-memory keyspace; persistence and replication hang off the core.</figcaption>
+</figure>
+
+<h2>The single-threaded event loop</h2>
+
+<p>The defining design choice: command execution is <strong>single-threaded</strong>. Redis multiplexes thousands of connections with an event loop (<code>epoll</code>/<code>kqueue</code>) and executes one command at a time. This sounds counter-intuitive but is the source of much of Redis's simplicity and speed:</p>
+
+<ul>
+<li><strong>No locks, no race conditions</strong> on the keyspace — every command is atomic by construction.</li>
+<li>RAM access is so fast that the bottleneck is the <strong>network and syscalls</strong>, not CPU. I/O multiplexing keeps the single core busy.</li>
+<li>Avoids context-switch and lock-contention overhead that would dominate at this latency scale.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant EL as Event loop
+  participant KS as Keyspace
+  C->>EL: SET user:1 "Lam" (RESP frame)
+  EL->>EL: read + parse command
+  EL->>KS: apply mutation (atomic)
+  KS-->>EL: OK
+  EL-->>C: +OK
+  Note over EL: next command only after this one finishes
+</pre>
+<figcaption><strong>Figure 2.</strong> Request lifecycle. Commands are serialized through one thread, so each one observes a consistent keyspace and completes atomically.</figcaption>
+</figure>
+
+<p><strong>Where threads <em>are</em> used:</strong> modern Redis offloads slow side-tasks to background threads — closing large keys (<code>UNLINK</code> / lazy-free), <code>fsync</code> of the AOF, and optional I/O threads for reading/writing sockets. The command logic itself stays single-threaded.</p>
+
+<p><strong>Pipelining vs the round-trip tax.</strong> Because the bottleneck is network round-trips, not CPU, the single biggest client-side win is <strong>pipelining</strong>: send N commands without waiting for each reply, so N requests cost one round-trip instead of N. A loop of 10k individual <code>SET</code>s over a 1 ms RTT link takes ~10 s of pure waiting; pipelined, it is a few ms. This is also why <code>MGET</code>/<code>MSET</code> and Lua scripts (which run server-side, atomically) are preferred over chatty per-key calls.</p>
+
+<p><strong>What this buys and what it costs.</strong> The single thread gives you atomicity for free — a Lua script or <code>MULTI/EXEC</code> transaction runs to completion with no other command interleaving — but it also means <strong>one slow command stalls everyone</strong>. A single <code>KEYS *</code> on 100M keys, a 1M-element <code>ZRANGE</code>, or a heavy Lua script blocks the whole server for its entire duration. The design rule that follows: keep every command O(small), and push large scans to <code>SCAN</code>/cursor-based iteration.</p>
+
+<h2>Data structures &amp; memory</h2>
+
+<p>Redis is "data structures as a service". Each value type is backed by a specialized internal encoding that switches as data grows, trading memory for speed:</p>
+
+<table>
+<thead><tr><th>Type</th><th>Used for</th><th>Notable encodings</th></tr></thead>
+<tbody>
+<tr><td><code>string</code></td><td>cache values, counters</td><td>int, embstr, raw</td></tr>
+<tr><td><code>hash</code></td><td>objects / fields</td><td>listpack then hashtable</td></tr>
+<tr><td><code>list</code></td><td>queues, timelines</td><td>quicklist (linked listpacks)</td></tr>
+<tr><td><code>set</code></td><td>unique membership</td><td>intset / listpack / hashtable</td></tr>
+<tr><td><code>zset</code></td><td>leaderboards, rate limits</td><td>listpack then skiplist + hashtable</td></tr>
+</tbody>
+</table>
+
+<p>The <strong>sorted set</strong> is worth a closer look because it powers leaderboards and time-ranged queries. It keeps two structures in sync: a <strong>hashtable</strong> (member to score, O(1) lookup) and a <strong>skip list</strong> (ordered by score, O(log n) range queries).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph ZSET["Sorted set: game:leaderboard"]
+    direction LR
+    HT["Hashtable: member to score (O(1) lookup)"]
+    SL["Skip list: ordered by score (O(log n) range + rank)"]
+  end
+  ZADD["ZADD / ZINCRBY"] --> HT
+  ZADD --> SL
+  ZRANGE["ZRANGE / ZREVRANK"] --> SL
+</pre>
+<figcaption><strong>Figure 3.</strong> A zset maintains a hashtable and a skip list together — fast point lookups <em>and</em> ordered range/rank queries.</figcaption>
+</figure>
+
+<p><strong>Why the encodings matter.</strong> A small hash or zset is stored as a compact <strong>listpack</strong> (a flat, cache-friendly array) and only "upgrades" to a hashtable/skiplist once it crosses a size threshold. This is a deliberate memory/speed trade: tiny collections stay tiny in RAM; large ones pay for the index. It is also a footgun — a key that slowly grows past the threshold suddenly costs more memory, and a single huge collection becomes a "big key" that blocks the thread on access or delete.</p>
+
+<p><strong>Two worked uses:</strong></p>
+<ul>
+<li><strong>Sliding-window rate limiter (zset):</strong> store request timestamps as scores in <code>rl:user:42</code>; on each request <code>ZADD</code> now, <code>ZREMRANGEBYSCORE</code> to drop entries older than the window, then <code>ZCARD</code> to count — all O(log n), atomic in one Lua script.</li>
+<li><strong>Object cache (hash):</strong> store a user as fields in <code>user:42</code> so you can read/update one field without serializing the whole object, and set a TTL on the key for expiry.</li>
+</ul>
+
+<h2>Persistence: RDB vs AOF</h2>
+
+<p>Pure in-memory data is lost on restart. Redis offers two complementary persistence modes:</p>
+
+<ul>
+<li><strong>RDB (snapshot):</strong> periodically <code>fork()</code> the process and dump a point-in-time binary image of the dataset. Compact, fast to load, great for backups — but you can lose the writes since the last snapshot.</li>
+<li><strong>AOF (append-only file):</strong> log every write command to a file; replay it on startup. More durable (configurable <code>fsync</code> policy: always / everysec / no), but the file grows and must be periodically <strong>rewritten</strong> (compacted).</li>
+</ul>
+
+<p>Production setups often run <strong>both</strong>: AOF for durability, RDB for fast restart and backups.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  W["Write command"] --> KS["In-memory keyspace"]
+  KS -->|periodic fork + dump| RDB["RDB snapshot dump.rdb (compact, lossy)"]
+  KS -->|append each write| AOF["AOF log appendonly.aof (durable)"]
+  AOF -->|background rewrite| AOF2["Compacted AOF"]
+  RDB --> RESTART["On restart: load snapshot then replay"]
+  AOF2 --> RESTART
+</pre>
+<figcaption><strong>Figure 4.</strong> RDB trades durability for compactness and fast loads; AOF trades size for durability. Many deployments combine them.</figcaption>
+</figure>
+
+<p><strong>The fork trick:</strong> snapshotting and AOF rewrite use <code>fork()</code> + copy-on-write. The child writes a consistent view to disk while the parent keeps serving traffic; only pages modified during the dump are duplicated. The cost is a memory spike (a write-heavy workload during the dump can nearly double RSS) and a brief fork pause on very large datasets — a real production gotcha on big instances.</p>
+
+<p>The AOF <code>fsync</code> policy is the core <strong>durability vs throughput</strong> knob:</p>
+<table>
+<thead><tr><th>fsync policy</th><th>Durability on crash</th><th>Throughput cost</th></tr></thead>
+<tbody>
+<tr><td><code>always</code></td><td>lose ~0 (every write flushed)</td><td>high — an fsync per write</td></tr>
+<tr><td><code>everysec</code></td><td>lose up to ~1 s of writes</td><td>low — the usual balance</td></tr>
+<tr><td><code>no</code></td><td>lose whatever the OS hasn't flushed</td><td>lowest — OS decides</td></tr>
+</tbody>
+</table>
+<p>Even with <code>always</code>, "durable" means written to the local disk of one node — surviving a whole-node loss is the job of <em>replication</em>, not persistence. The two are complementary: persistence protects against restart, replication against node death.</p>
+
+<h2>Replication &amp; failover</h2>
+
+<p>For read scaling and availability, a <strong>primary</strong> asynchronously replicates to one or more <strong>replicas</strong>. A replica first does a full sync (the primary sends an RDB snapshot), then streams subsequent writes from a replication backlog buffer. Replication is <em>asynchronous</em>, so a replica can lag slightly behind — a deliberate latency/consistency trade-off.</p>
+
+<p>To make failover automatic, <strong>Redis Sentinel</strong> processes monitor the primary; on agreement (quorum) that it is down, they elect a new primary from the replicas and reconfigure clients.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  P["Primary"] -->|async stream| R1["Replica 1"]
+  P -->|async stream| R2["Replica 2"]
+  subgraph SENT["Sentinel quorum"]
+    S1["Sentinel A"]
+    S2["Sentinel B"]
+    S3["Sentinel C"]
+  end
+  S1 -.->|monitor| P
+  S2 -.->|monitor| P
+  S3 -.->|monitor| P
+  S1 -.->|promote on failure| R1
+</pre>
+<figcaption><strong>Figure 5.</strong> Async primary-replica replication plus a Sentinel quorum that detects primary failure and promotes a replica.</figcaption>
+</figure>
+
+<p><strong>Full sync vs partial resync.</strong> The first time a replica connects it does a <em>full</em> sync (the primary forks an RDB and ships it, then streams the backlog). If a replica briefly disconnects, it can do a <em>partial</em> resync — it asks for everything after the last replication offset it saw, served from the primary's in-memory <strong>replication backlog buffer</strong>. Size that buffer for your worst expected blip; if the replica falls further behind than the buffer holds, it is forced into an expensive full sync again.</p>
+
+<p><strong>The failure mode that bites people:</strong> because replication is asynchronous, a primary can acknowledge a write to the client and then crash <em>before</em> that write reached any replica — on failover the new primary never had it, so the write is silently lost. Redis is therefore <strong>not</strong> a strongly-consistent store by default. Mitigations: <code>WAIT numreplicas timeout</code> blocks the write until N replicas confirm (turning it into a slower, quorum-ish write), and replicas should be in different failure domains so one rack/AZ loss does not take the primary and all replicas together.</p>
+
+<h2>Horizontal scaling: Redis Cluster</h2>
+
+<p>One node is bounded by a single machine's RAM and CPU. <strong>Redis Cluster</strong> shards the keyspace across nodes using <strong>16384 hash slots</strong>: <code>slot = CRC16(key) mod 16384</code>. Each primary owns a contiguous range of slots (and has its own replicas). Clients cache the slot to node map and talk directly to the right node; if a key has moved, the node replies with a <code>MOVED</code> redirect.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  K["key 'user:42'"] --> H["CRC16(key) mod 16384 = slot number"]
+  H --> ROUTE{"Which node owns the slot?"}
+  ROUTE -->|slots 0-5460| N1["Node 1 (+ replica)"]
+  ROUTE -->|slots 5461-10922| N2["Node 2 (+ replica)"]
+  ROUTE -->|slots 10923-16383| N3["Node 3 (+ replica)"]
+</pre>
+<figcaption><strong>Figure 6.</strong> Fixed 16384 hash slots are distributed across primaries. Resharding moves whole slots between nodes, so scaling out does not require rehashing every key.</figcaption>
+</figure>
+
+<p><strong>Why fixed slots and not consistent hashing of nodes?</strong> Slots decouple the key space from the node count. Adding a node is "give it some slots"; the migration unit is a slot, and only keys in moved slots are affected — keeping resharding incremental and online.</p>
+
+<p><strong>Multi-key operations and hash tags.</strong> A command touching several keys (e.g. <code>MGET a b c</code>, a transaction, a Lua script) only works if all those keys live in the same slot — otherwise Redis rejects it with a cross-slot error. To force related keys together you use a <strong>hash tag</strong>: only the part in braces is hashed, so <code>user:{42}:profile</code> and <code>user:{42}:sessions</code> land in the same slot and can be operated on atomically. This is a real constraint to call out: Cluster trades away cross-shard transactions.</p>
+
+<p><strong>Online resharding (MOVED vs ASK).</strong> While a slot is migrating, some keys are on the old node and some on the new. A client hitting the old node for an already-moved key gets a <code>MOVED</code> (update your map permanently) or, for a key mid-migration, an <code>ASK</code> redirect (one-shot, do not cache). This is how Cluster reshards while still serving traffic — no global lock, no full rehash.</p>
+
+<h2>Eviction &amp; expiry</h2>
+
+<p>As a cache, Redis must stay within a memory budget (<code>maxmemory</code>). Two mechanisms reclaim space:</p>
+
+<ul>
+<li><strong>Expiry:</strong> keys with a TTL are removed <em>lazily</em> (on access) and by a <em>background sampler</em> that probabilistically scans for expired keys.</li>
+<li><strong>Eviction:</strong> when at the memory limit, a policy decides what to drop — <code>noeviction</code> (reject writes), <code>allkeys-lru</code>, <code>allkeys-lfu</code>, <code>volatile-ttl</code>, etc. Redis uses <em>approximate</em> LRU/LFU (samples a handful of keys) to avoid the cost of exact bookkeeping.</li>
+</ul>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Redis is itself the building block, so the "tech choice" is <em>when</em> to reach for it and what to pair it with:</p>
+<ul>
+<li><strong>Redis vs Memcached:</strong> Memcached is a simpler multi-threaded string cache; pick Redis when you need data structures, persistence, replication, or pub/sub. (Dragonfly / KeyDB are multi-threaded, Redis-compatible alternatives.)</li>
+<li><strong>Cache-aside with a primary DB:</strong> the most common pattern — Redis caches in front of <strong>PostgreSQL</strong> / <strong>Cassandra</strong>; the app reads cache, falls back to the DB, and writes invalidate or update the cache.</li>
+<li><strong>As a component inside other designs:</strong> session/presence registry (chat, Zoom), feed cache (news feed), rate limiter, geo index of hot locations (Grab/Uber), leaderboard (gaming), prefix cache (LLM serving).</li>
+<li><strong>Streams vs Kafka:</strong> Redis Streams suit lightweight, in-process queues; reach for <strong>Kafka</strong> when you need high-throughput, durable, replayable logs across many consumers.</li>
+</ul>
+
+<h2>Consistency &amp; guarantees</h2>
+<p>It is worth stating Redis's guarantees explicitly, because interviewers probe them:</p>
+<ul>
+<li><strong>Single-command atomicity:</strong> every command — and every Lua script / <code>MULTI/EXEC</code> block — executes atomically on the one thread. No partial updates, no interleaving.</li>
+<li><strong>No multi-key transactions across shards:</strong> in Cluster, atomicity is only within a slot (hence hash tags).</li>
+<li><strong>Asynchronous replication = possible data loss on failover</strong> (see above). With Sentinel/Cluster, Redis chooses <strong>availability</strong> on partition (AP-leaning), not strong consistency; <code>WAIT</code> tightens this but cannot make it fully linearizable.</li>
+<li><strong>At-most-once Pub/Sub:</strong> classic Pub/Sub is fire-and-forget — a disconnected subscriber misses messages. Use <strong>Streams</strong> (consumer groups, acks, replay) when you need at-least-once delivery.</li>
+</ul>
+
+<h2>When (not) to use Redis</h2>
+<ul>
+<li><strong>Great for:</strong> caching, sessions, rate limiting, leaderboards, counters, ephemeral queues, real-time presence — anything that fits in RAM and benefits from sub-ms latency.</li>
+<li><strong>Be careful for:</strong> a primary system of record with strict durability (acknowledged-write loss on failover is real) — pair it with a durable database or accept the trade-off.</li>
+<li><strong>Wrong tool for:</strong> datasets far larger than RAM where most data is cold (use a disk-based store), complex multi-key/relational queries, or strong cross-shard transactions.</li>
+</ul>
+
+<h2>Pitfalls &amp; talking points</h2>
+<ul>
+<li><strong>Hot key:</strong> a single key serving millions of ops can saturate one node (and one slot cannot be split). Mitigate with client-side caching, read fan-out to replicas, or splitting the value across keys.</li>
+<li><strong>Big key:</strong> a huge value blocks the single thread when accessed or deleted — use <code>UNLINK</code> (lazy free) and avoid unbounded collections.</li>
+<li><strong>Blocking commands:</strong> <code>KEYS *</code>, large <code>ZRANGE</code>, or Lua scripts run on the one thread and stall everyone — prefer <code>SCAN</code> and bounded operations.</li>
+<li><strong>Persistence latency:</strong> <code>fsync=always</code> hurts throughput; <code>everysec</code> is the usual balance.</li>
+<li><strong>Replica lag:</strong> reads from a replica may be stale; route read-your-writes to the primary.</li>
+<li><strong>Cache stampede:</strong> when a hot key expires, many clients miss and hit the database at once — use a short lock / single-flight on recompute, or stagger TTLs.</li>
+<li><strong>Unbounded growth:</strong> a list/zset/stream with no trimming silently grows into a big key — cap it (<code>LTRIM</code>, <code>XADD ... MAXLEN</code>) and always set TTLs on cache keys.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>A <strong>single-threaded event loop</strong> over an in-memory keyspace gives atomicity for free and makes the network the bottleneck, not CPU.</li>
+<li>Specialized <strong>data-structure encodings</strong> trade memory for speed and switch as data grows.</li>
+<li><strong>RDB + AOF</strong> are complementary durability knobs; both lean on <code>fork()</code> + copy-on-write.</li>
+<li><strong>Async replication + Sentinel</strong> give read scaling and automatic failover.</li>
+<li><strong>16384 hash slots</strong> make Redis Cluster shard and reshard incrementally; cross-slot atomicity needs hash tags.</li>
+<li><strong>Know the guarantees:</strong> per-command atomicity, but async replication means an acknowledged write can be lost on failover — Redis leans AP, and <code>WAIT</code> only tightens it.</li>
+<li><strong>Pick the right job:</strong> cache/sessions/rate-limit/leaderboard yes; strict system-of-record durability and cross-shard transactions, think twice.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Redis docs — persistence (RDB/AOF), replication, Redis Cluster specification, key eviction, and latency/single-threaded design (redis.io); Redis Sentinel docs; the RESP protocol spec. Diagrams and write-up are original EngineerPro content.</em></p>

@@ -1,0 +1,188 @@
+<p>Một <strong>stock exchange</strong> khớp lệnh mua và bán một cách công bằng, với <strong>latency cỡ microsecond</strong> và correctness tuyệt đối — mất hoặc đảo thứ tự một order là không chấp nhận được. Trái tim là một <strong>matching engine</strong> in-memory được nuôi bởi một <strong>sequencer</strong>, và recoverable nhờ <strong>event sourcing</strong>.</p>
+
+<p>Đây là thiết kế "correctness + latency, cả hai không thương lượng" thuần khiết nhất trong bộ. Trick định nghĩa là <strong>determinism</strong>: gán mỗi order một total order duy nhất qua một sequencer, ghi stream đã order đó vào một durable replicated log, rồi feed nó vào một <strong>matching engine in-memory, single-threaded</strong> mỗi symbol. Vì matching là một hàm deterministic của input sequence, log <em>chính là</em> database — bất kỳ replica nào hoặc một node recover replay cùng log và đạt cùng book và fill y hệt. Cố ý <strong>không có database trên matching hot path</strong>; persistence xảy ra bằng append vào log, không phải ghi row giữa lúc match.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Class latency?</strong> Matching cỡ microsecond HFT thật (kernel bypass, không GC) vs một venue "nhanh nhưng millisecond" — bar đổi implementation triệt để.</li>
+<li><strong>Quy tắc matching?</strong> Price-time priority (phổ biến nhất), pro-rata, hay auction phase (open/close)? Đây là thuật toán core.</li>
+<li><strong>Order type?</strong> Chỉ limit và market, hay stop/iceberg/IOC v.v.? Nhiều type hơn = nhiều matching logic hơn.</li>
+<li><strong>Pre-trade risk check?</strong> Order phải qua credit/risk limit trước khi match không? Điều đó thêm một gate trên critical path.</li>
+<li><strong>Độ sâu market data?</strong> L1 (top of book) vs full L2/L3 depth, và fan-out tới hàng nghìn subscriber, chi phối thiết kế publishing.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Đặt / huỷ order (limit, market); nhận execution (fill).</li>
+<li>Publish <strong>market data</strong> (order book L1/L2, candlestick).</li>
+<li>Tải dữ liệu lịch sử.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Latency cực thấp</strong> trên critical path (micro tới millisecond).</li>
+<li><strong>Fairness và total ordering</strong> của order.</li>
+<li><strong>Durability</strong> và recovery nhanh; high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Order rate:</strong> một exchange bận peak hàng trăm nghìn tới hàng triệu order/s, partition theo symbol.</li>
+<li><strong>Per-symbol matching:</strong> order book của một symbol single-threaded trong memory — CPU hiện đại match hàng triệu order/s, nên một core mỗi symbol hot là đủ.</li>
+<li><strong>Market data fan-out:</strong> một execution fanout tới nhiều subscriber — multicast, không unicast theo từng subscriber.</li>
+<li><strong>Critical-path hygiene:</strong> không lock, không GC pause trên matching path. Không bỏ durability — sequencer ghi mỗi order vào một durable, replicated <strong>input log</strong> trước khi match; một order "committed" khi nó nằm trong replicated log đó, nên matching state và fill luôn replay được.</li>
+</ul>
+<p><strong>Worked example.</strong> Lần theo budget microsecond của một order để thấy vì sao kiến trúc tồn tại. Ở, ví dụ, 1M order/s trên một symbol hot, đó là ~1 microsecond headroom mỗi order trên book đó — nên bất kỳ lock, allocation, hay GC pause (millisecond!) sẽ thảm khốc. Điều đó loại bỏ một database write mỗi order: một round-trip disk/DB là ~hàng trăm microsecond tới millisecond, gấp 100-1000x budget. Giải pháp: <strong>sequencer</strong> append order vào một replicated in-memory/log-structured input log (microsecond, và durable khi một quorum replica có nó), rồi matching engine — single-threaded, data structure pre-allocated, không lock vì một writer mỗi symbol — xử lý nó trong dưới một microsecond. Partition theo <strong>symbol</strong> là cái cho horizontal scale: 5000 symbol qua N core, mỗi book độc lập, nên throughput tổng là hàng triệu/s trong khi mỗi book vẫn single-threaded và deterministic. Market data fan-out (một fill → hàng nghìn subscriber) xử lý bằng <strong>multicast</strong>, không bao giờ unicast theo từng subscriber, ngoài matching path.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /orders</code> — <code>{symbol, side, type, price, quantity}</code> → <code>{order_id, status}</code> (thường FIX, không REST).</li>
+<li><code>DELETE /orders/{id}</code> — cancel.</li>
+<li><code>GET /marketdata/orderbook?symbol=&depth=</code> → bids / asks.</li>
+<li><code>GET /marketdata/candles?symbol=&resolution=</code> → OHLC candle.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Order vào qua một <strong>client gateway</strong>, được đóng dấu vào một total order duy nhất bởi <strong>sequencer</strong>, và chảy tới <strong>matching engine</strong> theo từng symbol. Order/cancel được commit vào <strong>Input command log</strong> trước khi match (commit point và replay source); fill và book update kết quả được append vào một <strong>Output event log</strong> riêng mà một market-data publisher và một reporter consume.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  BR["Broker / client"] --> GW["Client gateway"]
+  GW --> RISK["Risk / pre-trade + self-trade check"]
+  RISK --> SEQ["Sequencer: append vào durable replicated Input command log (total order)"]
+  SEQ --> ME["Matching engine (order book per-symbol)"]
+  ME --> ES["Output event log (fill, book update; append-only)"]
+  ES --> MD["Market data publisher"]
+  ES --> RPT["Reporter"]
+  MD --> SUBS["Market-data gateways (internal multicast) rồi client protocols"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Risk/pre-trade check chạy trước sequencer; sequencer append mỗi order/cancel vào <strong>Input command log</strong> durable, replicated (commit point) trước khi match; matching engine phát fill/book update vào <strong>Output event log</strong>, market data và report derive từ đó.</figcaption>
+</figure>
+
+<h2>Matching engine và order book</h2>
+<p>Mỗi symbol có một <strong>order book</strong>: bid sắp cao-xuống-thấp, ask thấp-lên-cao. Một order mới match với best opposite price; phần dư rest trong book. Giữ hoàn toàn trong memory và xử lý <strong>single-threaded theo từng symbol</strong>, matching vừa nhanh vừa vốn dĩ không có race condition.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  NEW["Buy order mới: 100 at 50.2"] --> ME["Matching engine cho symbol"]
+  subgraph BOOK["Order book"]
+    direction LR
+    BIDS["Bids: 50.1, 50.0, 49.9"]
+    ASKS["Asks: 50.2, 50.3, 50.4"]
+  end
+  ME --> BOOK
+  ME --> MATCH{"Cross best ask?"}
+  MATCH -->|có| FILL["Execute fill tại 50.2"]
+  MATCH -->|không| REST["Rest order trong book"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Matching engine cross order đến với best opposite price; phần chưa match rest trong book in-memory.</figcaption>
+</figure>
+
+<h2>Sequencer và event sourcing</h2>
+<p>Fairness cần một <strong>total order</strong> duy nhất của input. Sequencer gán một sequence number đơn điệu cho mọi order/cancel và append vào <strong>Input command log</strong> trước khi match — log này là commit point và replay source. Vì matching là một hàm deterministic của input có thứ tự đó, engine rebuildable: <strong>event sourcing</strong> nghĩa là recovery là "replay Input command log", và một replica giữ hot bằng cách consume cùng committed input.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  IN["Order / cancel"] --> SEQ["Sequencer gán seq 1,2,3..."]
+  SEQ --> LOG["Input command log (ordered, append-only, replicated)"]
+  LOG --> ME["Matching engine state"]
+  LOG --> REPLAY["Recovery: replay Input command log để rebuild"]
+  LOG --> HOT["Hot replica: consume cùng committed input"]
+  ME --> OEL["Output event log (fill / book update)"]
+</pre>
+<figcaption><strong>Hình 3.</strong> Sequencer tạo một total order của <em>input</em>; <strong>Input command log</strong> là commit point và replay source cho matching, còn fill/book update đi vào <strong>Output event log</strong> riêng để downstream consume.</figcaption>
+</figure>
+
+<h2>Order flow</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Broker
+  participant GW as Gateway
+  participant RK as Risk
+  participant SEQ as Sequencer
+  participant ICL as Input command log
+  participant ME as Matching engine
+  participant OEL as Output event log
+  participant MD as Market data
+  B->>GW: order mới
+  GW->>RK: pre-trade risk check
+  RK->>SEQ: forward
+  SEQ->>ICL: append (quorum) = commit point
+  ICL->>ME: deliver committed command
+  ME->>ME: match với book
+  ME->>OEL: append fill + book update
+  OEL-->>GW: execution report
+  GW-->>B: fill
+  OEL->>MD: market data
+</pre>
+<figcaption><strong>Hình 4.</strong> Commit point là lần append durable vào <strong>Input command log</strong>; matching engine consume committed command, append fill/book update vào <strong>Output event log</strong>, và execution report trả về qua gateway còn market data publish từ output log.</figcaption>
+</figure>
+
+<h2>High availability</h2>
+<p>Matching engine là một logical writer duy nhất mỗi symbol — nên HA là primary cộng hot replica được nuôi bởi <strong>Input command log</strong>, với <strong>leader election</strong> (vd Raft) để promote một replica khi lỗi. Replica đã replay cùng committed input, nên failover không mất order hay fill đã commit.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  PRIMARY["Primary matching engine"] -->|input command log| R1["Hot replica 1"]
+  PRIMARY -->|input command log| R2["Hot replica 2"]
+  RAFT["Leader election (Raft)"] -.elect.-> PRIMARY
+  RAFT -.->|khi lỗi promote| R1
+</pre>
+<figcaption><strong>Hình 5.</strong> Hot replica replay cùng Input command log; leader election promote một cái khi lỗi mà không mất order đã commit.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>Client gateway:</strong> thường là giao thức <strong>FIX</strong> (hoặc binary protocol) trên TCP, không REST — latency quan trọng; risk/pre-trade check nằm đây.</li>
+<li><strong>Sequencer + Input command log:</strong> một <strong>ordered log của order/cancel</strong> durable, replicated (journal replicated kiểu Aeron/LMAX, hoặc Kafka nơi không cần latency µs) — commit point và replay source cho matching.</li>
+<li><strong>Output event log:</strong> một log append-only riêng các <strong>fill / book update / trade</strong> — nguồn downstream cho execution report, market data, và reporting (tách khỏi input log để commit point không mơ hồ).</li>
+<li><strong>Matching engine:</strong> order book <strong>in-memory, single-threaded theo symbol</strong> (ring buffer LMAX Disruptor) — không database trên hot path.</li>
+<li><strong>Market data:</strong> một <strong>time-series database</strong> (kdb+ / một columnar TSDB) cho candle và analytics; fan-out real-time qua internal multicast.</li>
+<li><strong>Historical / reporting:</strong> event archive ra <strong>blob/object storage</strong> + một columnar warehouse cho compliance và backtest.</li>
+<li><strong>HA:</strong> primary + hot replica replay cùng log, với leader election kiểu <strong>Raft</strong>.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> correctness + latency µs cấm một database trên matching path → <em>log</em> durable là store và in-memory engine derive state từ nó; market data là time-series → một TSDB; history là bulk bất biến → object storage + warehouse. Đây là ví dụ rõ nhất của "log là database".</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Total order + determinism:</strong> sequencer gán một global order mỗi symbol; matching là một hàm deterministic của sequence đó, nên mọi replica đạt book state và fill giống nhau từng byte — fairness (price-time priority) enforce bởi chính ordering.</li>
+<li><strong>Durable commit trước match:</strong> một order committed khi nằm trong replicated input log (quorum); fill và ack derive từ committed state, nên crash không bao giờ mất một order hay fill đã ack — recovery replay log.</li>
+<li><strong>Exactly-once effect qua replay:</strong> vì state là một replay thuần của ordered log, failover không tạo fill trùng hay thiếu — engine recover tiếp từ sequence number applied gần nhất.</li>
+<li><strong>Strong consistency hơn availability (CP):</strong> khi failover hệ chờ một leader nhất quán replay log authoritative thay vì accept match phân kỳ — correctness thắng vài millisecond availability.</li>
+<li><strong>Market data eventually-consistent:</strong> book/feed published là derived và fanout sau matching; subscriber có thể thấy nó trễ vài microsecond, nhưng fill đã match đã authoritative.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hợp:</strong> bất kỳ matching two-sided liên tục với ordering nghiêm và latency cực thấp — securities, crypto, futures exchange, và matching/crossing engine nội bộ.</li>
+<li><strong>Thừa khi:</strong> volume thấp hoặc latency lỏng — một transactional DB với row lock hoặc một queue + worker đơn giản hơn nhiều một sequencer + in-memory engine + multicast.</li>
+<li><strong>Thiết kế khác khi:</strong> nó một phía (bid cao nhất thắng) — đó là một <strong>auction</strong>, không phải order book; hoặc khi bạn chỉ cần trade request/response với một liquidity provider (không có public book), vốn không cần một deterministic replicated log.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Commit point:</strong> một order durable khi nằm trong replicated input log (trước match); fill/ack derive từ committed state, nên crash không bao giờ mất một fill đã ack.</li>
+<li><strong>Critical path purity:</strong> không lock, không GC trên matching path; durable write là sequenced input log, giữ ngoài hot loop matching per-symbol.</li>
+<li><strong>Multicast là internal:</strong> publisher fanout qua internal multicast / ring buffer tới market-data gateway, rồi gateway giao qua client protocol (không phải raw multicast trên public internet).</li>
+<li><strong>Fairness:</strong> một sequencer duy nhất mỗi symbol là authority về ordering — không match song song một symbol.</li>
+<li><strong>Recovery:</strong> event sourcing làm recovery deterministic (replay), nhưng log phải durable và ordered.</li>
+<li><strong>Market data fan-out:</strong> dùng multicast và ring buffer; đừng unicast tới hàng nghìn.</li>
+<li><strong>Self-trade / risk check</strong> nằm trước matching, ở gateway/risk layer.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Một <strong>sequencer</strong> cho total order; <strong>matching engine</strong> per-symbol chạy single-threaded trong memory.</li>
+<li><strong>Event sourcing</strong> làm engine recoverable và replicable bằng replay.</li>
+<li><strong>Leader election + hot replica</strong> cho HA mà không mất event đã commit.</li>
+<li>Giữ matching path sạch khỏi disk, lock, và GC.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: LMAX Disruptor (Thompson et al.); event sourcing (Martin Fowler); giao thức FIX; tài liệu công khai về exchange matching engine và low-latency systems. Diagram và nội dung là content gốc của EngineerPro.</em></p>

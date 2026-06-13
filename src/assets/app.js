@@ -393,8 +393,8 @@
       title = chTitle ? `${chTitle} · ${SUFFIX}` : SUFFIX;
       if (chTitle && chN) {
         desc = en
-          ? `Ch. ${chN}: ${chTitle} — System Design Interview notes (VI & EN). Compiled by EngineerPro. Source: liquidslr/system-design-notes.`
-          : `Chương ${chN}: ${chTitle} — ghi chú System Design Interview (VI & EN). Tổng hợp EngineerPro. Nguồn: liquidslr/system-design-notes.`;
+          ? `Ch. ${chN}: ${chTitle} — original System Design Interview case study (VI & EN) by EngineerPro.`
+          : `Chương ${chN}: ${chTitle} — case study System Design Interview gốc (VI & EN) biên soạn bởi EngineerPro.`;
       } else {
         desc = "";
       }
@@ -413,7 +413,7 @@
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-        "system-design": en ? "23 System Design Interview case studies — read chapter by chapter (VI & EN). Compiled by EngineerPro. Source: liquidslr/system-design-notes." : "23 case study System Design Interview — đọc từng chương (VI & EN). Tổng hợp & dịch EngineerPro. Nguồn: liquidslr/system-design-notes.",
+        "system-design": en ? "21 original System Design Interview case studies — read chapter by chapter (VI & EN). Original content by EngineerPro." : "21 case study System Design Interview gốc — đọc từng chương (VI & EN). Nội dung gốc bởi EngineerPro.",
         resources: en ? "Free interview resources from EngineerPro — HR phone screen checklist, programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech và playlist review CV.",
         mentors:   en ? `${nMentors} mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…` : `${nMentors} mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…`,
         stories:   en ? `${nStories}+ EngineerPro students landed offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…` : `${nStories}+ học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…`,
@@ -1219,6 +1219,67 @@
     chEl.appendChild(itemsWrap);
   }
 
+  // Lazy-load the vendored Mermaid bundle (only on chapters that use diagrams).
+  let mermaidLoadingPromise = null;
+  const mermaidSrc = new WeakMap(); // node -> original diagram definition (for re-theming)
+
+  function mermaidTheme() {
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "neutral";
+  }
+  function initMermaid() {
+    try {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: mermaidTheme(),
+        flowchart: { useMaxWidth: true, htmlLabels: true },
+        sequence: { useMaxWidth: true },
+      });
+    } catch (e) { /* ignore init errors */ }
+  }
+  function ensureMermaid() {
+    if (window.mermaid) return Promise.resolve(window.mermaid);
+    if (mermaidLoadingPromise) return mermaidLoadingPromise;
+    mermaidLoadingPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = asset("assets/vendor/mermaid.min.js");
+      s.async = true;
+      s.onload = () => { initMermaid(); resolve(window.mermaid); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    return mermaidLoadingPromise;
+  }
+
+  // Render any <pre class="mermaid"> diagrams inside a freshly-injected container.
+  async function renderMermaidIn(container) {
+    if (!container) return;
+    const nodes = [...container.querySelectorAll("pre.mermaid, .mermaid")];
+    if (!nodes.length) return;
+    // Stash each diagram's source so we can re-render it on a theme switch.
+    nodes.forEach((n) => { if (!mermaidSrc.has(n)) mermaidSrc.set(n, n.textContent); });
+    try {
+      const m = await ensureMermaid();
+      const pending = nodes.filter((n) => n.getAttribute("data-processed") !== "true");
+      if (pending.length) await m.run({ nodes: pending });
+    } catch (e) { /* leave diagram source visible if rendering fails */ }
+  }
+
+  // Re-render on-page diagrams when the colour theme changes (light <-> dark).
+  async function rethemeMermaid() {
+    if (!window.mermaid) return; // nothing rendered yet
+    const nodes = [...document.querySelectorAll("pre.mermaid, .mermaid")]
+      .filter((n) => mermaidSrc.has(n));
+    if (!nodes.length) return;
+    nodes.forEach((n) => {
+      n.innerHTML = "";
+      n.textContent = mermaidSrc.get(n);
+      n.removeAttribute("data-processed");
+    });
+    initMermaid();
+    try { await window.mermaid.run({ nodes }); } catch (e) { /* ignore */ }
+  }
+
   function renderSdChapter(slug) {
     const wrap = document.getElementById("sdChapterArticle");
     if (!wrap) return;
@@ -1265,6 +1326,7 @@
           <div class="article__body">${body}</div>
           ${sdChapterFooterHtml()}
         `;
+        renderMermaidIn(wrap);
       })
       .catch(() => {
         if (reqId !== sdChapterRequest) return;
@@ -2878,6 +2940,7 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "dark" ? "#0a1424" : "#0b1d3a");
     updateThemeSwitchUI();
+    if (typeof rethemeMermaid === "function") rethemeMermaid();
   }
   updateThemeSwitchUI();
   document.getElementById("themeSwitch")?.addEventListener("click", () => {

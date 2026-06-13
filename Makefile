@@ -12,7 +12,7 @@ PORT      := 8001
 # Override with: make PYTHON=python3 crawl
 PYTHON   ?= python3.11
 
-.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks build-system-design translate-system-design review-system-design sd-all help
+.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks review-system-design help
 
 help:
 	@echo "EngineerPro rebuild — available targets:"
@@ -146,24 +146,14 @@ serve:
 
 dev: local-build serve
 
-build-system-design:
-	@echo "→ Building EN chapters from system-design-notes source ..."
-	@$(PYTHON) scripts/build_system_design.py
-
-translate-system-design:
-	@echo "→ Translating EN → VI chapter HTML ..."
-	@$(PYTHON) scripts/translate_system_design.py
-
 review-system-design:
-	@echo "→ Reviewing VI terminology ..."
+	@echo "→ Checking System Design v2 terminology consistency ..."
 	@$(PYTHON) scripts/review_system_design.py
 
-sd-all: build-system-design translate-system-design
-	@$(PYTHON) scripts/fix_system_design_html.py
-	@$(PYTHON) scripts/review_system_design.py
-	@$(PYTHON) scripts/review_system_design.py
-	@$(PYTHON) scripts/review_system_design.py
-	@echo "✓ System Design content pipeline done (local only — do not push without approval)"
+# NOTE: System Design v2 chapters are original, hand-authored HTML (EN + VI) with
+# original Mermaid diagrams. There is no generator/translator pipeline — edit the
+# content files and src/assets/system-design-data.js directly. The old
+# build/translate scripts are deprecated no-ops.
 
 clean:
 	@rm -rf $(DOCS_DIR) $(LOCAL_DIR)

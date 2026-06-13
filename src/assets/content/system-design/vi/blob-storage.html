@@ -1,0 +1,185 @@
+<p><strong>Blob (object) storage</strong> như Amazon S3 lưu bytes tuỳ ý dưới tên <code>bucket/key</code> với <strong>durability</strong> cực cao ở quy mô exabyte. Bài building-block này bao gồm write/read path, <strong>replication vs erasure coding</strong>, metadata sharding, multipart upload, và garbage collection.</p>
+
+<p>Insight cốt lõi là <strong>tách metadata khỏi data</strong> và coi chúng là hai bài toán khác nhau: metadata nhỏ, nhiều, cần lookup indexed nhanh; data khổng lồ, bất biến, cần bytes durable rẻ. Gần như mọi quyết định thiết kế (sharding, durability scheme, consistency) suy ra từ sự tách đó, nên câu trả lời mạnh giữ hai plane này tách biệt xuyên suốt.</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<ul>
+<li><strong>Profile kích thước object?</strong> Đa số object nhỏ (KB) gây áp lực lên metadata và overhead per-object; media lớn (GB-TB) gây áp lực lên data path và cần multipart + chunking.</li>
+<li><strong>Mix read/write/delete và hot vs cold?</strong> Hot read-heavy muốn replication; cold archival muốn erasure coding cho cost.</li>
+<li><strong>Kỳ vọng consistency?</strong> Read-after-write cho object mới là chuẩn; còn overwrite và list-after-write (thường yếu hơn)?</li>
+<li><strong>Target durability/availability?</strong> Durability "11 nines" và failure model regional/AZ chi phối lựa chọn replication/EC và placement.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li><code>PUT</code> / <code>GET</code> / <code>DELETE</code> một object; <code>LIST</code> một bucket.</li>
+<li><strong>Multipart upload</strong> cho object lớn; <strong>versioning</strong>; presigned URL.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Durability</strong> ~11 nines; high availability.</li>
+<li><strong>Scale</strong> tới exabyte và hàng nghìn tỷ object.</li>
+<li><strong>Read-after-write</strong> consistency cho object mới.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Durability math:</strong> với tỉ lệ hỏng đĩa ~0.8%/năm, 3 replica cho ~6 nines; erasure coding (vd 8+4) đạt ~11 nines — lý do EC được ưu tiên cho cold data.</li>
+<li><strong>Storage overhead:</strong> 3x replication = 200% overhead; erasure coding 8+4 = 50% overhead — chênh lệch chi phí lớn ở quy mô exabyte.</li>
+<li><strong>Metadata:</strong> nghìn tỷ object × ~1 KB metadata = petabyte chỉ riêng metadata — phải shard.</li>
+<li><strong>Object size spread:</strong> từ nhỏ xíu (KB) tới khổng lồ (TB) — đóng gói object nhỏ vào file lớn; chia object lớn thành chunk.</li>
+</ul>
+<p><strong>Ví dụ có số — chi phí replication vs erasure coding.</strong> Để lưu 1 EB data dùng được: <strong>3× replication</strong> cần ~3 EB disk thô (200% overhead) nhưng một copy bất kỳ serve read với latency thấp. <strong>Erasure coding 8+4</strong> cần ~1.5 EB thô (50% overhead) — tức <em>nửa phần cứng</em> ở quy mô exabyte, tiết kiệm khổng lồ — nhưng một read có thể phải fetch và decode k=8 shard (nhiều IO + CPU + tail latency), và mất một shard kích hoạt reconstruction read qua 8 node. Rule of thumb: replication cho hot/latency-sensitive, erasure coding cho cold/cost-sensitive, và re-encode object replicated sang EC khi chúng nguội.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>PUT /{bucket}/{key}</code> — body là object → <code>{etag, version_id}</code>.</li>
+<li><code>GET /{bucket}/{key}</code> → bytes object.</li>
+<li><code>DELETE /{bucket}/{key}</code>; <code>GET /{bucket}?list&prefix=</code> → keys.</li>
+<li><strong>Multipart:</strong> <code>POST .../uploads</code> (init), <code>PUT part</code>, <code>POST complete</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Tách <strong>metadata</strong> khỏi <strong>data</strong> để mỗi cái scale độc lập: một API tier stateless, một metadata service sharded (key tới location), và data node lưu bytes thực tế dưới dạng append-only chunk.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> API["API service (stateless)"]
+  API --> META["Metadata service (sharded): key to location"]
+  API --> PLACE["Placement / location service"]
+  API --> DN1["Data node 1"]
+  API --> DN2["Data node 2"]
+  API --> DN3["Data node 3"]
+  GC["Garbage collector"] -.reclaim.-> DN1
+  LIFE["Lifecycle manager"] -.tiering.-> DN3
+</pre>
+<figcaption><strong>Hình 1.</strong> Metadata và data scale riêng: API tier stateless, metadata sharded, placement service, và data node append-only (có GC và lifecycle tiering).</figcaption>
+</figure>
+
+<h2>Write path</h2>
+<p>Khi PUT, API chọn một placement group, ghi bytes tới vài data node, chờ một <strong>write quorum</strong> ack durable, rồi commit metadata entry. Read-after-write giữ được vì metadata chỉ commit sau khi data đã durable.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant API as API service
+  participant P as Placement
+  participant D as Data nodes
+  participant M as Metadata
+  C->>API: PUT bucket/key (bytes)
+  API->>P: chọn placement group
+  API->>D: write chunk tới N node
+  D-->>API: W ack (write quorum)
+  API->>M: commit key tới location + etag
+  API-->>C: 200 etag
+</pre>
+<figcaption><strong>Hình 2.</strong> Ghi tới quorum data node trước, rồi commit metadata — nên GET sau 200 luôn thấy data durable.</figcaption>
+</figure>
+
+<h2>Replication vs erasure coding</h2>
+<p>Hai cách sống sót qua hỏng đĩa:</p>
+<ul>
+<li><strong>Replication:</strong> giữ N bản copy đầy đủ. Đơn giản, recovery nhanh, read latency thấp — nhưng storage cost cao (3x = 200% overhead).</li>
+<li><strong>Erasure coding:</strong> chia object thành k data shard cộng m parity shard (vd 8+4); bất kỳ k trong k+m shard tái dựng được. Rẻ hơn nhiều (50% overhead cho 8+4) và durable hơn — nhưng reconstruction đọc vài shard, thêm latency.</li>
+</ul>
+<p>Rule of thumb: replication cho hot/latency-sensitive, erasure coding cho cold/cost-sensitive.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  OBJ["Object"] --> MODE{"Hot hay cold?"}
+  MODE -->|hot| REP["3x replication: 200% overhead, read nhanh"]
+  MODE -->|cold| EC["Erasure coding 8+4: 50% overhead, 11 nines"]
+  REP --> DUR["Durable + available"]
+  EC --> DUR
+</pre>
+<figcaption><strong>Hình 3.</strong> Replication (read rẻ, store đắt) vs erasure coding (store rẻ, reconstruct đắt hơn) — chọn theo access pattern.</figcaption>
+</figure>
+
+<h2>Metadata sharding và listing</h2>
+<p>Metadata (key tới location, size, version) bản thân nó khổng lồ, nên được <strong>shard</strong> — thường theo hash của <code>bucket+key</code>. Điều đó làm point lookup O(1) nhưng làm <code>LIST prefix</code> khó (key bị rải rác). Cách sửa thường gặp: giữ một index riêng, range-partition theo key để listing, chấp nhận listing eventually consistent và chậm hơn GET.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  K["bucket + key"] --> H["hash tới metadata shard"]
+  H --> S1["Shard 1"]
+  H --> S2["Shard 2"]
+  H --> S3["Shard 3"]
+  L["LIST prefix"] --> IDX["Index key range-ordered (cho listing)"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Metadata hash-sharded cho point lookup nhanh; một index riêng sắp theo key phục vụ prefix listing.</figcaption>
+</figure>
+
+<h2>Multipart upload</h2>
+<p>Upload object 5 TB trong một request thì mong manh. <strong>Multipart upload</strong> chia thành các part upload độc lập (và song song); khi <em>complete</em>, service ghép các part thành một object logic. Một part fail được retry riêng, không phải cả upload.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant API as API service
+  C->>API: init multipart upload
+  API-->>C: upload_id
+  par upload part song song
+    C->>API: PUT part 1 (etag1)
+    C->>API: PUT part 2 (etag2)
+    C->>API: PUT part 3 (etag3)
+  end
+  C->>API: complete (upload_id, part etags)
+  API->>API: assemble object từ các part
+  API-->>C: 200 object etag
+</pre>
+<figcaption><strong>Hình 5.</strong> Multipart upload: part đi lên độc lập và song song; complete ghép chúng, nên một part fail retry rẻ.</figcaption>
+</figure>
+
+<h2>Garbage collection và lifecycle</h2>
+<p>Delete và overwrite để lại chunk orphan; một <strong>garbage collector</strong> thu hồi không gian không còn metadata entry live nào tham chiếu (mark-and-sweep). Một <strong>lifecycle manager</strong> tier object cold sang storage rẻ hơn (vd Glacier) và có thể re-encode data replicated sang erasure coding khi nó nguội đi.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>Managed:</strong> AWS S3, Google Cloud Storage, Azure Blob, Cloudflare R2 — default cho đa số team.</li>
+<li><strong>Self-hosted:</strong> MinIO (tương thích S3), Ceph, SeaweedFS; Haystack/f4 của Facebook là thiết kế in-house kinh điển.</li>
+<li><strong>Metadata layer:</strong> thường một sharded relational/KV store (vd <strong>FoundationDB</strong>, DynamoDB, hoặc sharded Postgres) — tách khỏi data node.</li>
+<li><strong>Pair với:</strong> một <strong>CDN</strong> đứng trước cho media read-heavy, và lifecycle tiering sang class cold (Glacier) cho archive.</li>
+</ul>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Read-after-write cho object mới:</strong> đạt bằng cách chỉ commit metadata sau khi data write quorum durable — GET sau 200 luôn resolve. (S3 hiện đại làm strong cho mọi operation; hệ cũ thì eventual.)</li>
+<li><strong>Overwrite / delete khó hơn:</strong> với versioning, PUT tạo version mới và metadata pointer flip atomic; không versioning thì overwrite đồng thời cần last-writer-wins hoặc conditional write (<code>If-Match</code> trên etag).</li>
+<li><strong>Listing thường yếu hơn</strong> point read: index sắp theo key update bất đồng bộ, nên key vừa ghi có thể xuất hiện trong LIST hơi muộn.</li>
+<li><strong>Durability độc lập với availability:</strong> 11 nines durability (không mất bytes) không nghĩa 11 nines availability (có thể tạm không đọc được trong lúc failure) — nêu cả hai target riêng.</li>
+</ul>
+
+<h2>Tradeoffs &amp; khi nào không dùng object storage</h2>
+<ul>
+<li><strong>Tốt cho:</strong> blob lớn bất biến — media, backup, log, ML dataset, static asset (thường có CDN đứng trước).</li>
+<li><strong>Sai cho:</strong> record nhỏ mutable latency thấp (dùng database/KV), append-in-place hay edit một phần in-place (object bất biến — phải rewrite), hoặc strong cross-object transaction.</li>
+<li><strong>Cost lever:</strong> lifecycle-tier object cold sang class rẻ hơn và re-encode sang EC; đa số chi phí là storage-months, không phải request.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Metadata là bottleneck</strong> ở quy mô object — shard nó; bản thân nó là petabyte.</li>
+<li><strong>Listing đắt</strong> với hash sharding — giữ một index sắp xếp riêng.</li>
+<li><strong>Small-object overhead:</strong> đóng gói nhiều object nhỏ vào file append-only lớn để tránh chi phí per-object.</li>
+<li><strong>EC reconstruction cost:</strong> đọc cold data có thể đụng vài shard — ổn cho cold, không cho hot.</li>
+<li><strong>Read-after-write:</strong> chỉ commit metadata sau một durable write quorum.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Tách <strong>metadata</strong> khỏi <strong>data</strong>; shard cả hai.</li>
+<li><strong>Replication</strong> cho hot data, <strong>erasure coding</strong> cho cold — durability vs cost.</li>
+<li>Commit metadata sau một <strong>write quorum</strong> để read-after-write.</li>
+<li><strong>Multipart upload</strong> + <strong>GC</strong> + <strong>lifecycle tiering</strong> xử lý scale và cost.</li>
+<li><strong>Nêu rõ guarantee:</strong> read-after-write cho object mới (metadata commit sau durable data quorum); listing thường yếu hơn; durability ≠ availability.</li>
+<li><strong>Object bất biến</strong> — model update là version/overwrite mới, không edit in-place.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: AWS S3 docs; Facebook Haystack và f4 papers; bài viết Backblaze về erasure coding và độ bền ổ đĩa; tài liệu Reed-Solomon coding. Diagram và nội dung là content gốc của EngineerPro.</em></p>

@@ -1,0 +1,183 @@
+<p>A <strong>news feed</strong> shows each user a personalized, ranked stream of posts from the people and pages they follow. The hard parts are <strong>fanout</strong> (how a new post reaches millions of followers' feeds) and <strong>ranking</strong> (which posts to show first). This chapter designs a Facebook-style feed with an emphasis on the ranking/ML-serving path.</p>
+
+<p>The defining property of a feed is that it is <strong>read-dominated by ~100:1</strong> — billions of feed opens against far fewer posts. That single fact drives the central decision: do you do the expensive work (assembling a feed) at <strong>write time</strong> (push a post into every follower's precomputed feed) or at <strong>read time</strong> (gather and rank on the fly)? Push gives fast reads but explodes for celebrities; pull is cheap to write but slow to read. The real-world answer is a <strong>hybrid</strong>, and articulating exactly where the line sits is what the interview is testing.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Chronological or ranked?</strong> A reverse-chronological feed is much simpler; ML ranking adds a feature store, model serving, and a candidate-generation stage.</li>
+<li><strong>Follower distribution?</strong> If some accounts have tens of millions of followers (celebrities/pages), pure fanout-on-write is impossible — you need the hybrid.</li>
+<li><strong>Freshness SLA?</strong> Must a new post appear in seconds, or is a minute fine? That sets how aggressively you precompute vs compute on read.</li>
+<li><strong>Feed scope?</strong> Friends-only, follow graph, plus recommended/"discovery" content? Recommendations add a separate candidate source beyond the social graph.</li>
+<li><strong>Consistency expectation?</strong> Users tolerate an eventually-consistent feed (a post may appear a bit late) but not lost posts or wildly different orders on refresh.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Publish a post (text, image, video).</li>
+<li>Follow / friend other accounts (the social graph).</li>
+<li>Fetch a <strong>ranked</strong> news feed; paginate.</li>
+<li>Like / comment; counters update.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low feed latency</strong> (feed loads in tens of ms).</li>
+<li><strong>Freshness</strong> — new posts appear quickly.</li>
+<li><strong>Scale</strong> — billions of users and graph edges.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Users:</strong> 1B DAU, each opens the feed ~10×/day → ~10B feed reads/day ≈ <strong>~115k reads/s</strong> average, peak several×.</li>
+<li><strong>Writes:</strong> ~100M posts/day ≈ ~1.2k posts/s — reads dominate writes by ~100:1, so optimize reads.</li>
+<li><strong>Fanout cost:</strong> avg ~200 followers → a post fans out to ~200 feeds; a celebrity with 50M followers would be 50M writes — the reason for a hybrid model.</li>
+<li><strong>Feed cache:</strong> store ~hundreds of post-ids per user in memory; 1B users × ~1 KB ≈ ~1 TB of feed-id cache (sharded across a Redis fleet).</li>
+</ul>
+<p><strong>Worked example.</strong> Make the hybrid threshold concrete. An average post (~200 followers) costs ~200 inbox writes — trivial, so <strong>fanout-on-write</strong>: when posted, push the post-id into each follower's cached feed list. Now a celebrity with <strong>50M followers</strong>: fanout-on-write means 50M inbox writes for one post, and if a few thousand celebrities post during peak that's billions of writes/s of amplification — plus most of it is wasted on inactive followers. So above a threshold (say ~10k-100k followers) accounts are marked <strong>fanout-on-read</strong>: their posts are <em>not</em> pushed; instead, at read time the feed service pulls recent posts from the (few hundred) celebrities you follow and merges them with your precomputed inbox. A user's feed = "my precomputed feed (from normal authors)" ∪ "freshly pulled posts (from celebrity authors)", then ranked. The write cost stays bounded and the read cost only grows by the small number of big accounts you follow — that's why the hybrid wins.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /posts</code> — <code>{author_id, content, media_ref}</code> → <code>{post_id}</code>.</li>
+<li><code>GET /feed?cursor=</code> → <code>{items[], next_cursor}</code> (ranked, cursor-paginated).</li>
+<li><code>POST /follow</code> — <code>{follower_id, target_id}</code>.</li>
+<li><code>POST /posts/{id}/like</code>, <code>POST /posts/{id}/comments</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User"] --> POST["Post service"]
+  POST --> PSTORE["Post store"]
+  POST --> FAN["Fanout service (Kafka)"]
+  FAN --> FCACHE["Feed cache (Redis): user to post-ids"]
+  U --> FEED["Feed service"]
+  FEED --> FCACHE
+  FEED --> RANK["Ranking service"]
+  RANK --> FEAT["Feature store + model"]
+  FEED --> PSTORE
+  FEED --> CDN["Media via CDN"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Writes go through the post service and a fanout pipeline into per-user feed caches; reads hydrate post-ids, rank them, and pull media from CDN.</figcaption>
+</figure>
+
+<h2>Fanout on write vs read</h2>
+<ul>
+<li><strong>Fanout on write (push):</strong> when a post is created, append its id into every follower's feed cache. Reads are then a cheap cache lookup. Cost: huge write amplification for popular accounts.</li>
+<li><strong>Fanout on read (pull):</strong> build the feed at read time by gathering recent posts from followed accounts. Cheap writes, expensive reads.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph WRITE["Fanout on write"]
+    P1["New post"] --> F1["Append id to each follower feed cache"]
+    F1 --> R1["Read = cache lookup (fast)"]
+  end
+  subgraph READ["Fanout on read"]
+    P2["New post"] --> S2["Just store it"]
+    Q2["Read = gather from followed accounts (slow)"] --> S2
+  end
+</pre>
+<figcaption><strong>Figure 2.</strong> Push pre-computes feeds (fast reads, heavy writes); pull computes at read time (cheap writes, heavy reads).</figcaption>
+</figure>
+
+<h2>Write path (feed publishing)</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Author
+  participant PS as Post service
+  participant FAN as Fanout (Kafka)
+  participant FC as Feed cache
+  A->>PS: POST /posts
+  PS->>PS: persist post
+  PS-->>A: post_id
+  PS->>FAN: emit post-created event
+  FAN->>FC: append post_id to each follower feed (push)
+  Note over FAN,FC: celebrities skipped here (handled at read)
+</pre>
+<figcaption><strong>Figure 3.</strong> Publishing persists the post and emits an event; a fanout worker pushes the post-id into normal followers' feed caches asynchronously.</figcaption>
+</figure>
+
+<h2>Read path and ranking</h2>
+<p>Modern feeds are not reverse-chronological — they are <strong>ranked</strong>. The read path is a small pipeline: gather candidate post-ids (from the feed cache plus pulled celebrity posts), <strong>hydrate features</strong> (recency, affinity, engagement signals), <strong>score</strong> with an ML model, sort, and return a page.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  REQ["GET /feed"] --> CAND["Candidate generation: feed cache + pulled celebrity posts"]
+  CAND --> HYD["Feature hydration: affinity, recency, engagement"]
+  HYD --> SCORE["Model scoring (ranking service)"]
+  SCORE --> SORT["Sort + paginate (cursor)"]
+  SORT --> RESP["Return ranked page"]
+</pre>
+<figcaption><strong>Figure 4.</strong> The read path: candidate generation, feature hydration, ML scoring, then sort and cursor-paginate.</figcaption>
+</figure>
+
+<h2>The hybrid model (celebrity problem)</h2>
+<p>Pure push breaks for celebrities (one post = tens of millions of writes). The fix is <strong>hybrid</strong>: push for normal accounts, but <em>do not</em> push posts from high-follower accounts — instead pull them at read time and merge. Most accounts are small (cheap push); a few are huge (cheap to pull on demand).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  POST["New post"] --> CHECK{"Author follower count high?"}
+  CHECK -->|normal account| PUSH["Push id to follower feeds"]
+  CHECK -->|celebrity| SKIP["Skip push; store only"]
+  READ["Feed read"] --> MERGE["Merge pushed feed + pulled celebrity posts"]
+  PUSH --> MERGE
+  SKIP --> MERGE
+</pre>
+<figcaption><strong>Figure 5.</strong> Hybrid fanout: push for the many small accounts, pull-and-merge for the few celebrities — bounding write amplification.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing for post/feed/like endpoints.</li>
+<li><strong>Posts:</strong> a <strong>wide-column store (Cassandra)</strong> keyed by author/post id — append-heavy, huge, horizontally scalable.</li>
+<li><strong>Social graph (follows):</strong> a graph-optimized store — sharded MySQL with a caching layer (Meta's TAO pattern) or a graph DB — for "who follows whom" lookups.</li>
+<li><strong>Feed cache:</strong> <strong>Redis</strong> holding per-user lists of post-ids (the precomputed feed) — hot, in-memory, the read path's first stop.</li>
+<li><strong>Fanout:</strong> <strong>Kafka</strong> carries post-created events to fanout workers asynchronously.</li>
+<li><strong>Ranking:</strong> a <strong>feature store</strong> (Redis / Cassandra) + a model-serving service; counters (likes/views) via <strong>Redis</strong> or a stream processor (<strong>Flink</strong>) for real-time aggregation.</li>
+<li><strong>Media:</strong> <strong>blob storage (S3-like)</strong> + <strong>CDN</strong>; the post stores only a reference.</li>
+</ul>
+<p><strong>Why these:</strong> the precomputed feed must be sub-ms → Redis; posts are append-heavy at massive scale → wide-column; the graph has its own access pattern (adjacency lookups) → a graph/edge store; media is large + immutable → blob + CDN; fanout and counters are streams → Kafka/Flink. One relational DB would not scale any single one of these.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Eventually consistent feed:</strong> fanout is asynchronous, so a post may take seconds to appear in all feeds — acceptable for a feed, and stated explicitly. You optimize for read latency and freshness, not linearizability.</li>
+<li><strong>Best-effort, approximate ranking:</strong> the order is a model's score, recomputed over time; two refreshes can differ slightly. Counters (likes/views) are <em>approximate and eventually consistent</em> — exactness isn't worth the coordination at this scale.</li>
+<li><strong>Stable pagination:</strong> use a cursor/snapshot (post-id + timestamp) so paging down doesn't duplicate or skip as new posts arrive — the feed read is consistent within a session even though the global feed changes.</li>
+<li><strong>No lost posts:</strong> the post write itself (to the posts store) is durable and authoritative; the feed cache is a derived, rebuildable view — if a feed entry is missing, it can be recomputed by pulling from the posts store + graph.</li>
+<li><strong>Read-your-writes for the author:</strong> you should see your own post immediately — often handled by injecting it into your own feed synchronously even while fanout to others runs async.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Hybrid fanout when:</strong> a large social graph with a skewed follower distribution (most users small, some massive) and read-heavy traffic — the canonical feed/timeline.</li>
+<li><strong>Pure fanout-on-write when:</strong> followers are bounded and similar (e.g. a team activity feed) — simplest, fastest reads, no celebrity problem.</li>
+<li><strong>Pure fanout-on-read when:</strong> writes are rare or the graph is tiny — don't bother precomputing.</li>
+<li><strong>Different design when:</strong> the "feed" is actually a global ranked list identical for everyone (e.g. a trending page) — that's a single cached, periodically recomputed list, not per-user fanout.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Celebrity write storm:</strong> never push a 50M-follower post — hybrid is mandatory.</li>
+<li><strong>Feed cache invalidation:</strong> deletes/blocks must remove ids; keep feeds bounded (top N) and re-hydrate older pages from store.</li>
+<li><strong>Ranking latency:</strong> feature hydration is the slow step — cache features and limit candidate count.</li>
+<li><strong>Cursor pagination</strong> (not offset) — feeds change under the user.</li>
+<li><strong>Thundering herd</strong> on a viral post's counters — use sharded/approximate counters.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>Reads dominate</strong> — pre-compute feeds with fanout-on-write for most users.</li>
+<li><strong>Hybrid fanout</strong> solves the celebrity write-amplification problem.</li>
+<li>The feed is a <strong>ranking pipeline</strong>: candidates → features → model score → sort.</li>
+<li><strong>Feed cache</strong> of post-ids + a media CDN keep reads fast.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Meta Engineering posts on the News Feed and TAO social graph; public material on fanout (push/pull) and learning-to-rank feed ranking. Diagrams and write-up are original EngineerPro content.</em></p>

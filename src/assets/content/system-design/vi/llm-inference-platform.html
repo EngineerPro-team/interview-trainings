@@ -1,0 +1,249 @@
+<p>Một <strong>LLM inference platform</strong> serve các large language model ở quy mô lớn: nó biến một dàn GPU đắt tiền thành một API latency thấp, throughput cao cho chat, completion và embeddings. Đây là bài building-block với một bottleneck khác thường — GPU — nên các quyết định thú vị xoay quanh <strong>batching, memory (KV cache), parallelism và scheduling</strong>, chứ không chỉ là web tier stateless. Nó cũng là nền cho các hệ thống agentic và RAG xây bên trên.</p>
+
+<p>Mental model neo lại một câu trả lời tốt: một GPU là một pool cố định gồm <strong>compute và HBM memory</strong>, và việc của bạn là giữ nó bận mà không vỡ budget memory. Gần như mọi quyết định bên dưới — continuous batching, paged attention, parallelism — tồn tại để đẩy <strong>GPU utilization và tokens/sec lên</strong> trong khi giữ <strong>tail latency (TTFT/TPOT) trong giới hạn</strong>.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<p>Kiến trúc đúng phụ thuộc nhiều vào workload, nên chốt các điểm này trước khi thiết kế:</p>
+<ul>
+<li><strong>Chat nhạy latency hay batch/offline?</strong> Chat tương tác tối ưu TTFT và stream token; batch (eval, embeddings, summarization) tối ưu throughput và chịu được queueing.</li>
+<li><strong>Một model hay nhiều?</strong> Một model hot duy nhất cho phép pack GPU chặt; nhiều model (hoặc LoRA adapter) cần routing, multiplexing, và policy cold-start/load.</li>
+<li><strong>Kích thước model so với GPU memory?</strong> Model vừa một GPU, hay cần tensor/pipeline parallelism qua nhiều GPU? Điều đó đổi cả serving topology.</li>
+<li><strong>Context length và output length?</strong> Context dài thổi phồng KV cache và chặn concurrency; prompt ngắn với output dài thì decode-bound.</li>
+<li><strong>Cần multi-tenant fairness không?</strong> Nếu có, cần quota per-tenant và một scheduler ngăn một request lớn làm đói các request khác.</li>
+</ul>
+
+<h2>Requirements</h2>
+
+<h3>Functional</h3>
+<ul>
+<li>Serve request <strong>chat / completion</strong>, có <strong>token streaming</strong> (server-sent events).</li>
+<li>Serve <strong>nhiều model</strong> và một endpoint <strong>embeddings</strong>.</li>
+<li>Hỗ trợ passthrough <strong>function-calling</strong> và stop condition / max tokens.</li>
+</ul>
+
+<h3>Non-functional</h3>
+<ul>
+<li><strong>TTFT thấp</strong> (time-to-first-token) và <strong>TPOT</strong> (time-per-output-token) ổn định.</li>
+<li><strong>Throughput cao</strong> (tokens/sec) và <strong>GPU utilization</strong> cao — GPU chính là chi phí.</li>
+<li><strong>Autoscaling</strong> dưới tải bursty; queueing nhẹ nhàng.</li>
+<li><strong>Multi-tenant</strong> fairness và quota.</li>
+</ul>
+
+<h2>Vì sao serve LLM khác biệt</h2>
+
+<p>Một request không phải một function call đơn lẻ. Generation có hai phase: một <strong>prefill</strong> xử lý toàn bộ prompt trong một lượt, rồi một vòng <strong>decode</strong> autoregressive phát ra một token mỗi step, mỗi step phụ thuộc tất cả token trước đó. Hai hệ quả chi phối toàn bộ thiết kế:</p>
+<ul>
+<li>Một request chiếm GPU qua <em>nhiều</em> step (một step mỗi output token), không phải một phát.</li>
+<li>Mỗi step phải đọc lại attention state của tất cả token trước — được cache trong <strong>KV cache</strong>, thứ chiếm phần lớn GPU memory.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<p>Ước lượng cho model 13B tham số trên GPU 40 GB:</p>
+<ul>
+<li><strong>Weights:</strong> 13B params × 2 bytes (FP16) ≈ <strong>26 GB</strong> — vừa một GPU 40 GB, còn ~14 GB cho KV cache.</li>
+<li><strong>KV cache:</strong> cỡ ~0.5-1 MB mỗi token cho model này; context 2k token ≈ ~1-2 GB mỗi request → chỉ <strong>~7-14 request đồng thời</strong> mỗi GPU. KV cache, không phải compute, mới chặn batch.</li>
+<li><strong>Throughput:</strong> decode ~30-50 tokens/s mỗi sequence; khi batch, một GPU phát ra hàng trăm tới hàng nghìn tokens/s tổng.</li>
+<li><strong>Fleet:</strong> capacity quyết định bởi budget KV-cache đồng thời và context length, không phải QPS thô — giữ 1000 chat context 2k đồng thời cần cỡ <strong>~70-140 GPU</strong>.</li>
+</ul>
+<p><strong>Worked example.</strong> Lấy model 13B trên GPU 40 GB: weights ăn ~26 GB, còn ~14 GB cho KV cache. Nếu một request 2k token cần ~1.5 GB KV, GPU chỉ giữ ~9 request đồng thời — nên budget <em>memory</em>, không phải FLOPs, quyết định batch size. Giả sử decode chạy ~40 tokens/s mỗi sequence: với batch 9, GPU phát ~360 tokens/s tổng. Để serve 1000 chat đồng thời cần ~1000/9 ≈ <strong>112 GPU</strong> chỉ cho KV residency. Đây là lý do <strong>paged attention</strong> (không reserve contiguous per-request, ~4x ít waste hơn) và <strong>quantization</strong> (weights INT8/FP8 giải phóng HBM cho thêm KV) trực tiếp nâng concurrency: mỗi GB tiết kiệm trên weights hoặc fragmentation thành thêm request trong batch. Nó cũng cho thấy một request context 8k đắt ~4x một request 2k — context dài mới là sát thủ capacity thực sự.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /v1/chat/completions</code> — <code>{model, messages[], max_tokens, temperature, stream}</code> → SSE stream các token delta (hoặc một response đầy đủ).</li>
+<li><code>POST /v1/completions</code> — completion từ prompt thô.</li>
+<li><code>POST /v1/embeddings</code> — <code>{model, input[]}</code> → vector.</li>
+<li><code>GET /v1/models</code> — liệt kê model đang serve.</li>
+<li><strong>Streaming:</strong> Server-Sent Events; mỗi event mang một token delta, kết thúc bằng done marker.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> GW["API gateway: auth, quota, routing"]
+  GW --> Q["Request queue"]
+  Q --> SCH["Scheduler / batcher"]
+  SCH --> W1["GPU worker (model A)"]
+  SCH --> W2["GPU worker (model A)"]
+  SCH --> W3["GPU worker (model B)"]
+  REG["Model registry + weights store"] --> W1
+  REG --> W2
+  REG --> W3
+  W1 --> GW
+  AS["GPU autoscaler"] -.scale.-> W1
+  AS -.scale.-> W3
+</pre>
+<figcaption><strong>Hình 1.</strong> Gateway stateless đứng trước một queue và một scheduler đóng request lên GPU worker; autoscaler tăng pool worker cho mỗi model, và token stream ngược về qua gateway.</figcaption>
+</figure>
+
+<h2>Vòng đời request và streaming</h2>
+
+<p>Gateway authenticate, enforce quota, và route tới worker pool của model được yêu cầu. Worker chạy prefill, rồi stream token ra khỏi vòng decode ngay khi sinh ra — nên user thấy token đầu nhanh (TTFT thấp) dù câu trả lời đầy đủ mất lâu hơn.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant GW as Gateway
+  participant W as GPU worker
+  C->>GW: POST /chat (stream = true)
+  GW->>W: enqueue request
+  W->>W: prefill (xử lý prompt)
+  W-->>GW: token 1
+  GW-->>C: token 1 (TTFT)
+  loop decode step
+    W->>W: sinh token kế tiếp (dùng KV cache)
+    W-->>GW: token k
+    GW-->>C: stream token k (SSE / WebSocket)
+  end
+  W-->>GW: done
+  GW-->>C: done (stop token / max tokens)
+</pre>
+<figcaption><strong>Hình 2.</strong> Prefill rồi vòng decode; token stream ngay khi được sinh ra, nên TTFT tách khỏi tổng thời gian generation.</figcaption>
+</figure>
+
+<h2>Continuous batching</h2>
+
+<p>GPU chỉ hiệu quả khi công việc được <strong>batch</strong>. "Static" batching kiểu ngây thơ chờ gom đủ một batch, chạy tới khi xong, rồi mới nhận request mới — nên một request dài giữ chân các request ngắn và GPU idle ở đuôi. <strong>Continuous batching</strong> (còn gọi in-flight batching) thay vào đó hoạt động ở mức một decode step: sau mỗi step, request đã xong rời batch và request đang chờ gia nhập. Cách này giữ GPU luôn bão hoà và cắt mạnh latency hàng đợi.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  NEW["Request mới"] --> ADMIT["Admit vào running batch"]
+  ADMIT --> STEP["Chạy một decode step cho cả batch"]
+  STEP --> CHECK{"Có request nào xong?"}
+  CHECK -->|có| EVICT["Evict request xong, free KV cache của nó"]
+  CHECK -->|không| STEP
+  EVICT --> ADMIT
+</pre>
+<figcaption><strong>Hình 3.</strong> Continuous batching admit và evict request mỗi decode step, nên batch luôn đầy và request ngắn không bị kẹt sau request dài.</figcaption>
+</figure>
+
+<h2>KV cache và paged attention</h2>
+
+<p>Mỗi request đang chạy giữ một <strong>KV cache</strong> — các attention key/value theo từng token — tăng thêm một entry mỗi token sinh ra. KV cache, chứ không phải model weights, thường là bottleneck memory và nó giới hạn bao nhiêu request lọt vào một batch. Allocator cổ điển reserve một block liên tục cho max length của mỗi request, lãng phí memory. <strong>Paged attention</strong> mượn ý tưởng virtual memory của OS: chia cache thành các <strong>block</strong> cố định và cấp phát theo nhu cầu qua một block table, nên memory chỉ dùng cho token thực sự sinh ra và có thể share (vd giữa các beam hoặc một prompt prefix chung).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph POOL["GPU KV-cache block pool"]
+    direction LR
+    B0["block 0"]
+    B1["block 1"]
+    B2["block 2"]
+    B3["block 3"]
+    B4["block 4"]
+  end
+  R1["Request 1 block table"] --> B0
+  R1 --> B2
+  R2["Request 2 block table"] --> B1
+  R2 --> B3
+  R2 --> B4
+</pre>
+<figcaption><strong>Hình 4.</strong> Paged attention cấp KV cache theo block cố định qua block table của từng request — không over-reserve liên tục, và block có thể share cho prefix chung.</figcaption>
+</figure>
+
+<h2>Parallelism cho model lớn</h2>
+
+<p>Một model quá lớn cho một GPU được chia ra nhiều GPU:</p>
+<ul>
+<li><strong>Tensor parallelism:</strong> shard ma trận của mỗi layer ra các GPU cùng hợp tác trên mỗi token (cần interconnect nhanh, vd NVLink).</li>
+<li><strong>Pipeline parallelism:</strong> đặt các layer khác nhau lên các GPU khác nhau và stream activation giữa các stage.</li>
+</ul>
+<p>Hai cái kết hợp: tensor-parallel trong một node, pipeline-parallel giữa các node. Platform giấu chuyện này sau abstraction "worker" — một logical worker có thể là nhiều GPU.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  IN["Input tokens"] --> S1
+  subgraph S1["Stage 1: layer 1-20"]
+    direction TB
+    G0["GPU 0 (tensor shard)"]
+    G1["GPU 1 (tensor shard)"]
+  end
+  subgraph S2["Stage 2: layer 21-40"]
+    direction TB
+    G2["GPU 2 (tensor shard)"]
+    G3["GPU 3 (tensor shard)"]
+  end
+  S1 --> S2
+  S2 --> OUT["Output logits"]
+</pre>
+<figcaption><strong>Hình 5.</strong> Tensor parallelism shard layer ra các GPU trong một stage; pipeline parallelism nối các stage. Một logical "worker" có thể trải trên nhiều GPU.</figcaption>
+</figure>
+
+<h2>Scheduling, autoscaling và queueing</h2>
+
+<p>Scheduler cân bằng hai mục tiêu mâu thuẫn: <strong>throughput</strong> (batch lớn) vs <strong>latency</strong> (đừng để request chờ). Nó admit nhiều request nhất mà KV-cache memory cho phép, ưu tiên để bảo vệ TTFT, và áp fairness theo từng tenant. Vì GPU khan hiếm và khởi động chậm (weights phải load), autoscaling là thô và queue-aware: scale theo queue depth / GPU utilization với warmup rộng rãi, và shed hoặc queue tải nhẹ nhàng khi tới giới hạn.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  Q["Queue depth + GPU utilization"] --> AS{"Vượt target?"}
+  AS -->|có| UP["Thêm GPU worker (load weights, warm up)"]
+  AS -->|dưới ngưỡng một lúc| DOWN["Bỏ bớt worker"]
+  UP --> POOL["Worker pool"]
+  DOWN --> POOL
+  POOL --> SCH["Scheduler admit trong budget KV-cache"]
+</pre>
+<figcaption><strong>Hình 6.</strong> Autoscaling phản ứng theo queue depth và utilization, có tính tới warmup; scheduler admit request tới mức budget KV-cache.</figcaption>
+</figure>
+
+<h2>Tối ưu thêm</h2>
+<ul>
+<li><strong>Prefix / prompt caching:</strong> tái dùng KV cache cho một system prompt chung giữa các request — thắng lớn về TTFT cho agent.</li>
+<li><strong>Speculative decoding:</strong> một draft model nhỏ đề xuất vài token mà model lớn verify trong một step, tăng tokens/sec.</li>
+<li><strong>Quantization:</strong> serve ở INT8/FP8 để nhét model lớn hơn và nhiều KV cache hơn mỗi GPU.</li>
+<li><strong>Multi-adapter (LoRA):</strong> serve nhiều fine-tune trên một base model bằng cách swap các adapter nhỏ.</li>
+</ul>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong> (Envoy / NGINX / Kong): auth, API key, <strong>rate limiting</strong> + quota theo tenant, route tới đúng model pool.</li>
+<li><strong>Serving runtime:</strong> GPU worker chạy một inference engine thật — <strong>vLLM</strong> (PagedAttention), <strong>NVIDIA TensorRT-LLM / Triton</strong>, hoặc TGI — implement continuous batching và KV cache.</li>
+<li><strong>Model weights:</strong> file lớn bất biến → <strong>blob/object storage (S3-like)</strong>, pull về NVMe local và mmap vào GPU memory lúc warm-up; một <strong>model registry</strong> (metadata trong PostgreSQL) track version.</li>
+<li><strong>KV cache:</strong> nằm trong <strong>GPU HBM</strong>, không phải database — ephemeral theo request; <strong>prefix/prompt cache</strong> có thể back bằng Redis hoặc local store để tái dùng.</li>
+<li><strong>Queue:</strong> một queue in-memory/Redis nhanh (hoặc admission queue của scheduler) giữ request chờ slot batch.</li>
+<li><strong>Orchestration/autoscaling:</strong> Kubernetes + KEDA / autoscaler tuỳ chỉnh theo queue depth và GPU utilization.</li>
+<li><strong>Metrics/logs:</strong> Prometheus + Grafana cho TTFT/TPOT/utilization; usage event chảy qua <strong>Kafka</strong> tới consumer analytics/billing.</li>
+<li><strong>Usage ledger (source of truth cho billing):</strong> billing cần một record durable idempotent, không chỉ một Kafka event — một <strong>usage ledger / billing event store</strong> key theo <code>request_id</code> với token count cuối, dùng semantics upsert/finalize để crash worker, retry, hay replay consumer không double-count hay undercount. Kafka transport event; ledger là record authoritative để dựng invoice.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> weights khổng lồ + write-once → object storage; KV cache là hot state latency-critical → GPU memory (tài nguyên khan hiếm bạn size quanh nó). Hot path sinh token cố ý <em>không</em> có DB quan hệ lớn — bottleneck là GPU memory. Usage tách khỏi path đó: <strong>Kafka transport</strong> usage event, còn billing <strong>source of truth là usage ledger idempotent</strong>, finalize lúc stream kết thúc (key theo <code>request_id</code>), không nằm trong per-token loop.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<p>Serve LLM có profile guarantee khác một service CRUD thông thường:</p>
+<ul>
+<li><strong>Non-deterministic mặc định:</strong> với temperature &gt; 0, cùng một prompt cho output khác nhau; reproducibility cần seed cố định và greedy decoding, và ngay cả vậy thứ tự floating-point/batching có thể làm kết quả lệch nhẹ.</li>
+<li><strong>At-most-once generation:</strong> một request <em>không</em> an toàn để retry mù — một response stream dở dang bị fail nên restart sạch, không resume giữa stream, và các tool call có side-effect phải tự mang idempotency. Bill theo token <em>thực sự gửi tới client</em>, finalize idempotent trong usage ledger key theo <code>request_id</code> để crash hay retry không double-charge cũng không mất usage.</li>
+<li><strong>Không có cross-request transaction:</strong> mỗi request độc lập; shared state duy nhất là weights read-only và một prefix cache tùy chọn, vốn chỉ là tối ưu (miss thì recompute).</li>
+<li><strong>Fairness, không phải ordering nghiêm ngặt:</strong> scheduler bảo đảm quota/fairness giữa tenant, không phải FIFO — một request ngắn có thể vượt một request dài. Nói rõ điều đó thay vì hứa ordering.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng một inference platform riêng</h2>
+<ul>
+<li><strong>Tự xây khi:</strong> bạn serve model của mình/open model ở quy mô lớn, cần kiểm soát chi phí GPU, TTFT thấp/ổn định, quota multi-tenant, hoặc data-residency loại bỏ third-party API.</li>
+<li><strong>Đừng bận tâm khi:</strong> traffic thấp hoặc spiky và một hosted API (OpenAI/Anthropic/Bedrock) rẻ hơn GPU nằm không — quản fleet GPU là chi phí vận hành thật.</li>
+<li><strong>Sai khung khi:</strong> task là ML cổ điển (ranking, classifier nhỏ) — không cần hạ tầng autoregressive decode; hoặc khi latency cần dưới 10ms, điều generation từng token không đạt được.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>KV cache là giới hạn:</strong> batch size bị chặn bởi memory, không phải compute — tính capacity theo context length, không chỉ QPS.</li>
+<li><strong>Long context làm nổ memory:</strong> một prompt 100k token là một KV cache khổng lồ; cô lập hoặc rate-limit nó.</li>
+<li><strong>Cold start:</strong> load hàng chục GB weights mất thời gian — giữ warm pool, đừng scale từ zero dưới tải.</li>
+<li><strong>Tail latency:</strong> một generation rất dài trong batch làm chậm TPOT của mọi người — cap max tokens, cân nhắc priority lane.</li>
+<li><strong>TTFT vs throughput:</strong> batch lớn tăng throughput nhưng có thể hại TTFT — tune admission, đừng tối đa batch một cách mù quáng.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Serve LLM là <strong>GPU-bound và stateful theo từng request</strong> (KV cache), khác web tier stateless thường gặp.</li>
+<li><strong>Continuous batching</strong> ở mức decode-step giữ GPU bão hoà và cắt latency.</li>
+<li><strong>Paged attention</strong> quản KV cache như paging của OS — không over-reserve, block share được.</li>
+<li><strong>Tensor + pipeline parallelism</strong> serve model lớn hơn một GPU.</li>
+<li>Scheduling đánh đổi <strong>TTFT vs throughput</strong>; autoscaling phải tính tới warmup và queue.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: tài liệu công khai về vLLM (paged attention), continuous batching, và GPU model-serving. Diagram và nội dung là content gốc của EngineerPro.</em></p>

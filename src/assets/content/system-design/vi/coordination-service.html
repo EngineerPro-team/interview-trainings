@@ -1,0 +1,183 @@
+<p>Một <strong>coordination service</strong> (kiểu ZooKeeper / etcd) là building block mà các hệ phân tán khác dựa vào cho <strong>leader election</strong>, <strong>distributed lock</strong>, configuration, và service discovery. Toàn bộ giá trị của nó là <strong>strongly consistent</strong> (và available ở mức một hệ CP có thể) — đạt được bằng một consensus algorithm như Raft.</p>
+
+<p>Mental model then chốt: đây là chỗ duy nhất trong kiến trúc được phép <strong>nhỏ, chậm, và tuyệt đối đúng</strong>, để mọi thứ khác được lớn, nhanh, và lỏng. Bạn cố ý đánh đổi throughput lấy linearizability và một single source of truth — nên "đừng để data ở đây, để <em>quyết định</em> ở đây" là framing gây ấn tượng.</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<ul>
+<li><strong>Đang coordinate cái gì?</strong> Leader election, lock, config, service discovery, membership — đều dựa trên cùng primitive (CAS, watch, ephemeral key + lease) nhưng access pattern khác.</li>
+<li><strong>Read hay write heavy?</strong> Read có thể scale/nới (follower read, read-index); write bị chặn bởi consensus và nên hiếm.</li>
+<li><strong>Cần linearizable read?</strong> Nếu stale read chấp nhận được, follower read rẻ hơn nhiều; nếu không, read phải qua leader / read-index.</li>
+<li><strong>Failure model?</strong> Phải sống sót bao nhiêu node chết đồng thời — quyết định cluster size (3/5/7) và quorum.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Một <strong>key-value</strong> store nhỏ với <strong>watch</strong> (notify khi đổi).</li>
+<li><strong>Distributed lock</strong> và <strong>leader election</strong>.</li>
+<li>Entry ephemeral gắn với một session (tự xoá khi disconnect).</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Strong consistency</strong> (linearizable read/write).</li>
+<li><strong>Availability theo CAP CP tradeoff</strong> — sống sót khi <em>minority</em> node chết, nhưng khi partition thì phía minority không khả dụng (ưu tiên consistency hơn availability). Không phải "always available".</li>
+<li><strong>Durability</strong>; latency vừa phải nhưng dự đoán được.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Cluster size:</strong> 3, 5, hay 7 node — lẻ, để tạo majority quorum; chịu floor(N/2) lỗi.</li>
+<li><strong>Write throughput:</strong> mọi write đi qua consensus (replicate + majority ack), nên vừa phải (hàng nghìn/s), không phải hàng triệu — đây là coordination store, không phải data store.</li>
+<li><strong>Read:</strong> serve từ leader (linearizable) hoặc replica (nhanh hơn, có thể cũ) tuỳ guarantee.</li>
+<li><strong>Data size:</strong> nhỏ — config, lock, membership — giữ trong memory với một replicated log trên disk.</li>
+</ul>
+<p><strong>Ví dụ có số — vì sao write bị chặn.</strong> Mỗi write phải append vào log của leader, replicate, và được majority ack trước commit. Trên cluster 5 node đó là ít nhất một fsync + một round-trip mạng tới 2 node nữa mỗi write, nên một Raft group thực tế commit cỡ vài nghìn write/s — ổn cho "elect leader" hay "update config này", thảm hoạ nếu coi như database và write mỗi user request. Nếu thật sự cần write throughput hơn, shard thành nhiều Raft group độc lập (etcd/ZooKeeper không nhằm làm sharded data store) — đó là dấu hiệu bạn đang dùng sai công cụ.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>put(key, value)</code>, <code>get(key)</code>, <code>delete(key)</code>.</li>
+<li><code>watch(key)</code> → event khi đổi.</li>
+<li><code>lock(key)</code> / <code>unlock(key)</code> với một lease.</li>
+<li><code>create_ephemeral(key)</code> — xoá khi session kết thúc.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Một cluster nhỏ các node chạy một <strong>consensus protocol</strong>. Một node là <strong>leader</strong>; client gửi write tới nó, leader replicate chúng qua một replicated <strong>log</strong> tới follower, và một write commit khi một <strong>majority</strong> có nó. Log đã commit được apply vào một in-memory state machine (KV tree).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  C["Client"] --> LEADER["Leader node"]
+  subgraph CLUSTER["Consensus cluster (Raft)"]
+    LEADER -->|replicate log| F1["Follower 1"]
+    LEADER -->|replicate log| F2["Follower 2"]
+  end
+  LEADER --> SM["State machine: KV tree"]
+  F1 --> SM1["State machine replica"]
+  F2 --> SM2["State machine replica"]
+  C -.watch.-> LEADER
+</pre>
+<figcaption><strong>Hình 1.</strong> Leader replicate một log tới follower qua consensus; một khi majority có một entry thì nó commit và được apply vào in-memory KV state machine.</figcaption>
+</figure>
+
+<h2>Consensus và leader election</h2>
+<p><strong>Raft</strong> làm cluster đồng thuận về một ordered log bất chấp lỗi. Node elect một leader bằng majority vote cho một <em>term</em>; leader xử lý mọi write và replicate chúng. Nếu leader chết, follower timeout và elect một cái mới. Vì entry chỉ commit với majority, một network bị chia không thể tạo hai leader cùng commit (không split-brain).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant Cand as Candidate
+  participant F1 as Follower 1
+  participant F2 as Follower 2
+  Note over Cand: leader timeout
+  Cand->>F1: RequestVote (term T)
+  Cand->>F2: RequestVote (term T)
+  F1-->>Cand: vote granted
+  F2-->>Cand: vote granted
+  Note over Cand: majority -> thành leader
+  Cand->>F1: AppendEntries (heartbeat)
+  Cand->>F2: AppendEntries (heartbeat)
+</pre>
+<figcaption><strong>Hình 2.</strong> Leader election: một candidate thắng với majority vote cho một term, rồi khẳng định leadership qua heartbeat.</figcaption>
+</figure>
+
+<h2>Log replication</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  W["Client write"] --> L["Leader append vào log"]
+  L -->|AppendEntries| R1["Follower 1 append"]
+  L -->|AppendEntries| R2["Follower 2 append"]
+  R1 -->|ack| L
+  R2 -->|ack| L
+  L --> COMMIT{"Majority acked?"}
+  COMMIT -->|có| APPLY["Commit + apply vào state machine"]
+  APPLY --> ACK["Ack client"]
+</pre>
+<figcaption><strong>Hình 3.</strong> Một write được append vào log của leader, replicate, và commit một khi majority ack — rồi apply và ack.</figcaption>
+</figure>
+
+<h2>Distributed lock với lease và fencing</h2>
+<p>Một lock chỉ là một key mà một client giữ. Quan trọng là nó mang một <strong>lease</strong> (để lock của holder bị crash tự hết hạn) và một <strong>fencing token</strong> — một số tăng đơn điệu phát ra cùng lock. Hệ downstream reject operation mang token cũ, nên một holder cũ bị pause-rồi-resume không thể làm hỏng state. Lock không fencing là không an toàn.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Client A
+  participant CS as Coordination service
+  participant R as Protected resource
+  participant B as Client B
+  A->>CS: acquire lock (lease)
+  CS-->>A: granted, fencing token = 33
+  A->>R: write với token 33
+  Note over A: A pause (GC), lease hết hạn
+  B->>CS: acquire lock (lease)
+  CS-->>B: granted, fencing token = 34
+  B->>R: write với token 34
+  A->>R: late write với token 33
+  R-->>A: rejected, token mới nhất là 34
+</pre>
+<figcaption><strong>Hình 4.</strong> Lease tự hết hạn lock của holder bị crash; fencing token cho resource reject late write của một holder cũ.</figcaption>
+</figure>
+
+<h2>Watch và session</h2>
+<p>Client <strong>watch</strong> key để được notify khi đổi (vd config update, leader mới) thay vì polling. Watch mang một <strong>revision</strong> để client resume "từ revision X" sau reconnect mà không miss event; nếu history bị compact mất, server báo re-sync. Key <strong>ephemeral</strong> gắn với một client session giữ sống bằng heartbeat; khi session kết thúc, key ephemeral của nó biến mất — cơ chế đằng sau presence và leader election (leader giữ một ephemeral key). API cũng có <strong>compare-and-swap</strong> / versioned write và <strong>lease grant + keepalive</strong>.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant CS as Coordination service
+  C->>CS: watch(key, from_revision = 12)
+  CS-->>C: event rev 13 (put)
+  CS-->>C: event rev 14 (delete)
+  Note over C: disconnect, reconnect
+  C->>CS: watch(key, from_revision = 14)
+  alt history còn
+    CS-->>C: event rev 15 (lỡ khi vắng)
+  else đã compact
+    CS-->>C: cần re-sync (đọc current state)
+  end
+</pre>
+<figcaption><strong>Hình 5.</strong> Watch theo revision cho client resume sau reconnect mà không miss event; nếu history bị compact, server yêu cầu re-sync.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Quyết định storage ở đây là <em>cái gì authoritative</em> và làm nó durable thế nào — một coordination service lưu các quyết định nhỏ, quan trọng, không phải bulk data:</p>
+<ul>
+<li><strong>Replicated consensus log (source of truth):</strong> <strong>Raft/ZAB log</strong> durable, replicated của các state change là authority; mỗi write commit bởi một quorum trước ack. <strong>Snapshot</strong> định kỳ compact nó để recovery không phải replay toàn bộ.</li>
+<li><strong>In-memory KV state (MVCC projection):</strong> key space hiện tại giữ trong memory (một tree/MVCC store), rebuild từ log + snapshot khi restart — read nhanh, nhưng derived từ log, không phải một source of truth riêng.</li>
+<li><strong>Leases / session table:</strong> session client và lease expiry được track để lock tự release khi client chết (TTL + heartbeat); đây là cái làm lock an toàn.</li>
+<li><strong>Watch / revision history:</strong> một global revision đơn điệu mỗi change cho phép client watch và resume từ một revision; revision cũ được compact.</li>
+<li><strong>Local disk với fsync:</strong> mỗi node fsync log xuống local disk; value cố ý <strong>nhỏ</strong> (KB), không phải blob store — value lớn không thuộc về đây.</li>
+<li><strong>Implementations:</strong> <strong>etcd</strong> (Raft, sau Kubernetes), <strong>ZooKeeper</strong> (ZAB; Kafka/Hadoop/HBase), <strong>Consul</strong> (KV + discovery + health), <strong>Google Chubby</strong> (cái gốc). Gần như mọi system ở đây dùng một cái cho leader election, config, và lock.</li>
+</ul>
+
+<h2>Khi nào (không) dùng coordination service</h2>
+<ul>
+<li><strong>Tốt cho:</strong> leader election, distributed lock có fencing, dynamic config, service discovery/membership, lượng nhỏ metadata quan trọng — write thấp, correctness cao.</li>
+<li><strong>Sai cho:</strong> database tổng quát hay store throughput cao (write bị consensus chặn), blob lớn, hoặc bất cứ thứ gì cần availability thắng consistency khi partition.</li>
+<li><strong>Một alternative rẻ hơn</strong> cho lock best-effort là Redis lease + fencing token — nhưng không linearizable, nên dùng coordination service khi correctness dưới partition thật sự quan trọng.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Không phải data store:</strong> write đi qua consensus — giữ nó nhỏ và throughput thấp.</li>
+<li><strong>Lock cần fencing:</strong> chỉ lease là không an toàn dưới GC pause / network delay.</li>
+<li><strong>Cluster size:</strong> số lẻ (3/5/7); nhiều node thì durable hơn nhưng write chậm hơn.</li>
+<li><strong>Linearizable read cost:</strong> read từ leader (hoặc qua read-index) là đúng; replica read có thể cũ.</li>
+<li><strong>Watch storm:</strong> một thay đổi có thể notify nhiều watcher — debounce / batch.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Coordination service đánh đổi throughput lấy <strong>strong consistency</strong> qua <strong>consensus (Raft)</strong>.</li>
+<li><strong>Leader election + log replication</strong> với majority quorum tránh split-brain.</li>
+<li><strong>Lock cần một lease và một fencing token</strong> để an toàn.</li>
+<li><strong>Watch + ephemeral session</strong> tạo nên discovery, config, và presence.</li>
+<li><strong>Để quyết định ở đây, không phải data:</strong> nó cố ý nhỏ/chậm/đúng để phần còn lại của hệ lớn/nhanh/lỏng — sai công cụ cho một store throughput cao.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Raft (Ongaro &amp; Ousterhout, 2014, raft.github.io); etcd docs (lease, watch, MVCC); Apache ZooKeeper docs; "How to do distributed locking" (Kleppmann) về fencing token. Diagram và nội dung là content gốc của EngineerPro.</em></p>

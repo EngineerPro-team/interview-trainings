@@ -1,0 +1,193 @@
+<p><strong>Netflix</strong>-style video streaming (VOD) is dominated by two things: a heavy <strong>encoding pipeline</strong> that prepares each title in many formats, and a global <strong>CDN</strong> that serves the bytes close to viewers. This chapter covers ingest/transcoding, adaptive bitrate playback, CDN distribution, and recommendation.</p>
+
+<p>The framing that wins: VOD is an <strong>extreme read:write skew</strong> problem. A title is encoded <em>once</em> and streamed billions of times, so you happily spend hours of offline compute per title to make playback cheap and the bytes are pushed as close to viewers as physically possible. The control plane (catalog, auth, recommendations, resume points) is a fairly ordinary web system; the hard, distinctive part is moving <strong>petabytes of immutable video at the network edge</strong> with a fast start and no rebuffering. Almost nothing here lives on a database hot path — it lives on a CDN.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>VOD or live?</strong> Pre-recorded VOD lets you encode offline and pre-warm CDNs; live streaming adds real-time transcode and tight latency, a different problem.</li>
+<li><strong>Global scale and geography?</strong> Hundreds of millions of viewers worldwide forces an edge CDN (ideally inside ISPs); a regional service is far simpler.</li>
+<li><strong>DRM / content protection?</strong> Licensed content needs DRM (Widevine/FairPlay) and a license server — a real subsystem, not a checkbox.</li>
+<li><strong>Device matrix?</strong> Supporting TVs, phones, browsers dictates which codecs/containers and how many renditions you must encode.</li>
+<li><strong>Personalization depth?</strong> Simple "continue watching" vs full ML recommendations changes whether you need a feature store and model serving.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Browse / search the catalog; play a title with subtitles and multiple audio tracks.</li>
+<li>Resume where you left off; personalized recommendations.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Fast start</strong> (low join time) and minimal rebuffering.</li>
+<li><strong>Scale</strong> to hundreds of millions of viewers globally.</li>
+<li>Tolerate variable networks via adaptive quality.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Egress dominates:</strong> as a peak / stress target, 100M concurrent streams × ~5 Mbps ≈ <strong>500 Tbps</strong> — impossible from a few central data centers, hence a purpose-built CDN at ISPs. (Steady-state is lower, but you design for peak.)</li>
+<li><strong>Storage of renditions:</strong> one title is encoded into dozens of bitrate/codec/resolution variants → source size multiplied several-fold; store in blob storage, push hot titles to edges.</li>
+<li><strong>Read:write skew:</strong> a title is encoded once and watched billions of times — optimize delivery, do encoding offline.</li>
+<li><strong>Catalog:</strong> metadata is small; the bytes are the cost.</li>
+</ul>
+<p><strong>Worked example.</strong> Put the CDN argument in numbers. 100M concurrent streams at ~5 Mbps is ~500 Tbps of egress. A large data center egress is on the order of tens of Tbps, so serving this centrally would need dozens of full data centers <em>just for bandwidth</em> — and every byte would cross expensive long-haul links. Instead, a title's segments are <strong>immutable and cacheable</strong>, so you push them to thousands of edge caches (Open Connect appliances inside ISPs); a viewer's stream is served from a box a few milliseconds away, the origin sees only cache-fill traffic (a tiny fraction), and cross-ISP transit collapses. Encoding cost flips the other way: one 1-hour title encoded into ~dozens of bitrate/codec/resolution renditions might be hundreds of CPU/GPU-hours <em>once</em>, amortized over billions of views — trivially worth it. This asymmetry (spend offline compute + edge storage to save online bandwidth) is the whole design.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /titles?q=</code> → catalog search.</li>
+<li><code>GET /titles/{id}/play</code> → a <strong>manifest</strong> (HLS/DASH) listing bitrate variants + a DRM license URL.</li>
+<li><code>GET /segment/...</code> → media segments (served by the CDN edge).</li>
+<li><code>POST /progress</code> — <code>{title_id, position}</code> (resume point).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Uploaded masters flow through an <strong>encoding pipeline</strong> into blob storage, then propagate to <strong>CDN edge</strong> servers. The playback API hands the client a manifest; the client then pulls segments from the nearest edge and adapts quality on the fly.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  UP["Title master upload"] --> ENC["Encoding pipeline (transcode)"]
+  ENC --> BLOB["Blob storage: all renditions"]
+  BLOB --> CDN["CDN edge servers (at ISPs)"]
+  C["Client player"] --> BFF["API / backend-for-frontend"]
+  BFF --> CAT["Catalog / Search service"]
+  BFF --> META["Metadata service"]
+  BFF --> PROG["Progress / watch-history service"]
+  BFF --> REC["Recommendation service"]
+  BFF --> PLAY["Playback API: manifest (HLS/DASH)"]
+  C --> DRM["DRM / license service (key delivery)"]
+  C --> CDN
+</pre>
+<figcaption><strong>Figure 1.</strong> A backend-for-frontend fronts catalog, metadata, progress, and recommendation; the playback API returns a manifest while the DRM license is a separate path; segments stream from the nearest CDN edge.</figcaption>
+</figure>
+
+<h2>Encoding pipeline</h2>
+<p>Encoding is expensive and embarrassingly parallel, so it is a <strong>DAG</strong>: split the master into chunks, transcode chunks in parallel into each target (bitrate × resolution × codec), then package into streaming formats (HLS/DASH) and store. Doing it per-chunk means a failed chunk re-encodes alone and the whole farm stays busy.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  M["Master file"] --> SPLIT["Split into chunks"]
+  SPLIT --> T1["Transcode chunk to 1080p"]
+  SPLIT --> T2["Transcode chunk to 720p"]
+  SPLIT --> T3["Transcode chunk to 480p"]
+  T1 --> PKG["Package HLS / DASH + subtitles"]
+  T2 --> PKG
+  T3 --> PKG
+  PKG --> STORE["Store renditions in blob storage"]
+</pre>
+<figcaption><strong>Figure 2.</strong> The transcoding DAG: split, transcode chunks in parallel into many renditions, then package and store.</figcaption>
+</figure>
+
+<h2>CDN distribution</h2>
+<p>Serving 500 Tbps from central servers is impossible, so content lives at the <strong>edge</strong>, ideally inside ISP networks. Popular titles are <strong>pre-positioned</strong> to edges ahead of demand (predicted from viewing patterns); the long tail is pulled and cached on first request. Most bytes never traverse the core network.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  ORIGIN["Origin: blob storage"] -->|pre-position popular titles| E1["Edge cache (ISP region A)"]
+  ORIGIN -->|pull on first miss| E2["Edge cache (ISP region B)"]
+  E1 --> V1["Viewers region A"]
+  E2 --> V2["Viewers region B"]
+</pre>
+<figcaption><strong>Figure 3.</strong> Edge caches inside ISPs serve most traffic; hot titles are pushed ahead of demand, the long tail is pulled on first miss.</figcaption>
+</figure>
+
+<h2>Adaptive bitrate playback</h2>
+<p>The client drives quality. It fetches the manifest, then requests short segments; it measures throughput and buffer level and switches up or down between bitrate variants per segment. A slow network silently steps down instead of stalling.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Player
+  participant API as Playback API
+  participant DRM as DRM / license service
+  participant E as CDN edge
+  C->>API: GET play(title)
+  API-->>C: manifest (variants) + DRM license URL/token
+  C->>DRM: request license (token)
+  DRM-->>C: content key / license
+  C->>E: GET segment 1 at 1080p
+  E-->>C: segment 1
+  Note over C: buffer low / throughput drops
+  C->>E: GET segment 2 at 480p
+  E-->>C: segment 2
+</pre>
+<figcaption><strong>Figure 4.</strong> ABR: the Playback API returns the manifest plus a DRM license URL/token; the player fetches the license from the authoritative <strong>DRM/license service</strong> (separate from segment delivery), then picks the bitrate per segment based on measured throughput and buffer, stepping down to avoid stalls.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Player
+  participant E as Edge PoP
+  participant S as Regional shield
+  participant O as Origin (blob storage)
+  C->>E: GET segment
+  alt edge hit
+    E-->>C: segment (fast)
+  else edge miss
+    E->>S: fetch segment
+    alt shield hit
+      S-->>E: segment
+    else shield miss
+      S->>O: fetch segment
+      O-->>S: segment
+    end
+    E-->>C: segment (now cached at edge)
+  end
+</pre>
+<figcaption><strong>Figure 5.</strong> Segment delivery with cache fill: a miss cascades edge to shield to origin, caching on the way back — most bytes never reach the origin.</figcaption>
+</figure>
+
+<h2>Recommendation</h2>
+<p>The home screen is ranked rows produced by a recommendation system: heavy <strong>offline</strong> model training and candidate generation, plus a lighter <strong>online</strong> ranking that personalizes in real time from recent activity — the same offline/online split as feed ranking.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway / BFF</strong> (Netflix's Zuul-style): auth, routing, and aggregating the home screen calls.</li>
+<li><strong>Catalog &amp; metadata:</strong> a wide-column store (<strong>Cassandra</strong>) for title metadata + <strong>Elasticsearch</strong> for search/browse.</li>
+<li><strong>Encoding pipeline:</strong> a job/DAG orchestrator with a queue (<strong>SQS / Kafka</strong>) feeding a fleet of transcoding workers.</li>
+<li><strong>Renditions:</strong> the many encoded files in <strong>blob/object storage (S3-like)</strong>, distributed to <strong>CDN edge</strong> (Netflix Open Connect appliances inside ISPs).</li>
+<li><strong>Watch progress / history:</strong> a high-write wide-column store (<strong>Cassandra</strong>) keyed by user — millions of "resume point" updates/s.</li>
+<li><strong>Caching:</strong> Netflix's <strong>EVCache</strong> (a Memcached/Redis-style tier) in front of metadata.</li>
+<li><strong>Recommendation:</strong> offline training on <strong>Spark</strong> over event data in a data lake, served by an online ranking service; viewing events flow through <strong>Kafka</strong>.</li>
+</ul>
+<p><strong>Why these:</strong> bytes (renditions) are huge + immutable + read-globally → object storage + CDN; watch-progress is write-heavy + simple-keyed → wide-column, not SQL; catalog search needs an inverted index → Elasticsearch; the event firehose → Kafka. The expensive part is egress and storage, so the data layout is optimized to keep bytes at the edge and metadata cheap.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Immutable, eventually-distributed content:</strong> a rendition never changes once published, so edges can cache it forever; "publishing" a title is an eventual propagation to edges, not a synchronous global write.</li>
+<li><strong>Eventually-consistent control plane:</strong> catalog changes, new titles, and recommendations propagate with lag — fine for browsing. The catalog is read-mostly and heavily cached.</li>
+<li><strong>Best-effort, monotonic watch progress:</strong> resume points are written frequently and async; occasional loss of the last few seconds is acceptable, and updates should be last-writer-wins / monotonic so a stale device doesn't rewind your position.</li>
+<li><strong>Availability over strict consistency on playback:</strong> if metadata is briefly stale or a recommendation row is old, you still play — playback must never block on a consistency check. DRM license issuance is the one strict, authoritative step.</li>
+<li><strong>Graceful degradation (not an availability guarantee):</strong> ABR <em>attempts</em> to preserve playback by degrading quality first, dropping bitrate rather than stalling — but it can still stall if throughput falls below the lowest representation or the edge/origin path fails. It is a best-effort strategy, not a hard guarantee.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>CDN + offline encoding when:</strong> large-scale VOD with global reach — the standard answer; bytes belong at the edge, encoding offline.</li>
+<li><strong>Simpler when:</strong> a small video library or internal tool — a single object store + a managed CDN, no custom Open-Connect-style appliances or per-title encoding farm.</li>
+<li><strong>Different design when:</strong> the workload is <strong>live</strong> (sports, real-time) — you need low-latency live transcode and packaging, and can't fully pre-warm; or interactive video (conferencing) which is the Zoom/SFU problem, not VOD.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>You cannot serve video from the core</strong> — a CDN (ideally in-ISP) is the design.</li>
+<li><strong>Rendition explosion:</strong> many variants multiply storage — store in cheap blob, cache hot ones at edge.</li>
+<li><strong>Cold long-tail:</strong> first viewer of an obscure title pays a cache-fill latency — acceptable.</li>
+<li><strong>Encoding cost:</strong> do it offline as a parallel DAG; never on the playback path.</li>
+<li><strong>DRM</strong> adds a license round-trip — separate from segment delivery.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Two systems: an offline <strong>encoding DAG</strong> and an online <strong>CDN delivery</strong> path.</li>
+<li><strong>Edge caching at ISPs</strong> is the only way to serve the egress.</li>
+<li><strong>Adaptive bitrate</strong> trades quality for smoothness on the client.</li>
+<li>Recommendation is an <strong>offline-train + online-rank</strong> split.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Netflix Open Connect and the Netflix Tech Blog (encoding, ABR); HLS (RFC 8216) and MPEG-DASH specs; Widevine / FairPlay DRM docs. Diagrams and write-up are original EngineerPro content.</em></p>

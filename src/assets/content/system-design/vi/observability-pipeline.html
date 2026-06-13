@@ -1,0 +1,185 @@
+<p>Một <strong>observability pipeline</strong> ingest ba pillar telemetry — <strong>metrics, logs, và traces</strong> — từ một dàn service, lưu chúng hiệu quả, và cấp nguồn cho dashboard và alerting. Thách thức là <strong>ingest throughput</strong> cực lớn, kiểm soát <strong>cardinality</strong>, và retention có ý thức về cost.</p>
+
+<p>Mâu thuẫn cốt lõi: observability là hệ bạn dựa vào <em>đúng lúc mọi thứ khác đang cháy</em> — trong incident input volume spike mạnh nhất. Nên thiết kế phải degrade nhẹ nhàng dưới chính worst case của nó (backpressure, sampling, load-shedding), và driver chi phí chính không phải volume thô mà là <strong>cardinality</strong>. Câu trả lời mạnh coi nó là bài toán cost/SNR, không chỉ "lưu hết data".</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<ul>
+<li><strong>Pillar nào và cái nào quan trọng nhất?</strong> Metrics (rẻ, aggregatable), logs (dài dòng, đắt), traces (sampled) có nhu cầu storage và query rất khác.</li>
+<li><strong>Retention &amp; resolution?</strong> Full-resolution vài ngày vs rollup vài tháng vs cold archive vài năm — quyết định downsampling/tiering.</li>
+<li><strong>Multi-tenant?</strong> Isolation theo team, quota, và RBAC đổi model ingest và storage.</li>
+<li><strong>Loss tolerance?</strong> Có được drop debug log khi quá tải (được) nhưng không bao giờ error/security event (không)? Định nghĩa shedding policy.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Ingest metrics, logs, và traces từ nhiều service.</li>
+<li>Query / dashboard; <strong>alerting</strong> theo rule.</li>
+<li>Trace correlation; retention với downsampling.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Ingest throughput rất cao</strong>; query latency hợp lý.</li>
+<li><strong>Cost-aware</strong> retention; <strong>chính sách mất dữ liệu có ưu tiên</strong> — giữ error/security/SLO signal, sample/drop log/trace giá trị thấp khi quá tải (một số ít critical metric stream có thể durable no-loss).</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Volume:</strong> 10k host mỗi cái phát hàng nghìn metric series + log → hàng triệu data point/s và TB log/ngày.</li>
+<li><strong>Cardinality:</strong> một metric với label cardinality cao (user_id) có thể nổ thành hàng triệu series — driver cost số một; kiểm soát nó.</li>
+<li><strong>Storage tier:</strong> raw full resolution trong vài ngày, downsampled rollup trong vài tháng, cold archive trong vài năm — cost giảm vài bậc mỗi tier.</li>
+<li><strong>Read:write skew:</strong> write nhiều hơn read (dashboard/alert) rất nhiều — tối ưu ingest và compression.</li>
+</ul>
+<p><strong>Ví dụ có số — quả bom cardinality.</strong> Một time series được định danh bởi tên metric cộng <em>tập</em> giá trị label. Lấy <code>http_requests_total</code> với label <code>method</code> (5), <code>status</code> (10), <code>endpoint</code> (200): đó là 5 × 10 × 200 = 10,000 series — ổn. Giờ thêm <code>user_id</code> (10M user): số nhân lên 100 <em>tỷ</em> series, mỗi cái cần một index entry in-memory và chunk riêng. TSDB sập không phải vì <em>volume</em> data mà vì <em>số series</em>. Cách sửa là một policy lúc ingest: drop, hash/bucket, hoặc aggregate bỏ label không giới hạn (<code>user_id</code>, <code>request_id</code>, URL thô) trước khi chúng tạo series — và để detail high-cardinality đó trong <em>logs/traces</em> (query theo time + vài key), không phải metrics.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><strong>Ingest (OTLP):</strong> agent push metrics / logs / span.</li>
+<li><code>GET /query</code> — query time-series / log / trace (vd kiểu PromQL).</li>
+<li><code>POST /alerts</code> — <code>{rule, threshold, channel}</code>.</li>
+<li><code>GET /trace/{id}</code> → full span tree.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Agent (OpenTelemetry) ship telemetry tới một <strong>ingest gateway</strong> được buffer bởi một durable queue; một stream processor aggregate và route mỗi signal tới store chuyên biệt của nó (time-series DB, log store, trace store). Một query service và alert manager nằm trên.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  AG["Agents (OpenTelemetry)"] --> ING["Ingest gateway: rate limit + backpressure"]
+  ING --> RED["Redaction (PII / secrets) + tenant tag"]
+  RED --> BUF["Buffer (Kafka)"]
+  BUF --> SP["Stream processor: aggregate / downsample / sample"]
+  SP --> TSDB["Time-series DB (metrics)"]
+  SP --> LOGS["Log store / OLAP"]
+  SP --> TRACE["Trace store"]
+  TSDB --> QRY["Query service"]
+  LOGS --> QRY
+  TRACE --> QRY
+  QRY --> DASH["Dashboards"]
+  TSDB --> ALERT["Alert manager"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Agent tới ingest gateway có buffer, stream processor route mỗi pillar tới store của nó, và query service cộng alert manager nằm trên.</figcaption>
+</figure>
+
+<h2>Ba pillar</h2>
+<p>Mỗi pillar có hình dạng khác và một store chuyên dụng:</p>
+<ul>
+<li><strong>Metrics:</strong> numeric time series, aggregatable — lưu trong <strong>time-series DB</strong> với compression nặng và rollup.</li>
+<li><strong>Logs:</strong> text event khối lượng lớn — lưu trong columnar / OLAP store; index dè sẻn để kiểm soát cost.</li>
+<li><strong>Traces:</strong> span tree của một request xuyên service — lưu với <strong>sampling</strong> (không thể giữ mọi trace).</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  T["Telemetry"] --> M["Metrics: numeric series, aggregatable"]
+  T --> L["Logs: text event, khối lượng lớn"]
+  T --> R["Traces: span tree, sampled"]
+  M --> TSDB["Time-series DB + rollup"]
+  L --> OLAP["Columnar / OLAP store"]
+  R --> TR["Trace store (sampled)"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Metrics, logs, và traces mỗi cái đi tới một store tune theo hình dạng và access pattern của nó.</figcaption>
+</figure>
+
+<h2>Ingest: push vs pull và cardinality</h2>
+<p>Metrics có thể <strong>pull</strong> (collector scrape target) hoặc <strong>push</strong> (service emit). Pull dễ discover và scale sau load balancer; push hợp short-lived job. Dù cách nào, vấn đề chí mạng là <strong>cardinality</strong>: một label như <code>user_id</code> biến một metric thành hàng triệu series. Drop hoặc aggregate label cardinality cao lúc ingest.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  SRC["Metric kèm label"] --> CARD{"Label cardinality cao?"}
+  CARD -->|thấp| KEEP["Lưu như một series"]
+  CARD -->|cao vd user_id| DROP["Drop / aggregate label lúc ingest"]
+  KEEP --> TSDB["Time-series DB"]
+  DROP --> TSDB
+</pre>
+<figcaption><strong>Hình 3.</strong> Kiểm soát cardinality lúc ingest: label cardinality cao bị drop hoặc aggregate trước khi nổ số series.</figcaption>
+</figure>
+
+<h2>Query và alerting</h2>
+<p>Dashboard query các store theo time range. <strong>Alert manager</strong> định kỳ eval rule với metrics, dedup và group các alert đang fire, và route chúng tới channel với escalation. Alerting bản thân là một hệ streaming/eval nhỏ trên metrics store.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant AM as Alert manager
+  participant TSDB as Time-series DB
+  participant N as Notifier
+  loop mỗi interval
+    AM->>TSDB: eval rule (vd error rate trên threshold)
+    TSDB-->>AM: result
+    alt vượt threshold
+      AM->>AM: dedup + group
+      AM->>N: route alert (page / chat) với escalation
+    end
+  end
+</pre>
+<figcaption><strong>Hình 4.</strong> Alert manager eval rule theo lịch, dedup, và route alert đang fire với escalation.</figcaption>
+</figure>
+
+<h2>Backpressure, sampling, và safety</h2>
+<p>Trong incident, input spike (log storm), nên pipeline phải degrade nhẹ nhàng thay vì sập: ingest gateway áp <strong>rate limit và backpressure</strong>, và khi quá tải thì <strong>shed load bằng cách sample/drop signal giá trị thấp</strong> (debug log) trong khi <strong>ưu tiên</strong> error và security event — không bao giờ block producer. Lưu ý đây là ưu tiên, không phải guarantee cứng: critical stream thực sự no-loss cần reserved capacity hoặc một durable no-loss buffer. Trace dùng <strong>tail sampling</strong>: gom span của một trace, chờ một decision window ngắn, và giữ cái có error hoặc high latency. Log và trace thường mang secret/PII, nên một processor <strong>redaction</strong> chạy lúc ingest và store là tenant-scoped với RBAC và retention theo độ nhạy.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  IN["Telemetry vào (spiky)"] --> GATE{"Quá capacity?"}
+  GATE -->|không| KEEP["Ingest bình thường"]
+  GATE -->|có| SHED["Shed: sample/drop debug log, giữ error + security"]
+  KEEP --> TAIL["Trace tail sampling: giữ error / chậm"]
+  SHED --> TAIL
+  TAIL --> RED["Redact PII / secret"]
+  RED --> STORE["Stores (tenant-scoped, RBAC, retention theo độ nhạy)"]
+</pre>
+<figcaption><strong>Hình 5.</strong> Khi quá tải, gateway shed signal giá trị thấp nhưng ưu tiên error/security; tail sampling giữ trace thú vị; redaction và RBAC bảo vệ dữ liệu nhạy cảm.</figcaption>
+</figure>
+
+<h2>Retention và tiering</h2>
+<p>Giữ mọi thứ full resolution mãi mãi là không kham nổi. Data được <strong>downsample</strong> (rollup xuống interval thô hơn) khi cũ đi và tier sang storage rẻ hơn, cuối cùng vào cold archive — cùng vòng đời hot/cold như storage system.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>Instrumentation:</strong> OpenTelemetry (SDK + collector vendor-neutral) là chuẩn đang nổi.</li>
+<li><strong>Metrics:</strong> Prometheus + Grafana + Alertmanager; Thanos / Grafana Mimir / VictoriaMetrics cho long-term + scale.</li>
+<li><strong>Logs:</strong> Grafana Loki, ELK stack (Elasticsearch), hoặc ClickHouse (columnar, rẻ ở scale).</li>
+<li><strong>Traces:</strong> Jaeger hoặc Grafana Tempo.</li>
+<li><strong>Managed:</strong> Datadog, Honeycomb, New Relic. Buffer ingest gần như luôn dùng <strong>Kafka</strong>.</li>
+</ul>
+
+<h2>Guarantees &amp; tradeoffs</h2>
+<ul>
+<li><strong>Best-effort, lossy theo thiết kế:</strong> khi quá tải pipeline sample/drop signal giá trị thấp — không đảm bảo mọi datapoint, mà <em>ưu tiên</em> cái quan trọng (error, security, SLO metric); critical stream thực sự no-loss cần reserved capacity / durable buffering.</li>
+<li><strong>Eventually queryable:</strong> có lag ingest + processing, nên dashboard và alert thấy data trễ vài giây so với thực tế — ổn cho monitoring, không cho transactional truth.</li>
+<li><strong>Precision giảm theo tuổi:</strong> downsampling đánh đổi resolution lấy cost, nên data cũ trả lời câu hỏi "xu hướng", không phải "lúc 12:00:03.5 xảy ra gì".</li>
+<li><strong>Metrics vs logs vs traces là split có chủ đích:</strong> aggregate signal trong metrics, detail high-cardinality trong logs, causality trong traces — để sai thứ vào sai pillar là lỗi cost kinh điển.</li>
+</ul>
+
+<h2>Khi nào (không) dùng pipeline này</h2>
+<ul>
+<li><strong>Tốt cho:</strong> monitoring, alerting, debugging, capacity planning, theo dõi SLO trên một dàn.</li>
+<li><strong>Sai cho:</strong> record billing/audit phải chính xác và đầy đủ (dùng durable, no-sample event log), hoặc làm analytics warehouse chính (dùng OLAP/lakehouse).</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Cardinality là quả bom cost</strong> — không bao giờ đặt label không giới hạn (user_id, request_id) lên metrics.</li>
+<li><strong>Trace sampling:</strong> không thể giữ mọi trace — head/tail sampling giữ cái thú vị.</li>
+<li><strong>Logs đắt để index:</strong> lưu columnar, index dè sẻn, search theo time + service trước.</li>
+<li><strong>Ingest spike</strong> (incident = log storm) — buffer bằng queue, không bao giờ block producer.</li>
+<li><strong>Downsampling</strong> mất độ chính xác — giữ raw chỉ lâu cần thiết.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Ba pillar, ba <strong>store chuyên dụng</strong>, một ingest pipeline có buffer.</li>
+<li><strong>Kiểm soát cardinality</strong> lúc ingest là đòn bẩy cost quan trọng nhất.</li>
+<li><strong>Trace sampling</strong> và <strong>downsampling/tiering</strong> giữ nó kham nổi.</li>
+<li><strong>Alerting</strong> là rule evaluation + dedup + routing trên metrics store.</li>
+<li><strong>Lossy theo thiết kế:</strong> <strong>ưu tiên</strong> signal quan trọng khi quá tải (critical stream thực sự no-loss cần reserved capacity/durable buffering), không phải mọi datapoint — và để detail high-cardinality trong logs/traces, không phải metrics.</li>
+<li><strong>Thiết kế cho incident:</strong> spike input tệ nhất đúng lúc bạn cần nó nhất, nên backpressure và shedding là first-class.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: OpenTelemetry docs (OTLP, tail sampling); Prometheus / Thanos / Grafana Mimir; Grafana Loki và ClickHouse / Elasticsearch cho log; Jaeger / Grafana Tempo cho trace. Diagram và nội dung là content gốc của EngineerPro.</em></p>

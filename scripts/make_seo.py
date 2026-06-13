@@ -11,7 +11,9 @@ import datetime
 import json
 import os
 import re
+import subprocess
 import sys
+from functools import lru_cache
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
@@ -29,6 +31,66 @@ from site_config import (  # noqa: E402
     RESOURCES_ALIASES,
     SYSTEM_DESIGN_URL_SLUG,
 )
+
+# --- Accurate <lastmod> ------------------------------------------------------
+# Google only trusts <lastmod> when it is "verifiably accurate"; if every URL
+# is stamped with the build date it concludes the value is junk and ignores it
+# (and crawls/indexes lazily). So we derive each URL's lastmod from the last
+# git commit that touched the *content source* behind that page, not the build
+# clock. Shell-driven pages fall back to the SPA shell's own commit date.
+
+# Repo-relative source files that render every prerendered page (used as a
+# fallback / for pages without a dedicated data file).
+SHELL_SOURCES = ("src/index.html", "src/assets/app.js")
+
+# Per top-level route → the content source(s) that actually drive it.
+TOP_ROUTE_SOURCES = {
+    "courses": ("src/assets/courses-data.js",),
+    SYSTEM_DESIGN_URL_SLUG: ("src/assets/system-design-data.js",),
+    "resources": ("src/assets/resources-data.js",),
+    "mentors": ("src/assets/data.js",),
+    "stories": ("src/assets/stories-data.js",),
+    "podcast": ("src/assets/podcasts-data.js",),
+    "partners": ("src/assets/data.js",),
+    "faq": ("src/assets/faqs-data.js",),
+    "contact": ("src/assets/data.js",),
+}
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+@lru_cache(maxsize=None)
+def _git_last_date(path_rel: str) -> str | None:
+    """Date (YYYY-MM-DD) of the last commit touching ``path_rel``, or None."""
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%cs", "--", path_rel],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    date = out.stdout.strip()
+    return date if _DATE_RE.match(date) else None
+
+
+def last_mod(*path_rels: str) -> str:
+    """Most-recent git commit date among the given repo-relative source files.
+
+    Falls back to filesystem mtime, then today, so the sitemap always carries a
+    value — but a real, content-derived one whenever git history is available.
+    """
+    dates = [d for p in path_rels if (d := _git_last_date(p))]
+    if dates:
+        return max(dates)
+    for p in path_rels:
+        ap = os.path.join(ROOT, p)
+        if os.path.exists(ap):
+            return datetime.date.fromtimestamp(os.path.getmtime(ap)).isoformat()
+    return datetime.date.today().isoformat()
+
 
 ROUTE_PRIORITY = {
     "courses":       (0.9, "weekly"),
@@ -61,32 +123,40 @@ def load_sd_chapter_slugs() -> list[str]:
 
 
 def main() -> int:
-    today = datetime.date.today().isoformat()
     urls: list[tuple[str, str, float, str]] = []
 
-    # Home
-    urls.append((f"{SITE_BASE}/", today, 1.0, "weekly"))
+    # Home — driven by the SPA shell + hand-curated site data.
+    urls.append((f"{SITE_BASE}/", last_mod(*SHELL_SOURCES, "src/assets/data.js"), 1.0, "weekly"))
 
-    # Top-level routes
+    # Top-level routes — lastmod tracks each route's real content source.
     for slug, _vi, _en in TOP_ROUTES:
         prio, freq = ROUTE_PRIORITY.get(slug, (0.6, "monthly"))
-        urls.append((f"{SITE_BASE}/{slug}/", today, prio, freq))
+        sources = TOP_ROUTE_SOURCES.get(slug, SHELL_SOURCES)
+        urls.append((f"{SITE_BASE}/{slug}/", last_mod(*sources), prio, freq))
 
     # Course detail pages
+    courses_mod = last_mod("src/assets/courses-data.js")
     for s in load_slugs("courses-data.js", "COURSES"):
-        urls.append((f"{SITE_BASE}/courses/{s}/", today, 0.7, "monthly"))
+        urls.append((f"{SITE_BASE}/courses/{s}/", courses_mod, 0.7, "monthly"))
 
     # Story detail pages
+    stories_mod = last_mod("src/assets/stories-data.js")
     for s in load_slugs("stories-data.js", "STORIES"):
-        urls.append((f"{SITE_BASE}/stories/{s}/", today, 0.6, "monthly"))
+        urls.append((f"{SITE_BASE}/stories/{s}/", stories_mod, 0.6, "monthly"))
 
-    # System Design chapter pages
+    # System Design chapter pages — per-chapter content files give real dates.
     for s in load_sd_chapter_slugs():
-        urls.append((f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/{s}/", today, 0.65, "monthly"))
+        mod = last_mod(
+            f"src/assets/content/system-design/vi/{s}.html",
+            f"src/assets/content/system-design/en/{s}.html",
+            "src/assets/system-design-data.js",
+        )
+        urls.append((f"{SITE_BASE}/{SYSTEM_DESIGN_URL_SLUG}/{s}/", mod, 0.65, "monthly"))
 
     # Resources deep-link sub-pages (/resources/hr-screen/, /resources/cs-fundamental/, …)
+    resources_mod = last_mod("src/assets/resources-data.js", "scripts/site_config.py")
     for slug in RESOURCES_ALIASES:
-        urls.append((f"{SITE_BASE}/resources/{slug}/", today, 0.75, "monthly"))
+        urls.append((f"{SITE_BASE}/resources/{slug}/", resources_mod, 0.75, "monthly"))
 
     # Build XML
     sm = [

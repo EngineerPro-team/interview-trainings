@@ -1,0 +1,180 @@
+<p>A <strong>distributed job scheduler</strong> (think cron + Airflow at scale) runs jobs on time and in dependency order across a fleet of workers, reliably — <strong>no missed runs, no accidental duplicates</strong>. The interesting parts are scheduler high availability, DAG dependencies, and exactly-once-ish task execution.</p>
+
+<p>The whole problem reduces to two guarantees that pull against each other: <strong>liveness</strong> (every due run eventually fires) and <strong>safety</strong> (no run fires twice with visible effect). Distributed systems make exactly-once impossible cheaply, so the real design is "at-least-once delivery + idempotent execution", and most of the interesting work is making that safe under leader failover and zombie workers.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Cron-style or DAG?</strong> Independent periodic jobs are simple; a DAG of dependent tasks needs completion-driven dependency resolution and partial-failure handling.</li>
+<li><strong>How bad is a duplicate run?</strong> Idempotent tasks (overwrite a partition) tolerate duplicates; side-effecting tasks (send email, charge) need an idempotency key or an external dedup.</li>
+<li><strong>How bad is a missed/late run?</strong> Sets the SLA, the catch-up/backfill policy, and how aggressively to re-dispatch on worker failure.</li>
+<li><strong>Task duration spread?</strong> Sub-second tasks vs multi-hour jobs change lease/heartbeat timeouts and whether you need preemption.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Define jobs: cron schedule and/or a <strong>DAG</strong> of dependent tasks.</li>
+<li>Run tasks honoring dependencies; <strong>retry</strong> on failure.</li>
+<li>View status; <strong>backfill</strong> past runs.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Reliability:</strong> no missed logical runs; duplicate <em>dispatch</em> may happen, but duplicate <em>side effects</em> must be prevented (idempotency / run_id).</li>
+<li><strong>Scale:</strong> millions of tasks/day across many workers.</li>
+<li><strong>HA scheduler</strong>; fault-tolerant workers.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Tasks:</strong> 1M tasks/day ≈ ~12/s average, but bursty on the hour (everyone schedules at 00:00) → design for ~100x burst.</li>
+<li><strong>Scheduler tick:</strong> scanning for due tasks every few seconds over millions of definitions must use an indexed "next_run_at" query, not a full scan.</li>
+<li><strong>Queue:</strong> dispatched tasks go through a durable dispatch queue — a task queue (SQS/RabbitMQ/Temporal) for per-task ack/delay/DLQ, or Kafka as a dispatch log with ack/retry/lease state kept in the state store — sized for the burst, not the average.</li>
+<li><strong>State:</strong> each task run is a small row; history grows, so retain/compact.</li>
+</ul>
+<p><strong>Worked example — the hour-boundary thundering herd.</strong> If 1M jobs/day average ~12/s but a large fraction are <code>@hourly</code>/<code>@daily</code> with <code>0 * * * *</code> schedules, they all become due at the top of the hour. A naive scheduler tries to enqueue, say, 200k tasks in the same second — a 16,000× spike over average. Two defenses: (1) the scheduler reads due work with an indexed <code>next_run_at &lt;= now</code> query and enqueues in batches, never scanning all definitions; (2) add per-job <strong>jitter</strong> so runs spread across the minute. Size the durable queue and worker pool for that spike, not the 12/s average.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /jobs</code> — <code>{name, schedule | dag, params}</code> → <code>{job_id}</code>.</li>
+<li><code>GET /runs?job_id=</code> → run history + states.</li>
+<li><code>POST /jobs/{id}/trigger</code> — manual run; <code>POST /jobs/{id}/backfill</code> — <code>{from, to}</code>.</li>
+<li><strong>Worker:</strong> pulls tasks, reports <code>heartbeat</code> and <code>result</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>A leader-elected <strong>scheduler</strong> computes which tasks are due (honoring deps), enqueues them to a durable <strong>task queue</strong>; a pool of <strong>workers</strong> pulls and executes; a <strong>state store</strong> records every run. Heartbeats detect dead workers so their tasks are retried.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DEF["Job / DAG definitions"] --> SCH["Scheduler (leader-elected)"]
+  SCH --> QUEUE["Durable dispatch queue (SQS/RabbitMQ/Temporal, or Kafka + state-store leases)"]
+  QUEUE --> WK["Worker pool (W1..Wn)"]
+  WK --> STATE["State store: run status"]
+  STATE --> SCH
+  WK -->|heartbeat| HB["Health monitor"]
+  HB --> STATE
+  STATE --> ALERT["Alerting on SLA miss"]
+</pre>
+<figcaption><strong>Figure 1.</strong> A leader scheduler enqueues due tasks; workers pull and execute; the state store closes the loop so dependencies and retries are driven by recorded results.</figcaption>
+</figure>
+
+<h2>Scheduler high availability</h2>
+<p>If two schedulers run at once, every task could be scheduled twice. Run several scheduler replicas but elect a single <strong>leader</strong> (via a coordination service or a lease); only the leader schedules. If it dies, a standby acquires the lease and continues. Scheduling decisions are written to the state store so a new leader resumes cleanly.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  S1["Scheduler A"] --> LEASE["Leader lease (coordination service)"]
+  S2["Scheduler B (standby)"] --> LEASE
+  S3["Scheduler C (standby)"] --> LEASE
+  LEASE -->|holds lease| ACTIVE["Only leader schedules"]
+  ACTIVE -->|on leader death| FAILOVER["Standby acquires lease, resumes"]
+</pre>
+<figcaption><strong>Figure 2.</strong> Multiple scheduler replicas, one leader by lease — only the leader schedules, and a standby takes over on failure.</figcaption>
+</figure>
+
+<h2>DAG dependency resolution</h2>
+<p>A task runs only after its upstream tasks succeed. The scheduler tracks each run's state and releases a downstream task when all its parents are <code>Succeeded</code> — a topological walk driven by completion events.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  E["Extract"] --> T["Transform"]
+  T --> LV["Load to warehouse"]
+  T --> LC["Load to cache"]
+  LV --> R["Report"]
+  LC --> R
+  R --> DONE["DAG complete"]
+</pre>
+<figcaption><strong>Figure 3.</strong> A task is dispatched only when all upstream tasks have succeeded; completion events advance the topological walk.</figcaption>
+</figure>
+
+<h2>Exactly-once-ish execution</h2>
+<p>Distributed systems give you <em>at-least-once</em> delivery cheaply; true exactly-once is hard. The practical answer: <strong>at-least-once dispatch + idempotent tasks</strong>. Each run has a unique <code>run_id</code>; the worker records "started/finished run_id" so a re-delivered task is detected and skipped, and task side effects are written idempotently (keyed by run_id).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant Q as Task queue
+  participant W as Worker
+  participant ST as State store
+  Q->>W: deliver task (run_id=R)
+  W->>ST: claim run_id=R (conditional)
+  alt claim succeeds
+    W->>W: execute (idempotent side effects)
+    W->>ST: mark R succeeded
+  else already claimed/done
+    W->>W: skip duplicate
+  end
+</pre>
+<figcaption><strong>Figure 4.</strong> At-least-once delivery made safe: a conditional claim on run_id plus idempotent side effects turns duplicates into no-ops.</figcaption>
+</figure>
+
+<h2>Retries, backoff, and backfill</h2>
+<p>Failed tasks retry with exponential <strong>backoff</strong> up to a limit, then alert. <strong>Backfill</strong> re-runs a job over a past time range (e.g. after a bug fix) by generating the missing logical runs. Time handling must be explicit: schedule in UTC, store the logical run timestamp, and decide a catch-up policy for missed windows. A worker that claims a task takes a <strong>lease</strong>; if it stops heartbeating, the lease expires and the task is re-dispatched (so a zombie worker cannot strand a run).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Pending
+  Pending --> Running: worker claims (lease + run_id)
+  Running --> Succeeded: result recorded
+  Running --> Failed: error
+  Running --> Pending: lease expired (zombie) re-dispatch
+  Failed --> Pending: retry with backoff
+  Failed --> DeadLetter: max attempts reached
+  Succeeded --> [*]
+  DeadLetter --> [*]
+</pre>
+<figcaption><strong>Figure 5.</strong> Task-attempt lifecycle: a lease + run_id guard against zombies and duplicates; failures retry with backoff up to a limit, then dead-letter and alert.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>The storage decision separates the <em>authoritative state</em> from the dispatch transport — getting this split right is what makes "no missed run, no double-effect" achievable:</p>
+<ul>
+<li><strong>Job definitions:</strong> schedules/DAGs/owners in a relational DB (<strong>PostgreSQL</strong>) — small, queryable, the catalog of what should run.</li>
+<li><strong>Run / attempt state (source of truth):</strong> a transactional table keyed by <code>run_id</code> + attempt holding status (pending/running/succeeded/failed) — the authority a worker claims via a <strong>conditional write</strong>, so a run executes once even across retries.</li>
+<li><strong>Lease / heartbeat records:</strong> worker leases with TTL + fencing token so a dead worker's run is safely retried without two workers running it at once.</li>
+<li><strong>Dispatch queue (transport, not truth):</strong> a <strong>task queue (SQS/RabbitMQ/Temporal)</strong> for per-task ack/delay/DLQ, or <strong>Kafka</strong> as a dispatch log with ack/retry/lease kept in the state store — the queue moves work, it does not own the run's status.</li>
+<li><strong>History / retention:</strong> completed run history with compaction/retention; a <strong>DLQ</strong> for runs that exhaust retries.</li>
+<li><strong>Leader election:</strong> a <strong>coordination service</strong> (etcd/ZooKeeper) so a single scheduler decides what is due.</li>
+<li><strong>Implementations:</strong> Airflow/Dagster/Prefect (DAG + UI), Temporal/Cadence (durable execution), Quartz/cron/K8s <code>CronJob</code> (simple periodic).</li>
+</ul>
+
+<h2>Guarantees &amp; consistency</h2>
+<ul>
+<li><strong>Delivery is at-least-once:</strong> failover and retries can dispatch the same logical run twice — so the contract is "no missed run + idempotent side effects", never true exactly-once.</li>
+<li><strong>Scheduling is single-writer:</strong> a leader lease ensures only one scheduler decides what is due, so a run is enqueued once under normal operation; duplicates come from crash windows, caught by the run_id claim.</li>
+<li><strong>Ordering is per-DAG, not global:</strong> a task starts only after its parents succeed; there is no global ordering across unrelated jobs.</li>
+<li><strong>Time is explicit:</strong> the <em>logical</em> run timestamp (not wall-clock dispatch time) is the identity used for idempotency, backfill, and catch-up — schedule in UTC.</li>
+</ul>
+
+<h2>Tradeoffs &amp; when not to use one</h2>
+<ul>
+<li><strong>Great for:</strong> periodic batch jobs, ETL/ML pipelines with dependencies, cron at scale, backfills.</li>
+<li><strong>Wrong for:</strong> low-latency request/response (use a service), per-event stream processing (use a stream processor), or sub-second fan-out (use a queue/worker directly).</li>
+<li><strong>Queue choice:</strong> Kafka gives durable ordered streams but not per-task ack/delay/dead-letter — if you need those, layer them in the state store or use a task queue (SQS/RabbitMQ/Temporal).</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Two leaders = double runs</strong> — leader election is mandatory.</li>
+<li><strong>Exactly-once is a myth</strong> — design idempotent tasks keyed by run_id.</li>
+<li><strong>Hour-boundary burst:</strong> everyone schedules at 00:00 — jitter and size the queue for the spike.</li>
+<li><strong>Zombie workers:</strong> a worker that hangs after claiming — use heartbeats + lease timeouts to re-dispatch.</li>
+<li><strong>Backfill storms:</strong> a wide backfill can overwhelm workers — rate-limit it.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>A single <strong>leader scheduler</strong> avoids double scheduling.</li>
+<li>Dependencies are a <strong>topological walk</strong> driven by recorded task results.</li>
+<li><strong>At-least-once + idempotent (run_id)</strong> is the practical "exactly-once".</li>
+<li><strong>Heartbeats, backoff, and backfill</strong> make it reliable and operable.</li>
+<li><strong>Liveness vs safety:</strong> the design is "no missed run + idempotent side effects" — exactly-once is a myth, so make tasks safe to re-run.</li>
+<li><strong>Identity is the logical run time</strong> (UTC), not the dispatch time — it drives idempotency, backfill, and catch-up.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Apache Airflow scheduler docs; Temporal durable-execution docs; Quartz Scheduler / cron; Kafka and SQS docs for queue semantics. Diagrams and write-up are original EngineerPro content.</em></p>

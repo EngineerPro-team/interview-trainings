@@ -1,0 +1,183 @@
+<p>Collaborative editing kiểu <strong>Google Docs</strong> cho nhiều người cùng sửa một document và luôn hội tụ về cùng kết quả. Mấu chốt là <strong>conflict resolution</strong> cho edit đồng thời — Operational Transformation (OT) hoặc CRDT — cộng với per-document ordering, persistence, và presence.</p>
+
+<p>Toàn bộ bài toán quy về một guarantee: <strong>convergence</strong> — cho cùng tập edit theo bất kỳ thứ tự delivery nào, mọi client phải kết thúc với document state giống nhau từng byte. Edit đồng thời vào cùng một vùng là ca khó: nếu Alice insert tại position 5 trong khi Bob delete position 3, apply ngây thơ sẽ diverge. OT và CRDT là hai câu trả lời cho "làm sao để op đồng thời commute." Tin tốt là <em>scale</em> nhẹ nhàng (một doc có vài editor), nên đây là bài toán <strong>correctness</strong>, không phải throughput — và thiết kế xoay quanh một authority per-document order và transform op.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Bao nhiêu editor đồng thời mỗi doc?</strong> Vài người (doc điển hình) cho phép dồn op qua một server per-doc; hàng trăm (một whiteboard chia sẻ live) cần cẩn thận hơn.</li>
+<li><strong>OT hay CRDT?</strong> OT (server trung tâm transform) đơn giản hơn phía server và đã chinh chiến cho text; CRDT cho phép serverless/P2P và merge offline đổi lấy metadata — làm rõ có cần offline/P2P không.</li>
+<li><strong>Edit offline?</strong> Nếu client sửa offline rồi reconnect, bạn cần rebase một queue op local lên server — một requirement lớn, không phải đồ trang trí.</li>
+<li><strong>Rich content?</strong> Text thuần vs styled text, table, ảnh, comment — model giàu hơn làm phức tạp op set và transform.</li>
+<li><strong>History/audit?</strong> Full revision history và named version đổi model persistence (giữ op log + snapshot định kỳ).</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Nhiều user sửa cùng document đồng thời; mọi người hội tụ.</li>
+<li>Thấy <strong>cursor / presence</strong> người khác; comment.</li>
+<li><strong>Version history</strong>; offline edit sync khi reconnect.</li>
+<li>Sharing và permission.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Convergence latency thấp</strong> (edit hiện ra dưới một giây).</li>
+<li><strong>Consistency:</strong> mọi client đạt cùng document state.</li>
+<li>Scale concurrency mỗi document và tổng số document.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Edit rate:</strong> gõ tích cực là vài keystroke/s mỗi user; doc 10 editor là vài chục op/s — nhỏ mỗi doc, nhưng có hàng triệu doc.</li>
+<li><strong>Op size:</strong> một op (insert char tại position) nhỏ xíu (vài chục byte); op log tăng nhanh nhưng compact vào snapshot.</li>
+<li><strong>Fan-out:</strong> mỗi op broadcast tới N-1 editor khác của doc đó — giới hạn bởi editor-mỗi-doc, không phải global user.</li>
+<li><strong>Storage:</strong> snapshot + op log gần đây mỗi doc; op cũ compact đi sau một snapshot.</li>
+</ul>
+<p><strong>Worked example.</strong> Các con số giải thích vì sao kiến trúc là "một owner mỗi doc, shard theo doc." Mười người gõ là ~5 keystroke/s mỗi người ≈ 50 op/s trên document đó — chẳng là gì với một server thread. Nên bạn thừa sức route <em>mọi</em> op của một doc tới <strong>một server authoritative</strong> (hoặc một partition), nơi gán một revision number đơn điệu và transform mỗi op tới đến lên những op nó chưa biết. Việc serialize đó là cái bảo đảm convergence, và nó rẻ vì traffic per-doc nhỏ xíu. Scale đến từ <strong>shard document qua các server</strong> (doc_id → owner), không phải làm một doc nhanh hơn — một triệu doc active × 50 op/s là 50M op/s tổng, nhưng mỗi server chỉ xử lý các doc nó sở hữu. Storage: ở ~30 byte/op và 50 op/s, một giờ edit nặng là ~5 MB op; bạn snapshot định kỳ (vd mỗi N op) và compact, nên open = load snapshot mới nhất + replay op tail ngắn, giữ open latency bounded bất kể tuổi document.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><strong>WebSocket session:</strong> <code>open(doc_id)</code> → snapshot + revision hiện tại.</li>
+<li><code>submitOps(doc_id, base_revision, ops[])</code> → <code>{applied_revision}</code>.</li>
+<li><strong>Server push:</strong> <code>remote_ops</code>, <code>cursor</code>, <code>presence</code>.</li>
+<li><code>GET /docs/{id}/history</code> → revision / snapshot.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Mỗi document đang mở được sở hữu bởi một <strong>collaboration server</strong> duy nhất (shard theo <code>doc_id</code>) — server này serialize mọi edit của doc đó. Client nối qua WebSocket; server transform/merge op, gán revision number, persist vào op log, và broadcast.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U1["Editor A"] --> WS["WebSocket gateway"]
+  U2["Editor B"] --> WS
+  WS --> PERM["Permission service (ACL: view / comment / edit)"]
+  PERM --> COLLAB["Collaboration server (owner của doc, shard theo doc_id)"]
+  COLLAB --> ENGINE["OT / CRDT engine"]
+  COLLAB --> OPLOG["Op log store"]
+  COLLAB --> SNAP["Snapshot store"]
+  COLLAB --> PRES["Presence service"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Một permission service enforce ACL của doc lúc open/submit; một collaboration server sở hữu mỗi document và serialize edit của nó; op persist vào log và định kỳ compact thành snapshot.</figcaption>
+</figure>
+
+<p><strong>Permissions:</strong> mọi request <code>open</code>, <code>submitOps</code>, comment, history được authorize với ACL của document (view / comment / edit) trước khi collaboration server áp dụng — một viewer không thể submit edit dù forge op.</p>
+
+<h2>Bài toán concurrency</h2>
+<p>Nếu A insert "X" tại position 2 trong khi B delete position 1 cùng lúc, áp dụng ngây thơ cả hai cho kết quả khác nhau trên mỗi client. Hai họ giải pháp đảm bảo convergence:</p>
+<ul>
+<li><strong>Operational Transformation (OT):</strong> transform op đến so với op đồng thời để nó áp đúng tại position mới. Cần một server trung tâm order op; mô hình text đơn giản về ý tưởng, khó implement đúng.</li>
+<li><strong>CRDT:</strong> cho mỗi ký tự một id duy nhất, totally-ordered để insert/delete đồng thời commute — thứ tự áp dụng không còn quan trọng. Nhiều metadata mỗi ký tự hơn, nhưng hội tụ không cần transformer trung tâm (tốt cho offline/peer-to-peer).</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  CONC["Edit đồng thời từ A và B"] --> APPROACH{"OT hay CRDT?"}
+  APPROACH -->|OT| OT["Transform op vs op đồng thời; server order"]
+  APPROACH -->|CRDT| CRDT["Id duy nhất ordered; op commute"]
+  OT --> CONV["Mọi client hội tụ"]
+  CRDT --> CONV
+</pre>
+<figcaption><strong>Hình 2.</strong> OT transform op với nhau (server-ordered); CRDT làm op commute qua id duy nhất. Cả hai đảm bảo convergence.</figcaption>
+</figure>
+
+<h2>Per-document ordering</h2>
+<p>Thiết kế đúng đơn giản nhất: shard document sao cho một server sở hữu mỗi doc và áp edit theo một thứ tự duy nhất, gán một <strong>revision</strong> tăng đơn điệu. Client submit op so với revision cuối nó thấy; server transform với bất kỳ op nào nó đã accept ở giữa, áp dụng, và ack revision mới.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Editor A
+  participant S as Collaboration server
+  participant B as Editor B
+  A->>S: submitOps(base_rev=10, insert X)
+  S->>S: transform vs op sau rev 10, apply, rev=11
+  S-->>A: ack rev=11
+  S-->>B: remote_ops (rev=11)
+  B->>S: submitOps(base_rev=11, delete Y)
+  S-->>B: ack rev=12
+  S-->>A: remote_ops (rev=12)
+</pre>
+<figcaption><strong>Hình 3.</strong> Một owner duy nhất mỗi document gán revision và transform mỗi submission với op nó đã accept ở giữa.</figcaption>
+</figure>
+
+<h2>Persistence: op log cộng snapshot</h2>
+<p>Document state là snapshot cộng các op áp sau nó. Persist <strong>mọi op</strong> cho full history và crash recovery; định kỳ server ghi một <strong>snapshot</strong> và compact op cũ. Khi open, client load snapshot mới nhất rồi replay phần đuôi của op log.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  OPS["Op 1..N append"] --> LOG["Op log"]
+  LOG -->|định kỳ| SNAP["Snapshot tại rev N"]
+  SNAP --> OPEN["Open doc: load snapshot"]
+  LOG -->|đuôi sau N| OPEN
+  OPEN --> STATE["Document tái dựng"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Snapshot cộng đuôi op-log tái dựng document; snapshot định kỳ giữ replay ngắn.</figcaption>
+</figure>
+
+<h2>Presence và offline</h2>
+<p>Cursor và selection là presence event ephemeral broadcast tới co-editor (không persist). Offline editing buffer op tại local; khi reconnect client submit chúng so với revision cuối nó biết và server transform vào — cùng cơ chế với edit online, đó chính là lý do OT/CRDT quan trọng.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client (vừa offline)
+  participant S as Collaboration server
+  Note over C: sửa offline, buffer op tại base_rev 30
+  C->>S: reconnect + submitOps(base_rev 30, buffered ops)
+  S->>S: transform buffered op vs revision 31..38 accept lúc offline
+  S-->>C: ack tại rev 39 + remote_ops 31..38
+  Note over C: local state rebase và hội tụ
+</pre>
+<figcaption><strong>Hình 5.</strong> Offline reconnect: buffered op được transform so với các revision accept khi client vắng, rồi hai bên hội tụ — cùng transform path với edit online.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway + WebSocket gateway</strong>: REST cho open/share/history, một WebSocket persistent cho live edit stream.</li>
+<li><strong>Op log:</strong> source of truth là một <strong>append-only op table / event store theo từng document</strong> với retention vĩnh viễn và snapshot compaction (replay theo doc + revision, giữ history). Kafka có thể <em>mirror</em> op như một live change stream cho fanout, nhưng không phải source of truth dài hạn (retention/replay bị giới hạn).</li>
+<li><strong>Snapshot:</strong> document state compacted định kỳ trong <strong>blob/object storage (S3-like)</strong>, nên open = load snapshot + replay tail.</li>
+<li><strong>Document metadata + permission/ACL:</strong> một DB quan hệ (<strong>PostgreSQL</strong>) — có cấu trúc, transactional, authority cho sharing.</li>
+<li><strong>Presence/cursor:</strong> ephemeral → <strong>Redis</strong> (pub/sub + TTL), không persist.</li>
+<li><strong>Comment / version history:</strong> một store key theo doc + range/revision (Postgres hoặc wide-column cho doc rất active).</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> document live hot in-memory trên collaboration server sở hữu nó; durability là op log append-only + snapshot định kỳ (log hoàn hảo cho ordered edit stream, blob cho snapshot lớn); permission nhỏ + quan hệ → SQL; cursor vứt đi → Redis. Shard single-owner-per-doc làm routing "state của doc này ở đâu" trivial.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Strong eventual consistency (convergence):</strong> guarantee cốt lõi — mọi client đã nhận cùng tập op thì giống nhau từng byte, bất kể thứ tự. OT/CRDT làm op đồng thời commute nên có đúng một converged state.</li>
+<li><strong>Total order theo từng document:</strong> server sở hữu gán một revision đơn điệu mỗi doc; client transform op local lên thứ tự của server trước khi apply — có một sequence authoritative mỗi document.</li>
+<li><strong>Apply local optimistic + rebase:</strong> một client apply edit của mình ngay (UX mượt) và sau đó rebase lên server revision; khi reconnect offline, các op local đã queue được transform lên mọi thứ xảy ra lúc vắng.</li>
+<li><strong>History durable, replay được:</strong> một op được accept được append vào durable op log trước khi broadcast là committed, nên document luôn reconstruct được (snapshot + op tail) và version cũ restore được.</li>
+<li><strong>Permission enforce mạnh:</strong> ACL là authority — một client không có quyền edit không commit op được, check server-side, không phải ở client.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>OT + server trung tâm khi:</strong> collaborative text real-time với vài-tới-vài chục editor và một server bạn kiểm soát — path đã được chứng minh, đơn giản hơn (Docs, đa số editor).</li>
+<li><strong>CRDT khi:</strong> bạn cần offline-first, peer-to-peer, hoặc merge serverless (app local-first) và kham được metadata mỗi element.</li>
+<li><strong>Thừa khi:</strong> document được sửa bởi một người tại một thời điểm — last-writer-wins với locking/check-out đơn giản hơn nhiều OT/CRDT.</li>
+<li><strong>Thiết kế khác khi:</strong> "collaboration" thực ra là shared state tần suất cao (một game world, một whiteboard cursor-heavy hàng trăm user) — có thể cần model replication/interest-management khác với document OT.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>OT correctness</strong> nổi tiếng tinh vi — nhiều edge case; CRDT đánh đổi điều đó lấy metadata mỗi ký tự.</li>
+<li><strong>Single-owner hotspot:</strong> một doc hàng nghìn editor gây áp lực lên một server — cap editor hoặc partition doc lớn.</li>
+<li><strong>Snapshot cadence:</strong> quá thưa thì replay dài; quá dày thì phí storage.</li>
+<li><strong>Offline divergence:</strong> offline lâu sinh transform set lớn — giới hạn và reconcile.</li>
+<li><strong>Undo</strong> phải per-user và transform-aware, không phải revert global ngây thơ.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Convergence cần <strong>OT</strong> (server-ordered transform) hoặc <strong>CRDT</strong> (op commute).</li>
+<li>Một <strong>owner duy nhất mỗi document</strong> cho ordering sạch và revision number.</li>
+<li><strong>Op log + snapshot định kỳ</strong> cho history, recovery, và open nhanh.</li>
+<li>Offline edit tái dùng cùng transform path khi reconnect.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Operational Transformation (Ellis &amp; Gibbs, 1989); CRDT (Shapiro et al., 2011); Yjs và Automerge docs; tài liệu công khai về collaboration kiểu Google Wave / Docs. Diagram và nội dung là content gốc của EngineerPro.</em></p>

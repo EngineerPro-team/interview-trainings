@@ -1,0 +1,292 @@
+<p><strong>Redis</strong> là một in-memory data-structure store, dùng làm cache, database và message broker. Trong phỏng vấn, "design Redis" là dạng <em>building-block</em>: thay vì ghép các service có sẵn, bạn thiết kế phần lõi bên trong của một hệ thống. Chương này dựng một store kiểu Redis từ first principles — data model, engine thực thi single-threaded, persistence, replication, failover, horizontal scaling, và các consistency guarantee rơi ra từ những lựa chọn đó.</p>
+
+<p>Lý do câu hỏi này phổ biến: nó buộc bạn lý luận trực tiếp về <strong>memory layout, ranh giới CPU/IO, và trade space giữa durability–availability–latency</strong>, không núp sau một managed service. Một câu trả lời mạnh không phải "Redis có các tính năng này" — mà là "đây là <em>vì sao</em> mỗi quyết định thiết kế được đưa ra và nó tốn gì."</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<p>Trước khi thiết kế, chốt use case — câu trả lời đổi nhiều tuỳ theo nó:</p>
+<ul>
+<li><strong>Cache hay system of record?</strong> Cache thuần có thể mất data khi crash (rẻ, nhanh); một primary datastore cần durability thật và đổi câu trả lời persistence/replication.</li>
+<li><strong>Read-heavy hay write-heavy?</strong> Read-heavy ưu tiên replica và client-side caching; write-heavy gây áp lực lên single thread và persistence I/O.</li>
+<li><strong>Một dataset lớn hơn RAM một máy?</strong> Nếu có, cần Cluster (sharding); nếu không, một primary + replica đơn giản hơn.</li>
+<li><strong>Latency target và mức chịu stale?</strong> Sub-ms p99 và "stale read OK" → async replica; "read-your-writes" → primary hoặc <code>WAIT</code>.</li>
+</ul>
+
+<h2>Requirements</h2>
+
+<h3>Functional</h3>
+<ul>
+<li><code>GET</code> / <code>SET</code> / <code>DEL</code> kèm <strong>TTL</strong> tuỳ chọn (expiry theo từng key).</li>
+<li>Data structures phong phú: <code>string</code>, <code>hash</code>, <code>list</code>, <code>set</code>, <code>sorted set (zset)</code>, và <code>streams</code>.</li>
+<li>Thao tác <strong>atomic</strong> (vd <code>INCR</code>, <code>LPUSH</code>) và transaction nhiều lệnh / Lua script.</li>
+<li>Messaging kiểu <strong>Pub/Sub</strong>.</li>
+<li><strong>Persistence</strong> tuỳ chọn để dữ liệu sống sót qua restart.</li>
+</ul>
+
+<h3>Non-functional</h3>
+<ul>
+<li>Latency <strong>dưới một millisecond</strong> cho point operation; throughput rất cao (100k+ ops/s mỗi node).</li>
+<li><strong>High availability</strong> — chịu được một node chết với automatic failover.</li>
+<li><strong>Horizontal scalability</strong> vượt giới hạn RAM của một máy.</li>
+<li><strong>Durability điều chỉnh được</strong> — từ "cache thuần, mất khi crash" tới "fsync mỗi write".</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<p>Ước lượng cho một cache cluster phục vụ web backend tải cao:</p>
+<ul>
+<li><strong>Working set:</strong> 100M key, value trung bình ~1 KB → ~100 GB dữ liệu; cộng ~20% overhead ~120 GB.</li>
+<li><strong>Memory mỗi node:</strong> với node 64 GB, shard ra ~3-4 primary (~30-40 GB mỗi cái), mỗi primary 1-2 replica → tổng ~8-10 node.</li>
+<li><strong>Throughput:</strong> một node chịu ~100k-200k ops/s; peak 1M ops/s cần ~6-10 shard.</li>
+<li><strong>Network:</strong> 1M ops/s × ~1 KB ≈ 1 GB/s — cần 10 GbE và dùng pipelining để khấu hao round-trip.</li>
+<li><strong>Persistence I/O:</strong> AOF everysec ghi ~ write-QPS × value size xuống disk; tính dung lượng disk và IOPS cho spike khi rewrite.</li>
+</ul>
+<p><strong>Ví dụ có số.</strong> Giả sử mỗi value ~1 KB và giữ 100M key: đó là ~100 GB payload. Overhead mỗi key của Redis (dictionary entry, object header, expiry entry) cỡ vài chục byte/key, nên 100M key thêm vài GB bookkeeping nữa — đừng bao giờ size memory đúng bằng payload, luôn chừa 20-30% headroom cho overhead, fragmentation, và spike copy-on-write khi snapshot. Ở 1M ops/s với value ~1 KB, traffic dây ~1 GB/s mỗi chiều, nên NIC (10 GbE ≈ 1.25 GB/s) thành giới hạn trước CPU — đúng lý do pipelining (batch nhiều lệnh mỗi round-trip) và client-side caching quan trọng hơn tốc độ lệnh thô.</p>
+
+<h2>Core APIs</h2>
+<p>Redis expose command qua RESP (TCP), không phải REST. Bề mặt mà client dựa vào:</p>
+<ul>
+<li><strong>String / counter:</strong> <code>SET key val [EX ttl]</code>, <code>GET key</code>, <code>DEL key</code>, <code>INCR key</code>, <code>EXPIRE key ttl</code></li>
+<li><strong>Hash:</strong> <code>HSET key field val</code>, <code>HGET key field</code> — lưu object.</li>
+<li><strong>List:</strong> <code>LPUSH key val</code>, <code>RPOP key</code> — queue.</li>
+<li><strong>Sorted set:</strong> <code>ZADD key score member</code>, <code>ZRANGE key a b</code>, <code>ZREVRANK key member</code> — leaderboard.</li>
+<li><strong>Pub/Sub:</strong> <code>SUBSCRIBE ch</code>, <code>PUBLISH ch msg</code>.</li>
+<li><strong>Cluster / durability:</strong> <code>CLUSTER SLOTS</code>, <code>WAIT numreplicas timeout</code> (chờ tới khi replicate xong).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<p>Một node Redis về ý tưởng khá đơn giản: client nói chuyện qua một wire protocol gọn (RESP) trên TCP tới server mà trái tim là một <strong>command processor single-threaded</strong> thao tác trên keyspace nằm trong bộ nhớ. Bao quanh lõi đó là persistence engine, replication stream, và (trong cluster) lớp routing theo slot.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  subgraph SRV["Redis node"]
+    EL["Event loop (single thread)"] --> KS["In-memory keyspace + expiry"]
+    KS --> PERS["Persistence engine: RDB + AOF"]
+    KS --> REPL["Replication stream"]
+  end
+  C1["Client A"] --> EL
+  C2["Client B"] --> EL
+  C3["Client C"] --> EL
+  PERS --> DISK["Disk: dump.rdb / appendonly.aof"]
+  REPL --> RPL["Replica nodes"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Một node — nhiều connection client được multiplex lên một event loop single-threaded, thao tác trên in-memory keyspace; persistence và replication gắn vào lõi.</figcaption>
+</figure>
+
+<h2>Event loop single-threaded</h2>
+
+<p>Lựa chọn thiết kế đặc trưng: command execution là <strong>single-threaded</strong>. Redis multiplex hàng nghìn connection bằng event loop (<code>epoll</code>/<code>kqueue</code>) và chạy một lệnh tại một thời điểm. Nghe phản trực giác nhưng đây là nguồn gốc của sự đơn giản và tốc độ của Redis:</p>
+
+<ul>
+<li><strong>Không lock, không race condition</strong> trên keyspace — mọi lệnh atomic theo thiết kế.</li>
+<li>Truy cập RAM nhanh tới mức bottleneck là <strong>network và syscall</strong>, không phải CPU. I/O multiplexing giữ cho single core luôn bận.</li>
+<li>Tránh chi phí context-switch và lock-contention vốn sẽ chiếm ưu thế ở mức latency này.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant EL as Event loop
+  participant KS as Keyspace
+  C->>EL: SET user:1 "Lam" (RESP frame)
+  EL->>EL: read + parse command
+  EL->>KS: apply mutation (atomic)
+  KS-->>EL: OK
+  EL-->>C: +OK
+  Note over EL: lệnh kế tiếp chỉ chạy sau khi lệnh này xong
+</pre>
+<figcaption><strong>Hình 2.</strong> Vòng đời một request. Các lệnh được serialize qua một thread, nên mỗi lệnh thấy keyspace nhất quán và hoàn tất atomic.</figcaption>
+</figure>
+
+<p><strong>Thread <em>được</em> dùng ở đâu:</strong> Redis hiện đại đẩy các side-task chậm sang background thread — đóng key lớn (<code>UNLINK</code> / lazy-free), <code>fsync</code> AOF, và optional I/O thread cho việc đọc/ghi socket. Bản thân command logic vẫn single-threaded.</p>
+
+<p><strong>Pipelining vs thuế round-trip.</strong> Vì bottleneck là round-trip mạng, không phải CPU, thắng lợi lớn nhất phía client là <strong>pipelining</strong>: gửi N lệnh mà không chờ từng reply, nên N request tốn một round-trip thay vì N. Một vòng 10k <code>SET</code> riêng lẻ trên link RTT 1 ms tốn ~10 s chờ thuần; pipelined thì còn vài ms. Đây cũng là lý do <code>MGET</code>/<code>MSET</code> và Lua script (chạy server-side, atomic) được ưu tiên hơn gọi từng key.</p>
+
+<p><strong>Được gì và mất gì.</strong> Single thread cho atomicity miễn phí — một Lua script hay transaction <code>MULTI/EXEC</code> chạy tới hết mà không lệnh nào xen vào — nhưng cũng nghĩa <strong>một lệnh chậm làm nghẽn tất cả</strong>. Một <code>KEYS *</code> trên 100M key, một <code>ZRANGE</code> 1M phần tử, hay một Lua script nặng chặn cả server suốt thời gian chạy. Quy tắc thiết kế kéo theo: giữ mọi lệnh O(nhỏ), và đẩy scan lớn sang <code>SCAN</code>/iteration theo cursor.</p>
+
+<h2>Data structures &amp; memory</h2>
+
+<p>Redis là "data structures as a service". Mỗi value type được hậu thuẫn bởi một encoding nội bộ chuyên biệt, tự đổi khi dữ liệu lớn lên, đánh đổi memory lấy speed:</p>
+
+<table>
+<thead><tr><th>Type</th><th>Dùng cho</th><th>Encoding tiêu biểu</th></tr></thead>
+<tbody>
+<tr><td><code>string</code></td><td>cache value, counter</td><td>int, embstr, raw</td></tr>
+<tr><td><code>hash</code></td><td>object / field</td><td>listpack rồi hashtable</td></tr>
+<tr><td><code>list</code></td><td>queue, timeline</td><td>quicklist (linked listpacks)</td></tr>
+<tr><td><code>set</code></td><td>membership duy nhất</td><td>intset / listpack / hashtable</td></tr>
+<tr><td><code>zset</code></td><td>leaderboard, rate limit</td><td>listpack rồi skiplist + hashtable</td></tr>
+</tbody>
+</table>
+
+<p><strong>Sorted set</strong> đáng xem kỹ vì nó là nền cho leaderboard và truy vấn theo range thời gian. Nó giữ hai cấu trúc đồng bộ: một <strong>hashtable</strong> (member tới score, lookup O(1)) và một <strong>skip list</strong> (sắp theo score, range query O(log n)).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph ZSET["Sorted set: game:leaderboard"]
+    direction LR
+    HT["Hashtable: member to score (lookup O(1))"]
+    SL["Skip list: sắp theo score (range + rank O(log n))"]
+  end
+  ZADD["ZADD / ZINCRBY"] --> HT
+  ZADD --> SL
+  ZRANGE["ZRANGE / ZREVRANK"] --> SL
+</pre>
+<figcaption><strong>Hình 3.</strong> Một zset duy trì hashtable và skip list cùng lúc — vừa lookup nhanh, vừa query range/rank theo thứ tự.</figcaption>
+</figure>
+
+<p><strong>Vì sao encoding quan trọng.</strong> Một hash/zset nhỏ được lưu dưới dạng <strong>listpack</strong> gọn (mảng phẳng, thân thiện cache) và chỉ "nâng cấp" lên hashtable/skiplist khi vượt một ngưỡng kích thước. Đây là một trade memory/speed có chủ đích: collection nhỏ ở RAM nhỏ; collection lớn trả giá cho index. Cũng là một footgun — một key lớn dần vượt ngưỡng đột nhiên tốn nhiều memory hơn, và một collection khổng lồ thành "big key" chặn thread khi truy cập hoặc xoá.</p>
+
+<p><strong>Hai use thực tế:</strong></p>
+<ul>
+<li><strong>Sliding-window rate limiter (zset):</strong> lưu timestamp request làm score trong <code>rl:user:42</code>; mỗi request <code>ZADD</code> now, <code>ZREMRANGEBYSCORE</code> bỏ entry cũ hơn window, rồi <code>ZCARD</code> đếm — đều O(log n), atomic trong một Lua script.</li>
+<li><strong>Object cache (hash):</strong> lưu một user thành các field trong <code>user:42</code> để đọc/cập nhật một field mà không serialize cả object, và set TTL trên key cho expiry.</li>
+</ul>
+
+<h2>Persistence: RDB vs AOF</h2>
+
+<p>Dữ liệu thuần in-memory mất khi restart. Redis cho hai chế độ persistence bổ trợ nhau:</p>
+
+<ul>
+<li><strong>RDB (snapshot):</strong> định kỳ <code>fork()</code> process và dump một binary image của dataset tại một thời điểm. Gọn, load nhanh, hợp cho backup — nhưng có thể mất các write kể từ snapshot gần nhất.</li>
+<li><strong>AOF (append-only file):</strong> log mọi write command ra file; replay lại khi khởi động. Durable hơn (chính sách <code>fsync</code> điều chỉnh được: always / everysec / no), nhưng file phình to và phải định kỳ <strong>rewrite</strong> (nén lại).</li>
+</ul>
+
+<p>Production thường chạy <strong>cả hai</strong>: AOF cho durability, RDB cho restart nhanh và backup.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  W["Write command"] --> KS["In-memory keyspace"]
+  KS -->|định kỳ fork + dump| RDB["RDB snapshot dump.rdb (gọn, có thể mất data)"]
+  KS -->|append mỗi write| AOF["AOF log appendonly.aof (durable)"]
+  AOF -->|background rewrite| AOF2["AOF đã nén"]
+  RDB --> RESTART["Khi restart: load snapshot rồi replay"]
+  AOF2 --> RESTART
+</pre>
+<figcaption><strong>Hình 4.</strong> RDB đánh đổi durability lấy sự gọn nhẹ và load nhanh; AOF đánh đổi kích thước lấy durability. Nhiều deployment kết hợp cả hai.</figcaption>
+</figure>
+
+<p><strong>Mẹo fork:</strong> snapshot và AOF rewrite dùng <code>fork()</code> + copy-on-write. Child ghi một view nhất quán ra disk trong khi parent vẫn phục vụ traffic; chỉ các page bị sửa trong lúc dump mới bị nhân đôi. Cái giá là spike memory (workload write-heavy lúc dump có thể gần gấp đôi RSS) và một fork pause ngắn trên dataset rất lớn — một gotcha production thật trên instance lớn.</p>
+
+<p>Chính sách <code>fsync</code> của AOF là nút <strong>durability vs throughput</strong> cốt lõi:</p>
+<table>
+<thead><tr><th>fsync policy</th><th>Durability khi crash</th><th>Chi phí throughput</th></tr></thead>
+<tbody>
+<tr><td><code>always</code></td><td>mất ~0 (mỗi write flush)</td><td>cao — một fsync mỗi write</td></tr>
+<tr><td><code>everysec</code></td><td>mất tối đa ~1 s write</td><td>thấp — điểm cân bằng thường dùng</td></tr>
+<tr><td><code>no</code></td><td>mất phần OS chưa flush</td><td>thấp nhất — OS quyết định</td></tr>
+</tbody>
+</table>
+<p>Ngay cả với <code>always</code>, "durable" nghĩa là đã ghi xuống disk local của một node — sống sót khi mất cả node là việc của <em>replication</em>, không phải persistence. Hai cái bổ trợ: persistence chống restart, replication chống node chết.</p>
+
+<h2>Replication &amp; failover</h2>
+
+<p>Để scale read và tăng availability, một <strong>primary</strong> replicate bất đồng bộ tới một hoặc nhiều <strong>replica</strong>. Replica đầu tiên làm full sync (primary gửi một RDB snapshot), sau đó stream các write tiếp theo từ replication backlog buffer. Replication là <em>asynchronous</em>, nên replica có thể lag nhẹ — một đánh đổi latency/consistency có chủ đích.</p>
+
+<p>Để failover tự động, các process <strong>Redis Sentinel</strong> monitor primary; khi đồng thuận (quorum) rằng nó chết, chúng bầu một primary mới từ các replica và cấu hình lại client.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  P["Primary"] -->|async stream| R1["Replica 1"]
+  P -->|async stream| R2["Replica 2"]
+  subgraph SENT["Sentinel quorum"]
+    S1["Sentinel A"]
+    S2["Sentinel B"]
+    S3["Sentinel C"]
+  end
+  S1 -.->|monitor| P
+  S2 -.->|monitor| P
+  S3 -.->|monitor| P
+  S1 -.->|promote khi lỗi| R1
+</pre>
+<figcaption><strong>Hình 5.</strong> Async primary-replica replication cộng với Sentinel quorum phát hiện primary chết và promote một replica.</figcaption>
+</figure>
+
+<p><strong>Full sync vs partial resync.</strong> Lần đầu replica connect nó làm <em>full</em> sync (primary fork một RDB và ship đi, rồi stream backlog). Nếu replica rớt ngắn, nó có thể <em>partial</em> resync — xin mọi thứ sau replication offset cuối nó thấy, phục vụ từ <strong>replication backlog buffer</strong> trong memory của primary. Size buffer đó cho cú rớt tệ nhất dự kiến; nếu replica tụt xa hơn buffer chứa, nó bị ép full sync đắt lại.</p>
+
+<p><strong>Failure mode hay cắn người ta:</strong> vì replication bất đồng bộ, primary có thể ack một write cho client rồi crash <em>trước khi</em> write đó tới bất kỳ replica nào — khi failover primary mới chưa từng có nó, nên write mất âm thầm. Do đó Redis <strong>không</strong> phải strongly-consistent store mặc định. Giảm thiểu: <code>WAIT numreplicas timeout</code> chặn write tới khi N replica xác nhận (biến nó thành write chậm hơn, kiểu quorum), và replica nên ở các failure domain khác nhau để mất một rack/AZ không kéo cả primary lẫn replica đi cùng.</p>
+
+<h2>Horizontal scaling: Redis Cluster</h2>
+
+<p>Một node bị giới hạn bởi RAM và CPU của một máy. <strong>Redis Cluster</strong> shard keyspace ra nhiều node bằng <strong>16384 hash slot</strong>: <code>slot = CRC16(key) mod 16384</code>. Mỗi primary sở hữu một dải slot liên tục (và có replica riêng). Client cache bản đồ slot tới node và nói trực tiếp với node đúng; nếu key đã chuyển đi, node trả về một redirect <code>MOVED</code>.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  K["key 'user:42'"] --> H["CRC16(key) mod 16384 = slot number"]
+  H --> ROUTE{"Node nào sở hữu slot?"}
+  ROUTE -->|slot 0-5460| N1["Node 1 (+ replica)"]
+  ROUTE -->|slot 5461-10922| N2["Node 2 (+ replica)"]
+  ROUTE -->|slot 10923-16383| N3["Node 3 (+ replica)"]
+</pre>
+<figcaption><strong>Hình 6.</strong> 16384 hash slot cố định được phân ra các primary. Resharding chuyển nguyên slot giữa các node, nên scale-out không cần rehash mọi key.</figcaption>
+</figure>
+
+<p><strong>Vì sao slot cố định thay vì consistent hashing trên node?</strong> Slot tách key space khỏi số lượng node. Thêm node là "giao cho nó vài slot"; đơn vị migration là một slot, và chỉ key trong slot bị chuyển mới bị ảnh hưởng — giữ cho resharding incremental và online.</p>
+
+<p><strong>Thao tác multi-key và hash tag.</strong> Một lệnh đụng nhiều key (vd <code>MGET a b c</code>, một transaction, một Lua script) chỉ chạy được nếu mọi key đó nằm cùng slot — nếu không Redis từ chối với cross-slot error. Để ép các key liên quan về cùng chỗ, dùng <strong>hash tag</strong>: chỉ phần trong ngoặc nhọn được hash, nên <code>user:{42}:profile</code> và <code>user:{42}:sessions</code> rơi cùng slot và thao tác atomic được. Đây là một ràng buộc thật cần nêu: Cluster đánh đổi mất cross-shard transaction.</p>
+
+<p><strong>Resharding online (MOVED vs ASK).</strong> Trong lúc một slot đang migrate, vài key ở node cũ và vài key ở node mới. Client đập node cũ cho một key đã chuyển nhận <code>MOVED</code> (cập nhật map vĩnh viễn) hoặc, cho một key đang giữa migration, một redirect <code>ASK</code> (một lần, đừng cache). Đây là cách Cluster reshard trong khi vẫn phục vụ traffic — không global lock, không full rehash.</p>
+
+<h2>Eviction &amp; expiry</h2>
+
+<p>Là cache, Redis phải nằm trong ngân sách memory (<code>maxmemory</code>). Hai cơ chế thu hồi không gian:</p>
+
+<ul>
+<li><strong>Expiry:</strong> key có TTL bị xoá <em>lazy</em> (khi truy cập) và bởi một <em>background sampler</em> quét xác suất tìm key hết hạn.</li>
+<li><strong>Eviction:</strong> khi chạm giới hạn memory, một policy quyết định bỏ gì — <code>noeviction</code> (từ chối write), <code>allkeys-lru</code>, <code>allkeys-lfu</code>, <code>volatile-ttl</code>, v.v. Redis dùng LRU/LFU <em>xấp xỉ</em> (sample vài key) để tránh chi phí bookkeeping chính xác.</li>
+</ul>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Redis bản thân là building block, nên "tech choice" là <em>khi nào</em> dùng nó và pair với gì:</p>
+<ul>
+<li><strong>Redis vs Memcached:</strong> Memcached là string cache multi-threaded đơn giản hơn; chọn Redis khi cần data structure, persistence, replication, hoặc pub/sub. (Dragonfly / KeyDB là alternative multi-threaded, tương thích Redis.)</li>
+<li><strong>Cache-aside với một primary DB:</strong> pattern phổ biến nhất — Redis cache đứng trước <strong>PostgreSQL</strong> / <strong>Cassandra</strong>; app đọc cache, fallback DB, và write invalidate hoặc update cache.</li>
+<li><strong>Như một component trong các thiết kế khác:</strong> session/presence registry (chat, Zoom), feed cache (news feed), rate limiter, geo index location hot (Grab/Uber), leaderboard (gaming), prefix cache (LLM serving).</li>
+<li><strong>Streams vs Kafka:</strong> Redis Streams hợp queue nhẹ, in-process; dùng <strong>Kafka</strong> khi cần log throughput cao, durable, replayable qua nhiều consumer.</li>
+</ul>
+
+<h2>Consistency &amp; guarantees</h2>
+<p>Nên nêu rõ guarantee của Redis, vì interviewer hay hỏi sâu:</p>
+<ul>
+<li><strong>Atomicity từng lệnh:</strong> mọi lệnh — và mọi Lua script / block <code>MULTI/EXEC</code> — chạy atomic trên một thread. Không partial update, không interleaving.</li>
+<li><strong>Không có multi-key transaction xuyên shard:</strong> trong Cluster, atomicity chỉ trong một slot (nên cần hash tag).</li>
+<li><strong>Async replication = có thể mất data khi failover</strong> (xem trên). Với Sentinel/Cluster, Redis chọn <strong>availability</strong> khi partition (thiên AP), không strong consistency; <code>WAIT</code> siết chặt nhưng không làm nó fully linearizable.</li>
+<li><strong>Pub/Sub at-most-once:</strong> Pub/Sub cổ điển là fire-and-forget — subscriber bị rớt sẽ miss message. Dùng <strong>Streams</strong> (consumer group, ack, replay) khi cần at-least-once.</li>
+</ul>
+
+<h2>Khi nào (không) dùng Redis</h2>
+<ul>
+<li><strong>Tốt cho:</strong> caching, session, rate limiting, leaderboard, counter, queue ephemeral, real-time presence — thứ gì vừa RAM và hưởng lợi từ latency sub-ms.</li>
+<li><strong>Cẩn thận với:</strong> một primary system of record cần durability nghiêm ngặt (mất write đã ack khi failover là thật) — ghép với một database durable hoặc chấp nhận trade-off.</li>
+<li><strong>Sai công cụ cho:</strong> dataset lớn hơn RAM nhiều mà đa số cold (dùng disk-based store), query multi-key/relational phức tạp, hoặc strong cross-shard transaction.</li>
+</ul>
+
+<h2>Pitfalls &amp; điểm cần bàn</h2>
+<ul>
+<li><strong>Hot key:</strong> một key phục vụ hàng triệu ops có thể bão hoà một node (và một slot không tách được). Giảm thiểu bằng client-side caching, fan-out read qua replica, hoặc tách value ra nhiều key.</li>
+<li><strong>Big key:</strong> một value khổng lồ chặn single thread khi truy cập hoặc xoá — dùng <code>UNLINK</code> (lazy free) và tránh collection không giới hạn.</li>
+<li><strong>Blocking command:</strong> <code>KEYS *</code>, <code>ZRANGE</code> lớn, hay Lua script chạy trên một thread và làm nghẽn tất cả — ưu tiên <code>SCAN</code> và thao tác có giới hạn.</li>
+<li><strong>Persistence latency:</strong> <code>fsync=always</code> giảm throughput; <code>everysec</code> là điểm cân bằng thường dùng.</li>
+<li><strong>Replica lag:</strong> read từ replica có thể cũ; route read-your-writes về primary.</li>
+<li><strong>Cache stampede:</strong> khi một hot key hết hạn, nhiều client cùng miss và đập database — dùng lock ngắn / single-flight khi recompute, hoặc stagger TTL.</li>
+<li><strong>Tăng không giới hạn:</strong> một list/zset/stream không trim âm thầm thành big key — cap nó (<code>LTRIM</code>, <code>XADD ... MAXLEN</code>) và luôn set TTL trên cache key.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Một <strong>event loop single-threaded</strong> trên in-memory keyspace cho atomicity miễn phí và khiến network là bottleneck, không phải CPU.</li>
+<li><strong>Encoding data-structure</strong> chuyên biệt đánh đổi memory lấy speed và tự đổi khi dữ liệu lớn lên.</li>
+<li><strong>RDB + AOF</strong> là hai nút điều chỉnh durability bổ trợ nhau; cả hai dựa vào <code>fork()</code> + copy-on-write.</li>
+<li><strong>Async replication + Sentinel</strong> cho read scaling và automatic failover.</li>
+<li><strong>16384 hash slot</strong> giúp Redis Cluster shard và reshard incremental; atomicity xuyên slot cần hash tag.</li>
+<li><strong>Nắm guarantee:</strong> atomic từng lệnh, nhưng async replication nghĩa một write đã ack có thể mất khi failover — Redis thiên AP, và <code>WAIT</code> chỉ siết thêm.</li>
+<li><strong>Chọn đúng việc:</strong> cache/session/rate-limit/leaderboard thì có; durability system-of-record nghiêm ngặt và cross-shard transaction thì cân nhắc.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Redis docs — persistence (RDB/AOF), replication, Redis Cluster specification, key eviction, và latency/single-threaded design (redis.io); Redis Sentinel docs; spec giao thức RESP. Diagram và nội dung là content gốc của EngineerPro.</em></p>

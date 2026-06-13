@@ -1,0 +1,193 @@
+<p>Video streaming kiểu <strong>Netflix</strong> (VOD) bị chi phối bởi hai thứ: một <strong>encoding pipeline</strong> nặng chuẩn bị mỗi title ở nhiều format, và một <strong>CDN</strong> toàn cầu serve bytes gần viewer. Chương này bao gồm ingest/transcoding, adaptive bitrate playback, CDN distribution, và recommendation.</p>
+
+<p>Khung tư duy ăn điểm: VOD là bài toán <strong>read:write skew cực đoan</strong>. Một title được encode <em>một lần</em> và stream hàng tỷ lần, nên bạn vui vẻ bỏ hàng giờ compute offline mỗi title để playback rẻ và bytes được push gần viewer nhất có thể về mặt vật lý. Control plane (catalog, auth, recommendation, resume point) là một web system khá bình thường; phần khó, đặc trưng là chuyển <strong>hàng petabyte video bất biến ở network edge</strong> với start nhanh và không rebuffer. Gần như không gì ở đây nằm trên DB hot path — nó nằm trên một CDN.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>VOD hay live?</strong> VOD thu sẵn cho phép encode offline và pre-warm CDN; live streaming thêm transcode real-time và latency chặt, một bài toán khác.</li>
+<li><strong>Scale và geography toàn cầu?</strong> Hàng trăm triệu viewer toàn thế giới buộc dùng edge CDN (lý tưởng là bên trong ISP); một service vùng đơn giản hơn nhiều.</li>
+<li><strong>DRM / content protection?</strong> Content có license cần DRM (Widevine/FairPlay) và một license server — một subsystem thật, không phải checkbox.</li>
+<li><strong>Ma trận thiết bị?</strong> Hỗ trợ TV, điện thoại, browser quy định codec/container nào và bao nhiêu rendition phải encode.</li>
+<li><strong>Độ sâu personalization?</strong> "Continue watching" đơn giản vs full ML recommendation đổi việc có cần feature store và model serving không.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Duyệt / search catalog; play title với subtitle và nhiều audio track.</li>
+<li>Resume chỗ đang xem dở; recommendation cá nhân hoá.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Start nhanh</strong> (join time thấp) và rebuffer tối thiểu.</li>
+<li><strong>Scale</strong> tới hàng trăm triệu viewer toàn cầu.</li>
+<li>Chịu network biến động qua adaptive quality.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Egress áp đảo:</strong> như một peak / stress target, 100M stream đồng thời × ~5 Mbps ≈ <strong>500 Tbps</strong> — bất khả thi từ vài data center trung tâm, nên cần một CDN chuyên dụng đặt tại ISP. (Steady-state thấp hơn, nhưng thiết kế cho peak.)</li>
+<li><strong>Storage renditions:</strong> một title được encode thành hàng chục variant bitrate/codec/resolution → source size nhân lên nhiều lần; lưu trong blob storage, push title hot ra edge.</li>
+<li><strong>Read:write skew:</strong> một title encode một lần và xem hàng tỷ lần — tối ưu delivery, encode offline.</li>
+<li><strong>Catalog:</strong> metadata nhỏ; bytes mới là chi phí.</li>
+</ul>
+<p><strong>Worked example.</strong> Đưa lập luận CDN thành số. 100M stream đồng thời ở ~5 Mbps là ~500 Tbps egress. Egress một data center lớn cỡ hàng chục Tbps, nên serve tập trung sẽ cần hàng chục data center đầy đủ <em>chỉ cho bandwidth</em> — và mọi byte sẽ qua link long-haul đắt đỏ. Thay vào đó, segment của một title <strong>bất biến và cacheable</strong>, nên bạn push chúng ra hàng nghìn edge cache (Open Connect appliance bên trong ISP); stream của một viewer được serve từ một box cách vài millisecond, origin chỉ thấy traffic cache-fill (một phần nhỏ xíu), và transit cross-ISP sụp xuống. Encoding cost lật hướng ngược lại: một title 1 giờ encode thành ~hàng chục rendition bitrate/codec/resolution có thể là hàng trăm CPU/GPU-giờ <em>một lần</em>, amortize qua hàng tỷ view — quá đáng. Bất đối xứng này (bỏ compute offline + edge storage để tiết kiệm bandwidth online) là toàn bộ thiết kế.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /titles?q=</code> → catalog search.</li>
+<li><code>GET /titles/{id}/play</code> → một <strong>manifest</strong> (HLS/DASH) liệt kê các bitrate variant + URL DRM license.</li>
+<li><code>GET /segment/...</code> → media segment (serve bởi CDN edge).</li>
+<li><code>POST /progress</code> — <code>{title_id, position}</code> (điểm resume).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Master upload chảy qua một <strong>encoding pipeline</strong> vào blob storage, rồi propagate ra các <strong>CDN edge</strong> server. Playback API đưa client một manifest; client sau đó pull segment từ edge gần nhất và adapt quality on the fly.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  UP["Title master upload"] --> ENC["Encoding pipeline (transcode)"]
+  ENC --> BLOB["Blob storage: tất cả rendition"]
+  BLOB --> CDN["CDN edge server (tại ISP)"]
+  C["Client player"] --> BFF["API / backend-for-frontend"]
+  BFF --> CAT["Catalog / Search service"]
+  BFF --> META["Metadata service"]
+  BFF --> PROG["Progress / watch-history service"]
+  BFF --> REC["Recommendation service"]
+  BFF --> PLAY["Playback API: manifest (HLS/DASH)"]
+  C --> DRM["DRM / license service (key delivery)"]
+  C --> CDN
+</pre>
+<figcaption><strong>Hình 1.</strong> Một backend-for-frontend đứng trước catalog, metadata, progress, và recommendation; playback API trả manifest còn DRM license là một path riêng; segment stream từ CDN edge gần nhất.</figcaption>
+</figure>
+
+<h2>Encoding pipeline</h2>
+<p>Encoding đắt và song song hoàn hảo, nên nó là một <strong>DAG</strong>: split master thành chunk, transcode chunk song song vào từng target (bitrate × resolution × codec), rồi package thành streaming format (HLS/DASH) và lưu. Làm theo chunk nghĩa là một chunk fail re-encode riêng và cả farm luôn bận.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  M["Master file"] --> SPLIT["Split thành chunk"]
+  SPLIT --> T1["Transcode chunk sang 1080p"]
+  SPLIT --> T2["Transcode chunk sang 720p"]
+  SPLIT --> T3["Transcode chunk sang 480p"]
+  T1 --> PKG["Package HLS / DASH + subtitle"]
+  T2 --> PKG
+  T3 --> PKG
+  PKG --> STORE["Lưu rendition vào blob storage"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Transcoding DAG: split, transcode chunk song song thành nhiều rendition, rồi package và lưu.</figcaption>
+</figure>
+
+<h2>CDN distribution</h2>
+<p>Serve 500 Tbps từ server trung tâm là bất khả thi, nên content nằm ở <strong>edge</strong>, lý tưởng là bên trong network của ISP. Title phổ biến được <strong>pre-position</strong> ra edge trước nhu cầu (dự đoán từ viewing pattern); long tail được pull và cache khi request đầu. Đa số bytes không bao giờ đi qua core network.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  ORIGIN["Origin: blob storage"] -->|pre-position title phổ biến| E1["Edge cache (ISP region A)"]
+  ORIGIN -->|pull khi miss đầu tiên| E2["Edge cache (ISP region B)"]
+  E1 --> V1["Viewer region A"]
+  E2 --> V2["Viewer region B"]
+</pre>
+<figcaption><strong>Hình 3.</strong> Edge cache bên trong ISP serve đa số traffic; title hot được push trước nhu cầu, long tail pull khi miss đầu tiên.</figcaption>
+</figure>
+
+<h2>Adaptive bitrate playback</h2>
+<p>Client điều khiển quality. Nó fetch manifest, rồi request segment ngắn; nó đo throughput và buffer level và switch lên/xuống giữa các bitrate variant theo từng segment. Network chậm thì lặng lẽ hạ xuống thay vì đứng hình.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Player
+  participant API as Playback API
+  participant DRM as DRM / license service
+  participant E as CDN edge
+  C->>API: GET play(title)
+  API-->>C: manifest (variants) + DRM license URL/token
+  C->>DRM: request license (token)
+  DRM-->>C: content key / license
+  C->>E: GET segment 1 ở 1080p
+  E-->>C: segment 1
+  Note over C: buffer thấp / throughput giảm
+  C->>E: GET segment 2 ở 480p
+  E-->>C: segment 2
+</pre>
+<figcaption><strong>Hình 4.</strong> ABR: Playback API trả manifest cùng một DRM license URL/token; player lấy license từ <strong>DRM/license service</strong> authoritative (tách khỏi segment delivery), rồi chọn bitrate theo từng segment dựa trên throughput và buffer đo được, hạ xuống để tránh đứng hình.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Player
+  participant E as Edge PoP
+  participant S as Regional shield
+  participant O as Origin (blob storage)
+  C->>E: GET segment
+  alt edge hit
+    E-->>C: segment (nhanh)
+  else edge miss
+    E->>S: fetch segment
+    alt shield hit
+      S-->>E: segment
+    else shield miss
+      S->>O: fetch segment
+      O-->>S: segment
+    end
+    E-->>C: segment (giờ cached ở edge)
+  end
+</pre>
+<figcaption><strong>Hình 5.</strong> Giao segment với cache fill: miss cascade edge tới shield tới origin, cache trên đường về — đa số bytes không bao giờ tới origin.</figcaption>
+</figure>
+
+<h2>Recommendation</h2>
+<p>Home screen là các hàng được rank do recommendation system sinh ra: training model và candidate generation <strong>offline</strong> nặng, cộng một ranking <strong>online</strong> nhẹ hơn cá nhân hoá real-time từ activity gần đây — cùng kiểu offline/online split như feed ranking.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway / BFF</strong> (kiểu Zuul của Netflix): auth, routing, và aggregate các call home screen.</li>
+<li><strong>Catalog &amp; metadata:</strong> một wide-column store (<strong>Cassandra</strong>) cho title metadata + <strong>Elasticsearch</strong> cho search/browse.</li>
+<li><strong>Encoding pipeline:</strong> một job/DAG orchestrator với queue (<strong>SQS / Kafka</strong>) nuôi một dàn transcoding worker.</li>
+<li><strong>Rendition:</strong> nhiều file đã encode trong <strong>blob/object storage (S3-like)</strong>, distribute ra <strong>CDN edge</strong> (Netflix Open Connect appliance trong ISP).</li>
+<li><strong>Watch progress / history:</strong> một wide-column store write-heavy (<strong>Cassandra</strong>) key theo user — hàng triệu update "resume point"/s.</li>
+<li><strong>Caching:</strong> <strong>EVCache</strong> của Netflix (tier kiểu Memcached/Redis) đứng trước metadata.</li>
+<li><strong>Recommendation:</strong> training offline trên <strong>Spark</strong> over event data trong data lake, serve bởi online ranking service; viewing event chảy qua <strong>Kafka</strong>.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> bytes (rendition) khổng lồ + bất biến + read-toàn-cầu → object storage + CDN; watch-progress write-heavy + key đơn giản → wide-column, không phải SQL; catalog search cần inverted index → Elasticsearch; event firehose → Kafka. Phần đắt là egress và storage, nên data layout tối ưu để giữ bytes ở edge và metadata rẻ.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Content bất biến, phân phối eventually:</strong> một rendition không bao giờ đổi khi đã publish, nên edge cache nó mãi; "publish" một title là một propagation eventual ra edge, không phải một global write đồng bộ.</li>
+<li><strong>Control plane eventually-consistent:</strong> thay đổi catalog, title mới, và recommendation lan truyền có độ trễ — ổn cho browsing. Catalog read-mostly và cache nặng.</li>
+<li><strong>Watch progress best-effort, monotonic:</strong> resume point ghi thường xuyên và async; mất vài giây cuối thỉnh thoảng là chấp nhận được, và update nên last-writer-wins / monotonic để một thiết bị cũ không tua lùi vị trí của bạn.</li>
+<li><strong>Availability hơn consistency nghiêm trên playback:</strong> nếu metadata tạm cũ hoặc một recommendation row cũ, bạn vẫn play — playback không bao giờ được block trên một consistency check. Cấp DRM license là bước strict, authoritative duy nhất.</li>
+<li><strong>Degradation êm (không phải guarantee availability):</strong> ABR <em>cố gắng</em> giữ playback bằng cách hạ chất lượng trước, hạ bitrate thay vì stall — nhưng vẫn có thể stall nếu throughput tụt dưới representation thấp nhất hoặc path edge/origin fail. Nó là một chiến lược best-effort, không phải guarantee cứng.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>CDN + encoding offline khi:</strong> VOD quy mô lớn phủ toàn cầu — câu trả lời chuẩn; bytes thuộc về edge, encode offline.</li>
+<li><strong>Đơn giản hơn khi:</strong> một thư viện video nhỏ hoặc tool nội bộ — một object store + một managed CDN, không cần appliance kiểu Open Connect hay encoding farm per-title.</li>
+<li><strong>Thiết kế khác khi:</strong> workload là <strong>live</strong> (thể thao, real-time) — cần live transcode + packaging latency thấp, không pre-warm hết được; hoặc interactive video (conferencing) vốn là bài Zoom/SFU, không phải VOD.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Không thể serve video từ core</strong> — một CDN (lý tưởng in-ISP) chính là thiết kế.</li>
+<li><strong>Rendition explosion:</strong> nhiều variant nhân storage lên — lưu blob rẻ, cache cái hot ở edge.</li>
+<li><strong>Cold long-tail:</strong> viewer đầu của title hiếm chịu latency cache-fill — chấp nhận được.</li>
+<li><strong>Encoding cost:</strong> làm offline như một DAG song song; không bao giờ trên playback path.</li>
+<li><strong>DRM</strong> thêm một license round-trip — tách khỏi segment delivery.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Hai hệ thống: một <strong>encoding DAG</strong> offline và một <strong>CDN delivery</strong> path online.</li>
+<li><strong>Edge caching tại ISP</strong> là cách duy nhất serve nổi egress.</li>
+<li><strong>Adaptive bitrate</strong> đánh đổi quality lấy mượt phía client.</li>
+<li>Recommendation là một <strong>offline-train + online-rank</strong> split.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Netflix Open Connect và Netflix Tech Blog (encoding, ABR); HLS (RFC 8216) và MPEG-DASH specs; Widevine / FairPlay DRM docs. Diagram và nội dung là content gốc của EngineerPro.</em></p>
