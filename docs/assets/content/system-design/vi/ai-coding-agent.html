@@ -1,0 +1,181 @@
+<p>Một <strong>AI coding agent platform</strong> (kiểu Cursor / Devin) chạy các agent tự động edit code, chạy test, và mở pull request — thường nhiều cái song song, chạy nền. Các bài infra khó là <strong>sandbox cô lập</strong>, durable agent run, và Git operation an toàn ở scale. Nó xây trên agentic platform và LLM inference platform.</p>
+
+<p>Ràng buộc phân biệt so với một agentic platform chung chung: agent <strong>execute code tùy ý, untrusted</strong> (test của repo, build script, và bất cứ gì model quyết định chạy) trên source và credential private. Nên thiết kế bị chi phối bởi hai căng thẳng — <strong>isolation mạnh</strong> (một run thù địch hoặc lỗi không được thoát sandbox, exfiltrate secret, hay đụng repo của tenant khác) versus <strong>spin-up nhanh và cost</strong> (hàng nghìn environment ngắn hạn). Gần như mọi lựa chọn (microVM, warm pool, copy-on-write repo, egress proxy, secret broker) là một điểm trên trade-off đó.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Trust boundary?</strong> Code agent có chạy lệnh và test tùy ý không? (Có → isolation cứng: microVM, không network mặc định, secret brokered.)</li>
+<li><strong>Interactive hay background?</strong> User chờ trong editor quan tâm spin-up dưới giây; fleet background tối ưu throughput và cost.</li>
+<li><strong>Side effect nào được phép?</strong> Chỉ mở PR, hay cả push, deploy, gọi API ngoài? Mỗi cái cần scoped token và audit.</li>
+<li><strong>Scale repo và ngôn ngữ?</strong> Monorepo vs repo nhỏ đổi chiến lược clone/snapshot và thiết kế build-cache.</li>
+<li><strong>Multi-tenant?</strong> Isolation per-tenant của sandbox, secret, cache, và egress là một yêu cầu security, không phải tối ưu.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Submit một coding task lên một repo; agent edit code trong <strong>sandbox</strong>, chạy test, stream progress.</li>
+<li>Tạo diff / mở <strong>pull request</strong>; resume run bị gián đoạn.</li>
+<li>Chạy nhiều background agent đồng thời.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Isolation / security</strong> — code agent không được thoát sandbox hay rò rỉ secret.</li>
+<li><strong>Sandbox spin-up nhanh</strong>; reliability; concurrency cao; cost control.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Concurrency:</strong> hàng nghìn run đồng thời, mỗi cái sở hữu một sandbox — pool và recycle environment, đừng spin một cái cold mỗi request.</li>
+<li><strong>Spin-up:</strong> một container cold mất vài giây; một microVM với warm pool dưới một giây — quan trọng vì user chờ ở lúc bắt đầu.</li>
+<li><strong>Run length:</strong> vài phút tới vài chục phút, đa số chờ LLM và test — async orchestration, không phải thread giữ mãi.</li>
+<li><strong>Repo size:</strong> snapshot/clone repo lớn thì nặng → cache base image và dùng copy-on-write workspace.</li>
+</ul>
+<p><strong>Worked example.</strong> Giả sử 5.000 run đồng thời, mỗi cái cần environment 2 GB repo + toolchain. Clone repo 2 GB mới mỗi run là ~10 TB I/O và hàng chục giây latency mỗi cái — không khả thi. Với <strong>copy-on-write</strong> từ một base snapshot cache sẵn, mỗi run chỉ lưu diff của nó (vài chục MB), nên 5.000 run tốn ~vài trăm GB, không phải 10 TB, và start dưới một giây nhiều. Toán spin-up: boot container/VM cold ~2-10s; nếu user chờ lúc đầu, một <strong>warm pool</strong> các sandbox đã boot biến nó thành latency pop-queue (ms). Size pool là một trade-off utilization kinh điển — nhỏ quá thì user queue, lớn quá thì microVM nằm không đốt tiền — nên pool được autoscale theo demand với một buffer warm nhỏ. Tài nguyên khan hiếm là memory/CPU sandbox và token LLM, không phải throughput orchestrator.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /tasks</code> — <code>{repo, branch, instruction}</code> → <code>{run_id}</code> (async, background).</li>
+<li><code>GET /runs/{id}</code> → status, log stream, diff.</li>
+<li><code>POST /runs/{id}/resume</code>; <code>POST /runs/{id}/pr</code> — mở pull request.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Một <strong>orchestrator</strong> (durable, như agentic platform) điều khiển mỗi run; một <strong>sandbox provisioner</strong> đưa nó một environment cô lập từ warm pool; một <strong>repo service</strong> clone/snapshot code; <strong>tool layer</strong> chạy edit/shell/test bên trong sandbox; kết quả stream ra và một <strong>artifact service</strong> mở PR.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> ORCH["Run orchestrator (durable)"]
+  ORCH --> PROV["Sandbox provisioner (warm pool)"]
+  PROV --> SB["Sandbox (container / microVM)"]
+  ORCH --> REPO["Repo / Git service"]
+  REPO --> SB
+  ORCH --> LLM["LLM / agent gateway"]
+  SB --> TOOLS["Tool layer: edit, shell, test"]
+  ORCH --> STREAM["Log streaming"]
+  ORCH --> ART["Artifact service: diff / PR"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Orchestrator ghép một durable run với một sandbox cô lập, điều khiển agent qua LLM gateway, chạy tool trong sandbox, và mở PR.</figcaption>
+</figure>
+
+<h2>Sandbox provisioning</h2>
+<p>Mỗi run cần một environment sạch, cô lập nơi các lệnh untrusted do model điều khiển có thể chạy. <strong>microVM</strong> (hoặc container được hardened) cho isolation mạnh; một <strong>warm pool</strong> các sandbox đã boot sẵn với base image cached làm start-up dưới một giây. Repo được materialize qua copy-on-write nên clone repo lớn rẻ.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  REQ["Run mới cần sandbox"] --> POOL{"Có warm sandbox?"}
+  POOL -->|có| ASSIGN["Gán warm sandbox (dưới một giây)"]
+  POOL -->|không| BOOT["Boot microVM mới từ base image"]
+  ASSIGN --> COW["Materialize repo qua copy-on-write"]
+  BOOT --> COW
+  COW --> READY["Sandbox sẵn sàng cho agent"]
+  REFILL["Nền: refill warm pool"] --> POOL
+</pre>
+<figcaption><strong>Hình 2.</strong> Warm pool các sandbox cô lập cộng materialize repo copy-on-write cho environment nhanh, an toàn mỗi run.</figcaption>
+</figure>
+
+<h2>Run lifecycle</h2>
+<p>Orchestrator chạy agent loop (plan-act-observe) nơi tool là <strong>edit file</strong>, <strong>run shell</strong>, và <strong>run tests</strong>. Mỗi step được checkpoint nên một run sống sót qua restart và có thể pause để review. Log stream tới client suốt quá trình.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant O as Orchestrator
+  participant SB as Sandbox
+  participant L as LLM
+  participant G as Git service
+  O->>SB: clone repo (copy-on-write)
+  loop agent step
+    O->>L: context + tool
+    L-->>O: action (edit / shell / test)
+    O->>SB: execute action
+    SB-->>O: result (stream log)
+    O->>O: checkpoint run state
+  end
+  O->>G: tạo branch + commit diff
+  G-->>O: mở pull request
+</pre>
+<figcaption><strong>Hình 3.</strong> Agent edit, chạy lệnh, và test bên trong sandbox, checkpoint mỗi step, rồi commit và mở PR.</figcaption>
+</figure>
+
+<h2>Tool execution và Git</h2>
+<p>Tool được scope vào filesystem của sandbox và một shell hạn chế; network và secret bị khoá. Khi agent xong, repo service biến working change thành một <strong>branch + commit</strong> và mở pull request qua Git provider — agent không bao giờ push trực tiếp với credential rộng; một scoped token làm việc đó.</p>
+
+<p>Tách <strong>side effect local trong sandbox</strong> (edit file, chạy test — redo rẻ) khỏi <strong>side effect bên ngoài</strong> (Git PR, package publish, network call). Action bên ngoài đi qua artifact/approval service với một <strong>idempotency key</strong> đã ghi, nên crash-rồi-replay không mở hai PR hay publish hai lần. Một control plane bọc sandbox: một <strong>secret broker</strong> inject scoped short-lived token chỉ khi approved, một <strong>egress proxy/allowlist</strong> hạn chế network, và một <strong>artifact scanner</strong> + <strong>audit log</strong> phủ output.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph BOUND["Security boundary mỗi run"]
+    SB["Sandbox (microVM): edit / shell / test"]
+  end
+  SB -->|network| EGRESS["Egress proxy + allowlist"]
+  SECRET["Secret broker (scoped, short-lived)"] -->|inject chỉ khi approved| SB
+  SB -->|action bên ngoài| APPROVAL["Approval / artifact service (idempotency key)"]
+  APPROVAL --> GIT["Git PR / publish (scoped token)"]
+  SB --> AUDIT["Audit log + artifact scanner"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Security boundary: tool trong sandbox chỉ ra network qua egress allowlist, secret được broker khi approved, và action bên ngoài đi qua một idempotent approval/artifact path.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  EDIT["Edit file trong sandbox"] --> DIFF["Tính diff vs base"]
+  DIFF --> BRANCH["Tạo branch"]
+  BRANCH --> COMMIT["Commit bằng scoped token"]
+  COMMIT --> PR["Mở pull request"]
+  PR --> REVIEW["Human review / CI"]
+</pre>
+<figcaption><strong>Hình 5.</strong> Working change thành branch và commit qua scoped token, rồi một PR cho human review và CI.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, quota concurrency theo tenant, route tới run orchestrator.</li>
+<li><strong>Orchestrator:</strong> một <strong>durable workflow engine</strong> (kiểu Temporal) để background run sống sót qua restart và resume.</li>
+<li><strong>Sandbox:</strong> một warm pool <strong>Firecracker microVM</strong> (hoặc gVisor/Kata) — isolation mạnh, start dưới giây; repo materialize qua một <strong>copy-on-write overlay filesystem</strong> trên base image cached.</li>
+<li><strong>Run state &amp; artifact:</strong> <strong>PostgreSQL</strong> cho run/step state; <strong>blob storage (S3-like)</strong> cho diff, log, build artifact; <strong>Redis</strong> cho warm-pool bookkeeping và live log fan-out.</li>
+<li><strong>Repo / Git:</strong> Git provider (GitHub/GitLab API) cho clone + PR; commit đi qua scoped token do <strong>secret broker (Vault)</strong> cấp; một <strong>egress proxy/allowlist</strong> gate network.</li>
+<li><strong>LLM:</strong> <strong>LLM/agent gateway</strong> cho model call.</li>
+<li><strong>Audit trail (durable sink):</strong> vì actor tự động, mọi command/tool/action ngoài phải đáp vào một <strong>append-only audit store</strong> thiết kế đạt mức audit-grade — một append-only Postgres table hoặc một immutable object-storage log partition theo run/date (tùy chọn hash-chained), kèm retention/WORM và access control. <strong>Kafka</strong> là fanout <em>từ</em> lần ghi audit tới consumer, không phải system of record tự thân.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> isolation là toàn bộ cuộc chơi → microVM + egress proxy + Vault, không phải host chung; run state nhỏ/có cấu trúc → SQL; diff/log lớn/append → object storage; warm pool và streaming hot/ephemeral → Redis. Không có DB quan hệ lớn trên critical path — tài nguyên khan hiếm là sandbox slot và LLM token.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Run resumable, external effect idempotent:</strong> việc trong sandbox (edit, chạy test) rẻ để làm lại khi resume, nhưng action ngoài — <code>git push</code>, mở/update PR, gọi deploy API — phải idempotent (vd push lên một branch deterministic, upsert PR) để retry sau crash không tạo bản trùng.</li>
+<li><strong>Sandbox isolation là guarantee cứng:</strong> một run không ra được network trừ qua egress allowlist, không đọc được repo hay secret của tenant khác, và bị hủy sau run (không rò state giữa các run).</li>
+<li><strong>Secret được broker, không bao giờ resident:</strong> sandbox nhận token short-lived, scoped từ broker theo nhu cầu; credential long-lived không bao giờ vào không gian agent kiểm soát, nên một run bị compromise có blast radius nhỏ, giới hạn thời gian.</li>
+<li><strong>Eventually-consistent với Git provider:</strong> state PR/commit thuộc GitHub/GitLab; platform reconcile view của nó bằng webhook/polling thay vì giả định state local là authoritative.</li>
+<li><strong>Auditability:</strong> mọi lệnh, tool call, và action ngoài được ghi durable vào một store append-only đạt audit-grade (immutable, có retention, access-controlled) — không chỉ emit ra một stream — vì actor là một agent tự động và audit trail phải trụ được trước tranh chấp/security review.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Dùng khi:</strong> bạn chạy code untrusted/agent-generated ở scale, cần isolation per-run và Git side effect audit được, và muốn parallelism nền (nhiều agent cùng lúc).</li>
+<li><strong>Thừa khi:</strong> code hoàn toàn trusted và chạy hiếm — một CI runner thường hoặc một container đơn là đủ; không cần microVM và warm pool.</li>
+<li><strong>Cẩn thận khi:</strong> agent có thể push/deploy lên production — gate sau human approval và scoped token; failure mode (một deploy tự động sai) đắt hơn nhiều một suggestion sai.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Sandbox escape</strong> là rủi ro hàng đầu — isolation mạnh (microVM), không host access, network bị khoá.</li>
+<li><strong>Cold start</strong> hại UX — warm pool + base image cached + repo copy-on-write.</li>
+<li><strong>Secret leakage:</strong> không bao giờ expose credential long-lived thô trong sandbox; dùng scoped token short-lived.</li>
+<li><strong>Runaway run:</strong> step/time/cost limit; phát hiện vòng lặp no-progress.</li>
+<li><strong>Concurrency limit:</strong> cap sandbox mỗi tenant; recycle quyết liệt.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Platform ghép một <strong>durable run</strong> với một <strong>sandbox cô lập</strong> từ warm pool.</li>
+<li>Tool (edit/shell/test) chạy <strong>bên trong sandbox</strong>; không bao giờ trên host.</li>
+<li><strong>Repo copy-on-write + warm pool</strong> làm start-up nhanh.</li>
+<li>Commit đi qua một <strong>scoped token</strong>; một PR gate human review.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Firecracker microVM (Agache et al., NSDI 2020); gVisor và Kata Containers docs; GitHub / GitLab REST API docs; Temporal durable-execution docs. Diagram và nội dung là content gốc của EngineerPro.</em></p>

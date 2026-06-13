@@ -1,0 +1,179 @@
+<p>Hệ thống <strong>flight-booking</strong> có một bài search read-heavy (hàng triệu người duyệt) bọc quanh một bài booking strict-consistency (một ghế không bao giờ được bán hai lần). Chương này thiết kế search caching, <strong>seat hold</strong>, và một <strong>booking saga</strong> giữa inventory và payment.</p>
+
+<p>Hình dạng định nghĩa là hai hệ thống nhu cầu đối lập gắn lại: một <strong>search read-heavy khổng lồ</strong> (cacheable, eventually consistent, tối ưu QPS) và một <strong>booking core nhỏ nhưng nghiêm</strong> (một ghế là tài nguyên duy nhất bán nhiều nhất một lần, trải inventory + payment, phải idempotent). Cầu nối giữa "tôi thấy giá này" và "tôi mua nó" là <strong>seat hold với TTL</strong> — một reservation tạm biến một race thành một "reserve, rồi pay" hai pha để user không bị charge cho một ghế người khác đã giành. Làm đúng hold và booking saga là toàn bộ cuộc chơi.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Một hãng hay aggregator (GDS)?</strong> Sở hữu inventory là bài consistency bạn kiểm soát; aggregate inventory third-party thêm external availability call và xử lý stale-price.</li>
+<li><strong>Semantics hold?</strong> Một ghế giữ bao lâu trong checkout, và gì xảy ra khi hết hạn? Điều này định nghĩa TTL và path release.</li>
+<li><strong>Multi-leg / multi-passenger?</strong> Book nhiều ghế/leg atomically (all-or-nothing) khó hơn một ghế — làm rõ phạm vi atomicity.</li>
+<li><strong>Thời điểm payment?</strong> Authorize rồi capture (flow sạch khi có hold) vs charge upfront — định hình saga và compensation.</li>
+<li><strong>Freshness search?</strong> Kết quả cache được vài giây/phút, hay price/availability phải live lúc search?</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Search chuyến bay (gồm multi-leg) theo route và ngày.</li>
+<li><strong>Hold</strong> một ghế trong lúc user trả tiền; rồi confirm booking.</li>
+<li>Cancel / refund; tra cứu booking theo reference (PNR).</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Consistency:</strong> một ghế bán nhiều nhất một lần (không double-booking).</li>
+<li><strong>Read scalability:</strong> search QPS lớn hơn booking QPS rất nhiều.</li>
+<li><strong>Booking idempotent</strong> khi retry; high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Read:write skew:</strong> ~1000 search mỗi booking — tối ưu read path mạnh tay (cache, read replica).</li>
+<li><strong>Search QPS:</strong> 100M search/ngày ≈ <strong>~1.2k/s</strong> trung bình, peak lớn; kết quả cacheable vài giây.</li>
+<li><strong>Inventory contention:</strong> chuyến hot có ghế giới hạn; hold + conditional update serialize số ít write quan trọng.</li>
+<li><strong>Storage:</strong> booking nhỏ và durable; dữ liệu search là derived và cacheable.</li>
+</ul>
+<p><strong>Worked example.</strong> Read:write skew ~1000:1 là động lực thiết kế. 100M search/ngày ≈ 1.2k/s (peak lớn), nhưng chỉ ~100k booking/ngày ≈ ~1/s write thật. Nên bạn đổ công vào read path — cache kết quả fare/availability vài giây, serve từ read replica, precompute route phổ biến — vì đó là chỗ có volume, và kết quả search hơi cũ chấp nhận được (bước hold re-validate). Write path nhỏ nhưng phải đúng tuyệt đối: một chuyến hot có, ví dụ, 180 ghế, và lúc peak hàng chục user thử book vài ghế cuối cùng lúc. Bạn không lock cả chuyến; bạn làm một <strong>conditional decrement</strong> ("reserve ghế chỉ khi available count &gt; 0") hoặc một per-seat conditional claim, serialize chỉ các ghế contended. Hold cho user một cửa sổ TTL (vd 10 phút) để trả tiền; nếu seat count bị decrement lúc hold, một hold hết hạn/bỏ phải <strong>release</strong> ghế lại — nếu không inventory rò âm thầm. Con số biện minh kiến trúc: tối ưu read rộng, guard write hiếm nghiêm.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /search?from=&to=&date=</code> → <code>{itineraries[]}</code> (cacheable).</li>
+<li><code>POST /holds</code> — <code>{flight_id, seat_class, user_id}</code> → <code>{hold_id, expires_at}</code>.</li>
+<li><code>POST /bookings</code> — <code>{hold_id, passenger, payment, idempotency_key}</code> → <code>{pnr, status}</code>.</li>
+<li><code>GET /bookings/{pnr}</code>, <code>POST /bookings/{pnr}/cancel</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User"] --> SRCH["Search service"]
+  SRCH --> CACHE["Search cache"]
+  SRCH --> RR["Read replicas"]
+  U --> BOOK["Booking service (saga)"]
+  BOOK --> INV["Inventory service: seat holds"]
+  BOOK --> PAY["Payment"]
+  BOOK --> PNR["Booking / PNR store"]
+  BOOK --> NOTIF["Notification"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Search path cache + replica tách khỏi booking saga điều phối inventory hold và payment.</figcaption>
+</figure>
+
+<h2>Search path</h2>
+<p>Search read-heavy và chịu được hơi cũ. Serve từ một <strong>cache</strong> (key theo route+date, TTL ngắn) hậu thuẫn bởi <strong>read replica</strong>; precompute route phổ biến. Availability hiển thị trong search chỉ là gợi ý — kiểm tra chính thức xảy ra lúc hold.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  Q["GET /search route+date"] --> C{"Có trong cache?"}
+  C -->|hit| R1["Trả itineraries cached"]
+  C -->|miss| RR["Query read replica"]
+  RR --> BUILD["Dựng itineraries (gồm multi-leg)"]
+  BUILD --> FILL["Fill cache (TTL ngắn)"]
+  FILL --> R2["Trả về"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Search đập cache TTL ngắn trước, fallback read replica, và cache itineraries dựng được — availability là gợi ý, xác nhận sau.</figcaption>
+</figure>
+
+<h2>Seat hold với TTL</h2>
+<p>Để tránh hai user trả tiền cùng một ghế, user <strong>hold</strong> nó trước: một conditional update đánh dấu ghế reserved kèm <strong>expiry</strong>. Nếu trả kịp, hold thành booking; nếu không, hold tự hết hạn và ghế trở lại inventory. Hold là consistency boundary.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant INV as Inventory
+  U->>INV: hold ghế 14C
+  INV->>INV: conditional reserve nếu ghế free, set expiry
+  INV-->>U: hold_id, hết hạn trong 5 phút
+  Note over U,INV: user sang bước payment
+  alt trả kịp
+    U->>INV: confirm (qua booking saga)
+    INV-->>U: ghế đã booked
+  else hold hết hạn
+    INV->>INV: trả ghế về inventory
+  end
+</pre>
+<figcaption><strong>Hình 3.</strong> Conditional reserve có TTL là consistency boundary: trả kịp để chuyển hold, không thì tự release.</figcaption>
+</figure>
+
+<h2>Booking saga</h2>
+<p>Confirm một booking đụng hai hệ thống đều có thể fail: <strong>inventory</strong> (chuyển hold thành sold) và <strong>payment</strong>. Vì hold đã có sẵn, flow sạch là <strong>authorize</strong> payment (giữ tiền), <strong>commit ghế</strong>, rồi <strong>capture</strong> — nên path thường gặp không bao giờ charge rồi refund. Một <strong>saga</strong> sắp xếp chúng với một <strong>idempotency key</strong> để retry an toàn; void/refund chỉ là compensation fallback nếu commit fail sau khi đã authorize.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  START["POST /bookings (idempotency_key)"] --> AUTH["Authorize payment (giữ tiền)"]
+  AUTH -->|ok| COMMIT["Commit ghế: hold sang sold"]
+  AUTH -->|fail| FAILP["Trả payment error"]
+  COMMIT -->|ok| CAPTURE["Capture payment"]
+  CAPTURE --> PNR["Issue PNR + notify"]
+  COMMIT -->|fail| VOID["Compensate: void / release authorization"]
+  VOID --> FAILB["Booking failed, không capture"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Booking saga: authorize, commit ghế, rồi capture; nếu ghế không commit được thì void authorization (compensation) thay vì charge-rồi-refund. Idempotency key dedup retry.</figcaption>
+</figure>
+
+<h2>Booking lifecycle</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Held
+  Held --> Booked: payment + ghế committed
+  Held --> Released: hold hết hạn
+  Booked --> Cancelled: user cancel
+  Cancelled --> Refunded: refund xong
+  Released --> [*]
+  Refunded --> [*]
+  Booked --> [*]
+</pre>
+<figcaption><strong>Hình 5.</strong> Trạng thái booking từ hold tới booked, với path expiry/cancel/refund.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing cho search vs booking.</li>
+<li><strong>Search:</strong> một cache <strong>Redis</strong> (key route+date, TTL ngắn) đứng trước <strong>read replica</strong> của fare/schedule DB; route phổ biến precomputed.</li>
+<li><strong>Inventory:</strong> một transactional DB (<strong>PostgreSQL</strong>) giữ ghế với <strong>conditional hold + TTL</strong>; một background sweeper release hold hết hạn.</li>
+<li><strong>Booking:</strong> một saga orchestrator (workflow engine) điều phối inventory + payment với một <strong>idempotency key</strong>; record PNR trong một relational store.</li>
+<li><strong>Events:</strong> <strong>Kafka</strong> cho event booking/cancellation → notification, analytics, sync GDS downstream.</li>
+<li><strong>Payments:</strong> một tích hợp PSP; email/itinerary tới một notification service.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> search read-heavy và chịu được stale → cache + replica; seat hold là consistency boundary và phải strongly consistent → một transactional DB với conditional write; booking xuyên hệ là saga → một workflow engine + idempotency key. Read path và write path cố ý dùng consistency model khác nhau.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Một ghế bán nhiều nhất một lần:</strong> conditional hold/booking trên inventory DB là single source of truth — availability của search chỉ là gợi ý, và một booking bị reject nếu conditional reserve fail.</li>
+<li><strong>Hold = reservation bounded, tự release:</strong> một hold có TTL; nếu user không trả kịp, một sweeper release ghế, nên checkout bỏ dở không thể rò inventory vĩnh viễn.</li>
+<li><strong>Booking idempotent qua saga:</strong> booking key theo một idempotency key nên một client retry trả cùng kết quả, không phải một booking thứ hai; saga authorize → commit → capture có compensation (void/refund) cho partial failure.</li>
+<li><strong>Search eventually-consistent:</strong> fare/availability cached có thể cũ vài giây — chấp nhận tường minh vì bước hold re-validate lên inventory authoritative.</li>
+<li><strong>Confirmation durable:</strong> một khi PNR phát hành, nó durable và authoritative; hệ downstream (GDS, notification) sync từ booking event, eventually consistent.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hợp:</strong> bất kỳ flow reserve-inventory-giới-hạn-rồi-pay — flight, hotel, vé sự kiện, thuê xe — nơi oversell không chấp nhận được và search lớn hơn booking nhiều.</li>
+<li><strong>Đơn giản hoá khi:</strong> inventory gần như vô hạn (digital goods) — không cần hold hay conditional reserve, chỉ một purchase idempotent.</li>
+<li><strong>Thiết kế khác khi:</strong> demand vượt xa một supply nhỏ tại một thời điểm (một flash ticket drop) — có thể thêm một virtual waiting room / queue phía trước để booking core không bị stampede, trên model hold này.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Double-book:</strong> không bao giờ tin availability của search — conditional hold là single source of truth.</li>
+<li><strong>Orphaned hold:</strong> luôn set TTL và có sweeper release hold hết hạn.</li>
+<li><strong>Idempotency:</strong> POST /bookings retry với cùng key phải trả kết quả gốc, không charge hai lần.</li>
+<li><strong>Multi-leg / multi-airline:</strong> saga trải nhiều inventory — partial hold cần compensation.</li>
+<li><strong>Cache staleness:</strong> ổn cho search; không bao giờ cho bước hold/booking.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Tách <strong>search read-heavy</strong> (cache + replica) khỏi <strong>booking strict</strong>.</li>
+<li><strong>Seat hold với TTL</strong> là consistency boundary chống double-booking.</li>
+<li>Booking là một <strong>saga</strong> với compensation và <strong>idempotency key</strong>.</li>
+<li>Availability trong search là gợi ý; conditional hold mới là chính thức.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: saga pattern (Garcia-Molina &amp; Salem, 1987); Stripe idempotency-key docs; tài liệu công khai về airline reservation / GDS và inventory-hold. Diagram và nội dung là content gốc của EngineerPro.</em></p>

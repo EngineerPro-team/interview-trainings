@@ -3,7 +3,7 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://engineerprogurus.com/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/" />
@@ -19,7 +19,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/book/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/book/" />
@@ -27,7 +27,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/" />
@@ -35,7 +35,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/mock/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/mock/" />
@@ -91,7 +91,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/terms/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/terms/" />
@@ -947,7 +947,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/redis-in-memory-store/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/redis-in-memory-store/" />
@@ -955,7 +955,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/cdn-system/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/cdn-system/" />
@@ -963,7 +963,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/blob-storage/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/blob-storage/" />
@@ -971,7 +971,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/coordination-service/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/coordination-service/" />
@@ -979,7 +979,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/distributed-job-scheduler/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/distributed-job-scheduler/" />
@@ -987,7 +987,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/distributed-search-engine/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/distributed-search-engine/" />
@@ -995,7 +995,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/observability-pipeline/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/observability-pipeline/" />
@@ -1003,7 +1003,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/llm-inference-platform/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/llm-inference-platform/" />
@@ -1011,7 +1011,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/rag-system/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/rag-system/" />
@@ -1019,7 +1019,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/agentic-ai-platform/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/agentic-ai-platform/" />
@@ -1027,7 +1027,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/ai-coding-agent/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/ai-coding-agent/" />
@@ -1035,7 +1035,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/zoom-video-conferencing/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/zoom-video-conferencing/" />
@@ -1043,7 +1043,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/telegram-chat/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/telegram-chat/" />
@@ -1051,7 +1051,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/facebook-news-feed/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/facebook-news-feed/" />
@@ -1059,7 +1059,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/google-docs-collab/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/google-docs-collab/" />
@@ -1067,7 +1067,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/netflix-streaming/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/netflix-streaming/" />
@@ -1075,7 +1075,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/grab-food-delivery/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/grab-food-delivery/" />
@@ -1083,7 +1083,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/uber-ride-hailing/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/uber-ride-hailing/" />
@@ -1091,7 +1091,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/online-auction/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/online-auction/" />
@@ -1099,7 +1099,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/flight-booking/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/flight-booking/" />
@@ -1107,7 +1107,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/system-design-material/stock-exchange-v2/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/system-design-material/stock-exchange-v2/" />

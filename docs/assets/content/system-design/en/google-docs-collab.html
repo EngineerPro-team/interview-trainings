@@ -1,0 +1,183 @@
+<p><strong>Google Docs</strong>-style collaborative editing lets many people edit one document at once and always converge to the same result. The crux is <strong>conflict resolution</strong> for concurrent edits — Operational Transformation (OT) or CRDTs — plus per-document ordering, persistence, and presence.</p>
+
+<p>The entire problem reduces to one guarantee: <strong>convergence</strong> — given the same set of edits in any delivery order, every client must end up with byte-identical document state. Concurrent edits to the same region are the hard case: if Alice inserts at position 5 while Bob deletes position 3, naive application diverges. OT and CRDTs are two answers to "how do we make concurrent ops commute." The good news is the <em>scale</em> is gentle (a doc has a handful of editors), so this is a <strong>correctness</strong> problem, not a throughput one — and the design centers on a per-document authority that orders and transforms ops.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>How many concurrent editors per doc?</strong> A handful (typical docs) lets you funnel ops through one per-doc server; hundreds (a live shared whiteboard) needs more care.</li>
+<li><strong>OT or CRDT?</strong> OT (central server transforms) is simpler server-side and battle-tested for text; CRDTs enable serverless/P2P and offline merge at the cost of metadata — clarify if offline/P2P is required.</li>
+<li><strong>Offline editing?</strong> If clients edit offline and reconnect, you need to rebase a queue of local ops against the server — a major requirement, not a nicety.</li>
+<li><strong>Rich content?</strong> Plain text vs styled text, tables, images, comments — richer models complicate the op set and transforms.</li>
+<li><strong>History/audit?</strong> Full revision history and named versions change the persistence model (keep the op log + periodic snapshots).</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Multiple users edit the same document concurrently; everyone converges.</li>
+<li>See others' <strong>cursors / presence</strong>; comments.</li>
+<li><strong>Version history</strong>; offline edits that sync on reconnect.</li>
+<li>Sharing and permissions.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low-latency convergence</strong> (edits appear in well under a second).</li>
+<li><strong>Consistency:</strong> all clients reach the same document state.</li>
+<li>Scale per-document concurrency and total documents.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Edit rate:</strong> active typing is a few keystrokes/s per user; a 10-editor doc is tens of ops/s — small per doc, but there are millions of docs.</li>
+<li><strong>Op size:</strong> an op (insert char at position) is tiny (tens of bytes); the op log grows fast but compacts into snapshots.</li>
+<li><strong>Fan-out:</strong> each op broadcasts to the other N-1 editors of that doc — bounded by editors-per-doc, not global users.</li>
+<li><strong>Storage:</strong> snapshot + recent op log per doc; old ops compacted away after a snapshot.</li>
+</ul>
+<p><strong>Worked example.</strong> The numbers explain why the architecture is "one owner per doc, sharded by doc." Ten people typing is ~5 keystrokes/s each ≈ 50 ops/s on that document — nothing for a single server thread. So you can afford to route <em>all</em> ops for one doc to <strong>one authoritative server</strong> (or one partition), which assigns a monotonic revision number and transforms each incoming op against any it didn't yet know about. That serialization is what guarantees convergence, and it's cheap because per-doc traffic is tiny. Scale comes from <strong>sharding documents across servers</strong> (doc_id → owner), not from making one doc faster — a million active docs × 50 ops/s is 50M ops/s in aggregate, but each server only handles the docs it owns. Storage: at ~30 bytes/op and 50 ops/s, an hour of heavy editing is ~5 MB of ops; you snapshot periodically (e.g. every N ops) and compact, so open = load latest snapshot + replay the short op tail, keeping open latency bounded regardless of document age.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><strong>WebSocket session:</strong> <code>open(doc_id)</code> → snapshot + current revision.</li>
+<li><code>submitOps(doc_id, base_revision, ops[])</code> → <code>{applied_revision}</code>.</li>
+<li><strong>Server pushes:</strong> <code>remote_ops</code>, <code>cursor</code>, <code>presence</code>.</li>
+<li><code>GET /docs/{id}/history</code> → revisions / snapshots.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Each open document is owned by a single <strong>collaboration server</strong> (sharded by <code>doc_id</code>) that serializes all edits for that doc. Clients connect over WebSocket; the server transforms/merges ops, assigns a revision number, persists to an op log, and broadcasts.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U1["Editor A"] --> WS["WebSocket gateway"]
+  U2["Editor B"] --> WS
+  WS --> PERM["Permission service (ACL: view / comment / edit)"]
+  PERM --> COLLAB["Collaboration server (owner of doc, sharded by doc_id)"]
+  COLLAB --> ENGINE["OT / CRDT engine"]
+  COLLAB --> OPLOG["Op log store"]
+  COLLAB --> SNAP["Snapshot store"]
+  COLLAB --> PRES["Presence service"]
+</pre>
+<figcaption><strong>Figure 1.</strong> A permission service enforces the doc ACL on open/submit; one collaboration server owns each document and serializes its edits; ops persist to a log and periodically compact into snapshots.</figcaption>
+</figure>
+
+<p><strong>Permissions:</strong> every <code>open</code>, <code>submitOps</code>, comment, and history request is authorized against the document ACL (view / comment / edit) before the collaboration server applies it — a viewer cannot submit edits even if it forges ops.</p>
+
+<h2>The concurrency problem</h2>
+<p>If A inserts "X" at position 2 while B deletes position 1 at the same time, naively applying both gives different results on each client. Two families of solutions guarantee convergence:</p>
+<ul>
+<li><strong>Operational Transformation (OT):</strong> transform an incoming op against concurrent ops so it applies correctly at its new position. Needs a central server to order ops; conceptually simple text model, tricky to implement correctly.</li>
+<li><strong>CRDT:</strong> give each character a unique, totally-ordered id so concurrent inserts/deletes commute — order of application no longer matters. More metadata per character, but converges without a central transformer (good for offline/peer-to-peer).</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  CONC["Concurrent edits from A and B"] --> APPROACH{"OT or CRDT?"}
+  APPROACH -->|OT| OT["Transform op vs concurrent ops; server orders"]
+  APPROACH -->|CRDT| CRDT["Unique ordered ids; ops commute"]
+  OT --> CONV["All clients converge"]
+  CRDT --> CONV
+</pre>
+<figcaption><strong>Figure 2.</strong> OT transforms ops against each other (server-ordered); CRDTs make ops commute via unique ids. Both guarantee convergence.</figcaption>
+</figure>
+
+<h2>Per-document ordering</h2>
+<p>The simplest correct design: shard documents so one server owns each doc and applies edits in a single order, assigning a monotonically increasing <strong>revision</strong>. Clients submit ops against the revision they last saw; the server transforms against any ops it accepted in between, applies, and acks with the new revision.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Editor A
+  participant S as Collaboration server
+  participant B as Editor B
+  A->>S: submitOps(base_rev=10, insert X)
+  S->>S: transform vs ops after rev 10, apply, rev=11
+  S-->>A: ack rev=11
+  S-->>B: remote_ops (rev=11)
+  B->>S: submitOps(base_rev=11, delete Y)
+  S-->>B: ack rev=12
+  S-->>A: remote_ops (rev=12)
+</pre>
+<figcaption><strong>Figure 3.</strong> A single owner per document assigns revisions and transforms each submission against the ops it accepted in between.</figcaption>
+</figure>
+
+<h2>Persistence: op log plus snapshots</h2>
+<p>The document state is the snapshot plus the ops applied after it. Persisting <strong>every op</strong> gives full history and crash recovery; periodically the server writes a <strong>snapshot</strong> and compacts older ops. On open, a client loads the latest snapshot then replays the tail of the op log.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  OPS["Ops 1..N appended"] --> LOG["Op log"]
+  LOG -->|periodic| SNAP["Snapshot at rev N"]
+  SNAP --> OPEN["Open doc: load snapshot"]
+  LOG -->|tail after N| OPEN
+  OPEN --> STATE["Reconstructed document"]
+</pre>
+<figcaption><strong>Figure 4.</strong> Snapshot plus op-log tail reconstructs the document; periodic snapshots keep replay short.</figcaption>
+</figure>
+
+<h2>Presence and offline</h2>
+<p>Cursors and selections are ephemeral presence events broadcast to co-editors (not persisted). Offline editing buffers ops locally; on reconnect the client submits them against its last known revision and the server transforms them in — the same mechanism as online edits, which is exactly why OT/CRDT matters.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client (was offline)
+  participant S as Collaboration server
+  Note over C: edited offline, buffered ops at base_rev 30
+  C->>S: reconnect + submitOps(base_rev 30, buffered ops)
+  S->>S: transform buffered ops vs revisions 31..38 accepted while offline
+  S-->>C: ack at rev 39 + remote_ops 31..38
+  Note over C: local state rebased and converged
+</pre>
+<figcaption><strong>Figure 5.</strong> Offline reconnect: buffered ops are transformed against the revisions accepted while the client was away, then both sides converge — the same transform path as online edits.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway + WebSocket gateway</strong>: REST for open/share/history, a persistent WebSocket for the live edit stream.</li>
+<li><strong>Op log:</strong> the source of truth is a durable <strong>append-only op table / event store per document</strong> with permanent retention and snapshot compaction (replay by doc + revision, keep history). Kafka may <em>mirror</em> ops as a live change stream for fanout, but it is not the long-term source of truth (retention/replay are bounded).</li>
+<li><strong>Snapshots:</strong> periodic compacted document state in <strong>blob/object storage (S3-like)</strong>, so open = load snapshot + replay tail.</li>
+<li><strong>Document metadata + permissions/ACL:</strong> a relational DB (<strong>PostgreSQL</strong>) — structured, transactional, the authority for sharing.</li>
+<li><strong>Presence/cursors:</strong> ephemeral → <strong>Redis</strong> (pub/sub + TTL), never persisted.</li>
+<li><strong>Comments / version history:</strong> a store keyed by doc + range/revision (Postgres or a wide-column store for very active docs).</li>
+</ul>
+<p><strong>Why these:</strong> the live document is hot in-memory on its owning collaboration server; durability is the append-only op log + periodic snapshots (logs are perfect for an ordered edit stream, blob for big snapshots); permissions are small + relational → SQL; cursors are throwaway → Redis. The single-owner-per-doc shard makes the "where is this doc's state" routing trivial.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Strong eventual consistency (convergence):</strong> the core guarantee — all clients that have received the same ops are byte-identical, regardless of order. OT/CRDT makes concurrent ops commute so there is exactly one converged state.</li>
+<li><strong>Per-document total order:</strong> the owning server assigns a monotonic revision per doc; clients transform local ops against the server's order before applying — there is one authoritative sequence per document.</li>
+<li><strong>Optimistic local apply + rebase:</strong> a client applies its own edit immediately (responsive UX) and later rebases it against the server revision; on offline reconnect, the queued local ops are transformed against everything that happened while away.</li>
+<li><strong>Durable, replayable history:</strong> an accepted op is appended to the durable op log before it is broadcast as committed, so the document can always be reconstructed (snapshot + op tail) and old versions restored.</li>
+<li><strong>Permissions are strongly enforced:</strong> the ACL is the authority — a client without edit rights cannot commit ops, checked server-side, not in the client.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>OT + central server when:</strong> real-time collaborative text with a handful-to-dozens of editors and a server you control — the proven, simpler path (Docs, most editors).</li>
+<li><strong>CRDTs when:</strong> you need offline-first, peer-to-peer, or serverless merge (local-first apps) and can afford the per-element metadata.</li>
+<li><strong>Overkill when:</strong> documents are edited by one person at a time — last-writer-wins with locking/check-out is far simpler than OT/CRDT.</li>
+<li><strong>Different design when:</strong> the "collaboration" is really high-frequency shared state (a game world, a cursor-heavy whiteboard with hundreds of users) — that may need a different replication/interest-management model than document OT.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>OT correctness</strong> is famously subtle — many edge cases; CRDTs trade that for per-char metadata.</li>
+<li><strong>Single-owner hotspot:</strong> a doc with thousands of editors stresses one server — cap editors or partition large docs.</li>
+<li><strong>Snapshot cadence:</strong> too rare means long replays; too frequent wastes storage.</li>
+<li><strong>Offline divergence:</strong> long offline edits produce big transform sets — bound and reconcile.</li>
+<li><strong>Undo</strong> must be per-user and transform-aware, not a naive global revert.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Convergence needs <strong>OT</strong> (server-ordered transform) or <strong>CRDT</strong> (commutative ops).</li>
+<li>A <strong>single owner per document</strong> gives a clean ordering and revision numbers.</li>
+<li><strong>Op log + periodic snapshot</strong> give history, recovery, and fast open.</li>
+<li>Offline edits reuse the same transform path on reconnect.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Operational Transformation (Ellis &amp; Gibbs, 1989); CRDTs (Shapiro et al., 2011); Yjs and Automerge docs; public material on Google Wave / Docs-style collaboration. Diagrams and write-up are original EngineerPro content.</em></p>

@@ -1,0 +1,180 @@
+<p>An <strong>agentic AI platform</strong> runs autonomous agents that plan, call tools, observe results, and iterate until a task is done. Unlike a single LLM call, an agent run is a <strong>long, stateful, multi-step workflow</strong> — so the design borrows from durable workflow engines: checkpointing, idempotent steps, tool sandboxing, memory, and guardrails. It sits on top of the LLM inference platform.</p>
+
+<p>The framing that wins the interview: stop thinking "LLM call" and start thinking "<strong>durable distributed workflow whose steps happen to be non-deterministic and can have side effects in the real world</strong>." That reframing is what forces the hard requirements — every step must be checkpointed so a crash can resume, every tool call must be idempotent or guarded so a retry doesn't double-charge a customer, and every action must be sandboxed and policy-gated because the model is untrusted input deciding what to do.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>What can tools actually do?</strong> Read-only (search, fetch) is low-risk; side-effecting (send email, move money, deploy) demands idempotency keys, approvals, and audit.</li>
+<li><strong>How autonomous?</strong> Fully autonomous, or human-in-the-loop approval gates before risky actions? That decides whether you need an approval/pause-resume state.</li>
+<li><strong>Run duration and resumability?</strong> Seconds vs hours-long runs decide whether state lives in memory or in a durable workflow store.</li>
+<li><strong>Multi-tenant isolation?</strong> Shared platform across tenants needs per-tenant memory, secrets, sandboxes, and quotas — a security boundary, not just config.</li>
+<li><strong>Cost/loop bounds?</strong> What stops an agent looping forever or burning unbounded tokens — step limits, token budgets, a supervisor?</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Define an agent with a set of <strong>tools</strong>; run a multi-step task (plan to act to observe).</li>
+<li><strong>Tool calling</strong>; short- and long-term <strong>memory</strong>.</li>
+<li><strong>Resume</strong> interrupted runs; human-in-the-loop approval; full trace.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Reliability:</strong> steps are idempotent and the run is resumable.</li>
+<li><strong>Cost control:</strong> token budgets and loop limits.</li>
+<li><strong>Safety:</strong> sandboxed tools, guardrails. Scale to many concurrent runs.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Run length:</strong> an agent run can be 10-100+ LLM calls over minutes to hours — far longer than one request, so state must be durable, not in memory.</li>
+<li><strong>Cost:</strong> each step sends the growing context to the LLM; a 50-step run with a 10k-token context can burn ~500k+ tokens — context management and budgets are essential.</li>
+<li><strong>Concurrency:</strong> thousands of concurrent runs, mostly waiting on LLM or tool I/O → an async, queue-driven orchestrator, not a thread per run.</li>
+<li><strong>Memory store:</strong> per-agent vector + key-value memory; reads on most steps.</li>
+</ul>
+<p><strong>Worked example.</strong> Suppose a run averages 30 steps and each step resends a context that grows from 2k to ~15k tokens; the integral is roughly 30 × ~8k ≈ <strong>240k input tokens</strong> plus output — one run alone. At 10k concurrent runs that is millions of tokens/s of demand on the inference platform, which is why context management (summarize/trim old turns, keep tool results out of the prompt when possible) is not optional — it directly controls cost and the per-step latency (bigger context = slower prefill). Concurrency math: 10k runs each blocked ~5s on an LLM/tool call means the orchestrator is mostly <em>waiting</em>, so a thread-per-run model would need 10k threads; an async, event-driven orchestrator backed by a durable queue handles the same load on a handful of workers. The scarce resource is the LLM/GPU and external tool rate limits, not orchestrator CPU.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /agents</code> — <code>{name, system_prompt, tools[]}</code> → <code>{agent_id}</code>.</li>
+<li><code>POST /agents/{id}/runs</code> — <code>{task, budget}</code> → <code>{run_id}</code> (async).</li>
+<li><code>GET /runs/{id}</code> → state, steps, trace; <code>POST /runs/{id}/resume</code>.</li>
+<li><code>POST /runs/{id}/approve</code> — human-in-the-loop gate.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>An <strong>orchestrator</strong> drives each run as a durable state machine: it calls the <strong>LLM gateway</strong> to decide the next action, executes <strong>tools</strong> in sandboxes, reads/writes <strong>memory</strong>, manages <strong>context</strong>, and records every step to a trace. Long-running runs live on a queue, not a held connection.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> ORCH["Agent orchestrator (durable run state)"]
+  ORCH --> POL["Policy / approval gate (human-in-the-loop)"]
+  ORCH --> LLM["LLM gateway (inference platform)"]
+  ORCH --> TOOLS["Tool service + sandbox executors"]
+  TOOLS --> REG["Tool registry + scopes"]
+  TOOLS --> SEC["Secret broker (scoped, short-lived)"]
+  ORCH --> MEM["Memory store (vector + KV, per-tenant)"]
+  ORCH --> CTX["Context manager"]
+  ORCH --> TRACE["Trace / observability + event stream (SSE)"]
+  Q["Run queue"] --> ORCH
+</pre>
+<figcaption><strong>Figure 1.</strong> The orchestrator coordinates the LLM, sandboxed tools, memory, and context, persisting run state so long runs survive restarts.</figcaption>
+</figure>
+
+<h2>The agent loop</h2>
+<p>The core is a loop: the LLM <strong>plans</strong> the next action, the platform <strong>acts</strong> (calls a tool), feeds back the <strong>observation</strong>, and repeats until the goal is met or a limit is hit. Each iteration is one durable step.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  START["Task"] --> PLAN["LLM: decide next action"]
+  PLAN --> ACT{"Tool call or final answer?"}
+  ACT -->|tool call| TOOL["Execute tool in sandbox"]
+  TOOL --> OBS["Append observation to context"]
+  OBS --> CHECK{"Goal met or limit hit?"}
+  CHECK -->|no| PLAN
+  CHECK -->|yes| DONE["Return result"]
+  ACT -->|final answer| DONE
+</pre>
+<figcaption><strong>Figure 2.</strong> Plan to act to observe, repeated. Loop limits and budgets guarantee termination.</figcaption>
+</figure>
+
+<h2>Tool calling and sandboxing</h2>
+<p>Tools are how an agent affects the world (search, code execution, API calls). They must run in an <strong>isolated sandbox</strong> with resource limits and no access to secrets it should not have — a tool is untrusted code driven by a model. The orchestrator validates the model's tool request, runs it, and returns a structured observation.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant O as Orchestrator
+  participant L as LLM gateway
+  participant S as Sandbox
+  O->>L: context + available tools
+  L-->>O: tool_call(search, query)
+  O->>O: validate request + budget
+  O->>S: run tool in isolated sandbox
+  S-->>O: structured result
+  O->>L: result appended as observation
+  L-->>O: next action
+</pre>
+<figcaption><strong>Figure 3.</strong> The model requests a tool; the orchestrator validates and runs it in a sandbox, then feeds the result back as an observation.</figcaption>
+</figure>
+
+<h2>Durable runs: checkpoint and resume</h2>
+<p>Because a run spans minutes/hours and many fallible calls, treat it like a <strong>durable workflow</strong> (Temporal-style). After each step, persist the run state (step index, context pointers, memory deltas). On crash, restart, or a human-approval pause, the orchestrator <strong>resumes</strong> from the last checkpoint.</p>
+<p><strong>Tool side-effect safety is the subtle part.</strong> A tool can create an external side effect (an API call, a payment, a PR) and then crash <em>before</em> the checkpoint is written — a naive replay would call it twice. So a tool step is itself a small state machine: <code>Planned → ToolRequested (idempotency_key recorded) → ToolResultRecorded → Checkpointed</code>. The orchestrator records the request <em>before</em> calling the tool, the tool is invoked with the idempotency key (or the orchestrator looks up an existing result), and only a recorded result advances the run. The trace/state store redacts secrets and is tenant-isolated; persist summarized context + pointers rather than raw prompts.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  STEP["Execute step k"] --> CP["Checkpoint: state after step k"]
+  CP --> NEXT["Step k+1"]
+  CRASH["Crash / pause / approval wait"] --> RESUME["Resume from last checkpoint"]
+  RESUME --> NEXT
+</pre>
+<figcaption><strong>Figure 4.</strong> Each step checkpoints run state; resume continues from the last checkpoint after crashes or human-in-the-loop pauses.</figcaption>
+</figure>
+
+<h2>Memory and context management</h2>
+<p>The LLM context window is finite, but a long run accumulates history. The <strong>context manager</strong> keeps the prompt within budget: summarize old steps, and retrieve only relevant long-term <strong>memory</strong> (a vector store) for the current step. Short-term memory is the recent step history; long-term memory persists across runs.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  HIST["Full run history"] --> CM["Context manager"]
+  MEM["Long-term memory (vector store)"] --> CM
+  CM --> SUM["Summarize old steps"]
+  CM --> RET["Retrieve relevant memory"]
+  SUM --> PROMPT["Bounded prompt for next LLM call"]
+  RET --> PROMPT
+</pre>
+<figcaption><strong>Figure 5.</strong> The context manager summarizes history and retrieves only relevant memory, keeping each prompt within the token budget.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, per-tenant quotas/token budgets, routing to the orchestrator.</li>
+<li><strong>Orchestrator:</strong> a <strong>durable workflow engine</strong> (Temporal / a custom state machine) so a multi-step run survives crashes and resumes from a checkpoint.</li>
+<li><strong>Run state &amp; trace:</strong> step state in <strong>PostgreSQL</strong> (small, transactional, queryable); large step artifacts (tool outputs, logs) in <strong>blob storage</strong>; traces in the observability stack.</li>
+<li><strong>Memory:</strong> long-term in a <strong>vector store</strong> (Milvus / pgvector / Pinecone), short-term/working memory in <strong>Redis</strong>, both per-tenant namespaced.</li>
+<li><strong>Tools:</strong> executed in a <strong>sandbox</strong> (Firecracker microVM / gVisor / containers); a <strong>secret broker</strong> (Vault) injects scoped short-lived credentials.</li>
+<li><strong>Queue + LLM:</strong> <strong>Kafka / SQS</strong> for long-running run scheduling; the <strong>LLM gateway</strong> (the inference platform) for model calls; <strong>SSE/WebSocket</strong> for progress streaming.</li>
+</ul>
+<p><strong>Why these:</strong> the run is long and fallible → a durable workflow engine, not a request thread; structured run state → SQL, big artifacts → object storage; semantic memory → a vector store, hot working state → Redis; untrusted tool code → a sandbox + Vault-brokered secrets. The split mirrors the data shapes, not one database for everything.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Exactly-once intent, at-least-once execution:</strong> the workflow engine guarantees a step is <em>not lost</em> (it retries from the last checkpoint), so a side-effecting tool call must be <strong>idempotent</strong> (idempotency key) or guarded by a step state machine, otherwise a retry repeats the action.</li>
+<li><strong>Durable, resumable runs:</strong> after every step the run state is committed; a worker crash resumes from the last checkpoint, not from the start — the LLM call output is recorded so it is not re-sampled on resume.</li>
+<li><strong>Policy is a hard gate, model output is not trusted:</strong> the model <em>proposes</em> actions; an authorization/approval layer decides if they execute. Guardrails (allowlist, scopes, human approval) are enforced outside the model.</li>
+<li><strong>Non-deterministic steps, deterministic orchestration:</strong> the LLM is non-deterministic, but the orchestration (which step ran, its result, retries) is a deterministic, replayable log — that is what makes debugging and auditing possible.</li>
+<li><strong>Isolation:</strong> per-tenant memory, secrets, and sandboxes are isolated; one run cannot read another's state or credentials.</li>
+</ul>
+
+<h2>When (not) to use an agentic platform</h2>
+<ul>
+<li><strong>Use it when:</strong> the task genuinely needs multi-step reasoning with tools (research, coding, ops automation), runs are long/resumable, and actions have real side effects that need audit and approval.</li>
+<li><strong>Overkill when:</strong> a single LLM call (or a fixed prompt chain) solves it — don't build a workflow engine for a one-shot classification or summarization.</li>
+<li><strong>Dangerous when:</strong> tools have irreversible side effects and you cannot make them idempotent or gate them with approvals — the cost of a wrong autonomous action outweighs the benefit. Start read-only, add write tools behind approvals.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Infinite loops / runaway cost:</strong> enforce step limits and token budgets; detect repeated no-progress actions.</li>
+<li><strong>Tool safety:</strong> sandbox everything; never give a model raw credentials or unbounded access.</li>
+<li><strong>Context overflow:</strong> summarize + retrieve; do not dump the whole history each step.</li>
+<li><strong>Non-determinism:</strong> traces and idempotent steps make runs debuggable and resumable.</li>
+<li><strong>Multi-agent:</strong> an orchestrator-worker pattern (a planner delegating to sub-agents) scales complex tasks but multiplies cost.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>An agent run is a <strong>durable, multi-step workflow</strong>, not a single call.</li>
+<li>The <strong>plan-act-observe loop</strong> with budgets and limits is the core.</li>
+<li><strong>Sandbox tools</strong>; the model is driving untrusted actions.</li>
+<li><strong>Checkpoint/resume</strong> + idempotent steps make long runs reliable.</li>
+<li><strong>Context management + memory</strong> keep prompts bounded and grounded.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: ReAct (Yao et al., 2022); Temporal durable-execution docs; LangGraph / LangChain agent docs; OpenAI and Anthropic tool/function-calling and safety docs; Firecracker/gVisor for tool sandboxing. Diagrams and write-up are original EngineerPro content.</em></p>

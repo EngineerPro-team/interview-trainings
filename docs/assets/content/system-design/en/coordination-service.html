@@ -1,0 +1,183 @@
+<p>A <strong>coordination service</strong> (ZooKeeper / etcd style) is the building block other distributed systems lean on for <strong>leader election</strong>, <strong>distributed locks</strong>, configuration, and service discovery. Its whole value is being <strong>strongly consistent</strong> (and as available as a CP system can be) — which it achieves with a consensus algorithm like Raft.</p>
+
+<p>The key mental model: this is the one place in your architecture that is allowed to be <strong>small, slow, and absolutely correct</strong>, so everything else can be large, fast, and loose. You deliberately trade throughput for linearizability and a single source of truth — which is why "don't put your data here, put your <em>decisions</em> here" is the framing that impresses.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>What is it coordinating?</strong> Leader election, locks, config, service discovery, membership — each leans on the same primitives (CAS, watches, ephemeral keys + leases) but with different access patterns.</li>
+<li><strong>Read or write heavy?</strong> Reads can be scaled/relaxed (follower reads, read-index); writes are bounded by consensus and should stay rare.</li>
+<li><strong>Linearizable reads required?</strong> If stale reads are acceptable, follower reads are far cheaper; if not, reads must go through the leader / read-index.</li>
+<li><strong>Failure model?</strong> How many simultaneous node failures must it survive — this sets the cluster size (3/5/7) and the quorum.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>A small <strong>key-value</strong> store with <strong>watches</strong> (notify on change).</li>
+<li><strong>Distributed lock</strong> and <strong>leader election</strong>.</li>
+<li>Ephemeral entries tied to a session (auto-removed on disconnect).</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Strong consistency</strong> (linearizable reads/writes).</li>
+<li><strong>Availability under the CAP CP tradeoff</strong> — survives a <em>minority</em> of node failures, but on a partition the minority side is unavailable (it favors consistency over availability). Not "always available".</li>
+<li><strong>Durability</strong>; modest but predictable latency.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Cluster size:</strong> 3, 5, or 7 nodes — odd, to form a majority quorum; tolerates floor(N/2) failures.</li>
+<li><strong>Write throughput:</strong> every write goes through consensus (replicated + majority ack), so it is modest (thousands/s), not millions — this is a coordination store, not a data store.</li>
+<li><strong>Read:</strong> can be served from the leader (linearizable) or replicas (faster, possibly stale) depending on guarantee.</li>
+<li><strong>Data size:</strong> small — config, locks, membership — keep it in memory with a replicated log on disk.</li>
+</ul>
+<p><strong>Worked example — why writes are bounded.</strong> Every write must be appended to the leader's log, replicated, and acked by a majority before commit. On a 5-node cluster that is at least one fsync + a network round-trip to 2 more nodes per write, so a single Raft group realistically commits on the order of a few thousand writes/s — fine for "elect a leader" or "update this config", catastrophic if you treat it as a database and write per user request. If you genuinely need more write throughput, you shard into multiple independent Raft groups (etcd/ZooKeeper are not meant to be sharded data stores) — which is the cue that you are using the wrong tool.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>put(key, value)</code>, <code>get(key)</code>, <code>delete(key)</code>.</li>
+<li><code>watch(key)</code> → events on change.</li>
+<li><code>lock(key)</code> / <code>unlock(key)</code> with a lease.</li>
+<li><code>create_ephemeral(key)</code> — removed when the session ends.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>A small cluster of nodes runs a <strong>consensus protocol</strong>. One node is the <strong>leader</strong>; clients send writes to it, the leader replicates them through a replicated <strong>log</strong> to followers, and a write commits once a <strong>majority</strong> has it. The committed log is applied to an in-memory state machine (the key-value tree).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  C["Client"] --> LEADER["Leader node"]
+  subgraph CLUSTER["Consensus cluster (Raft)"]
+    LEADER -->|replicate log| F1["Follower 1"]
+    LEADER -->|replicate log| F2["Follower 2"]
+  end
+  LEADER --> SM["State machine: KV tree"]
+  F1 --> SM1["State machine replica"]
+  F2 --> SM2["State machine replica"]
+  C -.watch.-> LEADER
+</pre>
+<figcaption><strong>Figure 1.</strong> A leader replicates a log to followers via consensus; once a majority has an entry it commits and is applied to the in-memory KV state machine.</figcaption>
+</figure>
+
+<h2>Consensus and leader election</h2>
+<p><strong>Raft</strong> makes the cluster agree on an ordered log despite failures. Nodes elect a leader by majority vote for a <em>term</em>; the leader handles all writes and replicates them. If the leader dies, followers time out and elect a new one. Because entries commit only with a majority, a split network cannot produce two committing leaders (no split-brain).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant Cand as Candidate
+  participant F1 as Follower 1
+  participant F2 as Follower 2
+  Note over Cand: leader timed out
+  Cand->>F1: RequestVote (term T)
+  Cand->>F2: RequestVote (term T)
+  F1-->>Cand: vote granted
+  F2-->>Cand: vote granted
+  Note over Cand: majority -> becomes leader
+  Cand->>F1: AppendEntries (heartbeat)
+  Cand->>F2: AppendEntries (heartbeat)
+</pre>
+<figcaption><strong>Figure 2.</strong> Leader election: a candidate wins with a majority of votes for a term, then asserts leadership via heartbeats.</figcaption>
+</figure>
+
+<h2>Log replication</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  W["Client write"] --> L["Leader appends to log"]
+  L -->|AppendEntries| R1["Follower 1 appends"]
+  L -->|AppendEntries| R2["Follower 2 appends"]
+  R1 -->|ack| L
+  R2 -->|ack| L
+  L --> COMMIT{"Majority acked?"}
+  COMMIT -->|yes| APPLY["Commit + apply to state machine"]
+  APPLY --> ACK["Ack client"]
+</pre>
+<figcaption><strong>Figure 3.</strong> A write is appended to the leader's log, replicated, and committed once a majority acks — then applied and acknowledged.</figcaption>
+</figure>
+
+<h2>Distributed lock with lease and fencing</h2>
+<p>A lock is just a key that one client holds. Crucially it carries a <strong>lease</strong> (so a crashed holder's lock auto-expires) and a <strong>fencing token</strong> — a monotonically increasing number handed out with the lock. Downstream systems reject operations carrying an old token, so a paused-then-resumed old holder cannot corrupt state. Locks without fencing are unsafe.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Client A
+  participant CS as Coordination service
+  participant R as Protected resource
+  participant B as Client B
+  A->>CS: acquire lock (lease)
+  CS-->>A: granted, fencing token = 33
+  A->>R: write with token 33
+  Note over A: A pauses (GC), lease expires
+  B->>CS: acquire lock (lease)
+  CS-->>B: granted, fencing token = 34
+  B->>R: write with token 34
+  A->>R: late write with token 33
+  R-->>A: rejected, latest token is 34
+</pre>
+<figcaption><strong>Figure 4.</strong> A lease auto-expires a crashed holder's lock; a fencing token lets the resource reject a stale holder's late write.</figcaption>
+</figure>
+
+<h2>Watches and sessions</h2>
+<p>Clients <strong>watch</strong> keys to be notified of changes (e.g. config update, new leader) instead of polling. Watches carry a <strong>revision</strong> so a client can resume "from revision X" after a reconnect and not miss events; if a watched history was compacted away, the server signals a re-sync. <strong>Ephemeral</strong> keys are tied to a client session kept alive by heartbeats; when the session ends, its ephemeral keys vanish — the mechanism behind presence and leader election (the leader holds an ephemeral key). The API also offers <strong>compare-and-swap</strong> / versioned writes and <strong>lease grant + keepalive</strong>.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant CS as Coordination service
+  C->>CS: watch(key, from_revision = 12)
+  CS-->>C: event rev 13 (put)
+  CS-->>C: event rev 14 (delete)
+  Note over C: disconnect, reconnect
+  C->>CS: watch(key, from_revision = 14)
+  alt history still available
+    CS-->>C: event rev 15 (missed while away)
+  else compacted
+    CS-->>C: re-sync required (read current state)
+  end
+</pre>
+<figcaption><strong>Figure 5.</strong> Revision-based watches let a client resume after reconnect without missing events; if the history was compacted, the server asks it to re-sync.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>The storage decision here is about <em>what is authoritative</em> and how it is made durable — a coordination service stores small, critical decisions, not bulk data:</p>
+<ul>
+<li><strong>Replicated consensus log (source of truth):</strong> the durable, replicated <strong>Raft/ZAB log</strong> of state changes is the authority; every write is committed by a quorum before ack. Periodic <strong>snapshots</strong> compact it so recovery isn't a full replay.</li>
+<li><strong>In-memory KV state (MVCC projection):</strong> the current key space is held in memory (a tree/MVCC store), rebuilt from log + snapshot on restart — fast reads, but derived from the log, not a separate source of truth.</li>
+<li><strong>Leases / session table:</strong> client sessions and lease expiries are tracked so locks auto-release on client death (TTL + heartbeat); this is what makes locks safe.</li>
+<li><strong>Watch / revision history:</strong> a monotonic global revision per change lets clients watch and resume from a revision; old revisions are compacted.</li>
+<li><strong>Local disk with fsync:</strong> each node fsyncs the log to local disk; values are deliberately <strong>small</strong> (KB), not a blob store — large values do not belong here.</li>
+<li><strong>Implementations:</strong> <strong>etcd</strong> (Raft, behind Kubernetes), <strong>ZooKeeper</strong> (ZAB; Kafka/Hadoop/HBase), <strong>Consul</strong> (KV + discovery + health), <strong>Google Chubby</strong> (the original). Almost every system here uses one for leader election, config, and locks.</li>
+</ul>
+
+<h2>When (not) to use a coordination service</h2>
+<ul>
+<li><strong>Great for:</strong> leader election, distributed locks with fencing, dynamic config, service discovery/membership, small amounts of critical metadata — low write volume, high correctness.</li>
+<li><strong>Wrong for:</strong> a general database or high-throughput store (writes are consensus-bound), large blobs, or anything where availability must beat consistency on a partition.</li>
+<li><strong>A cheaper alternative</strong> for plain best-effort locking is a Redis lease with a fencing token — but it is not linearizable, so use the coordination service when correctness under partition actually matters.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Not a data store:</strong> writes go through consensus — keep it small and low-throughput.</li>
+<li><strong>Locks need fencing:</strong> a lease alone is unsafe under GC pauses / network delays.</li>
+<li><strong>Cluster size:</strong> odd numbers (3/5/7); more nodes means more durable but slower writes.</li>
+<li><strong>Linearizable reads cost:</strong> reading from the leader (or via read-index) is correct; replica reads can be stale.</li>
+<li><strong>Watch storms:</strong> one change can notify many watchers — debounce / batch.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>A coordination service trades throughput for <strong>strong consistency</strong> via <strong>consensus (Raft)</strong>.</li>
+<li><strong>Leader election + log replication</strong> with a majority quorum avoids split-brain.</li>
+<li><strong>Locks need a lease and a fencing token</strong> to be safe.</li>
+<li><strong>Watches + ephemeral sessions</strong> power discovery, config, and presence.</li>
+<li><strong>Put decisions here, not data:</strong> it is intentionally small/slow/correct so the rest of the system can be large/fast/loose — wrong tool for a high-throughput store.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Raft (Ongaro &amp; Ousterhout, 2014, raft.github.io); etcd docs (lease, watch, MVCC); Apache ZooKeeper docs; "How to do distributed locking" (Kleppmann) on fencing tokens. Diagrams and write-up are original EngineerPro content.</em></p>

@@ -1,0 +1,181 @@
+<p>An <strong>AI coding agent platform</strong> (Cursor / Devin style) runs autonomous agents that edit code, run tests, and open pull requests — often many in parallel, in the background. The hard infrastructure problems are <strong>isolated sandboxes</strong>, durable agent runs, and safe Git operations at scale. It builds on the agentic platform and the LLM inference platform.</p>
+
+<p>The distinguishing constraint versus a generic agent platform: the agent <strong>executes arbitrary, untrusted code</strong> (the repo's tests, build scripts, and whatever the model decides to run) against private source and credentials. So the design is dominated by two tensions — <strong>strong isolation</strong> (a hostile or buggy run must not escape the sandbox, exfiltrate secrets, or touch another tenant's repo) versus <strong>fast spin-up and cost</strong> (thousands of short-lived environments). Almost every choice (microVMs, warm pools, copy-on-write repos, egress proxy, secret broker) is a point on that trade-off.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Trust boundary?</strong> Does agent code run arbitrary commands and tests? (Yes → hard isolation: microVM, no ambient network, brokered secrets.)</li>
+<li><strong>Interactive or background?</strong> A user waiting in an editor cares about sub-second spin-up; background fleets optimize throughput and cost.</li>
+<li><strong>What side effects are allowed?</strong> Open a PR only, or also push, deploy, call external APIs? Each needs scoped tokens and audit.</li>
+<li><strong>Repo scale and language?</strong> Monorepo vs small repos changes clone/snapshot strategy and build-cache design.</li>
+<li><strong>Multi-tenant?</strong> Per-tenant isolation of sandboxes, secrets, caches, and egress is a security requirement, not an optimization.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Submit a coding task against a repo; the agent edits code in a <strong>sandbox</strong>, runs tests, streams progress.</li>
+<li>Produce a diff / open a <strong>pull request</strong>; resume an interrupted run.</li>
+<li>Run many background agents concurrently.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Isolation / security</strong> — agent code must not escape its sandbox or leak secrets.</li>
+<li><strong>Fast sandbox spin-up</strong>; reliability; high concurrency; cost control.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Concurrency:</strong> thousands of concurrent runs, each owning a sandbox — pool and recycle environments, do not spin one per request cold.</li>
+<li><strong>Spin-up:</strong> a cold container is seconds; a microVM with a warm pool is sub-second — matters because users wait at the start.</li>
+<li><strong>Run length:</strong> minutes to tens of minutes, mostly waiting on the LLM and on tests — async orchestration, not held threads.</li>
+<li><strong>Repo size:</strong> snapshots/clones of large repos are heavy → cache base images and use copy-on-write workspaces.</li>
+</ul>
+<p><strong>Worked example.</strong> Suppose 5,000 concurrent runs, each needing a 2 GB repo + toolchain environment. Cloning a 2 GB repo fresh per run is ~10 TB of I/O and tens of seconds of latency each — untenable. With <strong>copy-on-write</strong> from a cached base snapshot, each run only stores its diff (tens of MB), so 5,000 runs cost ~hundreds of GB, not 10 TB, and start in well under a second. Spin-up math: a cold container/VM boot is ~2-10s; if users wait at the start, a <strong>warm pool</strong> of pre-booted sandboxes turns that into queue-pop latency (ms). Sizing the pool is a classic utilization trade — too small and users queue, too large and idle microVMs burn money — so the pool is autoscaled on demand with a small warm buffer. The scarce resources are sandbox memory/CPU and LLM tokens, not orchestrator throughput.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /tasks</code> — <code>{repo, branch, instruction}</code> → <code>{run_id}</code> (async, background).</li>
+<li><code>GET /runs/{id}</code> → status, streamed logs, diff.</li>
+<li><code>POST /runs/{id}/resume</code>; <code>POST /runs/{id}/pr</code> — open a pull request.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>An <strong>orchestrator</strong> (durable, like the agentic platform) drives each run; a <strong>sandbox provisioner</strong> hands it an isolated environment from a warm pool; a <strong>repo service</strong> clones/snapshots code; the <strong>tool layer</strong> runs edits/shell/tests inside the sandbox; results stream out and an <strong>artifact service</strong> opens the PR.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> ORCH["Run orchestrator (durable)"]
+  ORCH --> PROV["Sandbox provisioner (warm pool)"]
+  PROV --> SB["Sandbox (container / microVM)"]
+  ORCH --> REPO["Repo / Git service"]
+  REPO --> SB
+  ORCH --> LLM["LLM / agent gateway"]
+  SB --> TOOLS["Tool layer: edit, shell, test"]
+  ORCH --> STREAM["Log streaming"]
+  ORCH --> ART["Artifact service: diff / PR"]
+</pre>
+<figcaption><strong>Figure 1.</strong> The orchestrator pairs a durable run with an isolated sandbox, drives the agent via the LLM gateway, runs tools in the sandbox, and opens a PR.</figcaption>
+</figure>
+
+<h2>Sandbox provisioning</h2>
+<p>Each run needs a clean, isolated environment where untrusted, model-driven commands can run. <strong>microVMs</strong> (or hardened containers) give strong isolation; a <strong>warm pool</strong> of pre-booted sandboxes with a cached base image makes start-up sub-second. The repo is materialized via copy-on-write so cloning a large repo is cheap.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  REQ["New run needs a sandbox"] --> POOL{"Warm sandbox available?"}
+  POOL -->|yes| ASSIGN["Assign warm sandbox (sub-second)"]
+  POOL -->|no| BOOT["Boot new microVM from base image"]
+  ASSIGN --> COW["Materialize repo via copy-on-write"]
+  BOOT --> COW
+  COW --> READY["Sandbox ready for the agent"]
+  REFILL["Background: refill warm pool"] --> POOL
+</pre>
+<figcaption><strong>Figure 2.</strong> A warm pool of isolated sandboxes plus copy-on-write repo materialization gives fast, safe environments per run.</figcaption>
+</figure>
+
+<h2>Run lifecycle</h2>
+<p>The orchestrator runs the agent loop (plan-act-observe) where the tools are <strong>edit file</strong>, <strong>run shell</strong>, and <strong>run tests</strong>. Each step is checkpointed so a run survives restarts and can pause for review. Logs stream to the client throughout.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant O as Orchestrator
+  participant SB as Sandbox
+  participant L as LLM
+  participant G as Git service
+  O->>SB: clone repo (copy-on-write)
+  loop agent step
+    O->>L: context + tools
+    L-->>O: action (edit / shell / test)
+    O->>SB: execute action
+    SB-->>O: result (stream logs)
+    O->>O: checkpoint run state
+  end
+  O->>G: create branch + commit diff
+  G-->>O: open pull request
+</pre>
+<figcaption><strong>Figure 3.</strong> The agent edits, runs commands, and tests inside the sandbox, checkpointing each step, then commits and opens a PR.</figcaption>
+</figure>
+
+<h2>Tool execution and Git</h2>
+<p>Tools are scoped to the sandbox filesystem and a restricted shell; network and secrets are locked down. When the agent is done, the repo service turns the working changes into a <strong>branch + commit</strong> and opens a pull request through the Git provider — the agent never pushes directly with broad credentials; a scoped token does it.</p>
+
+<p>Separate <strong>local sandbox side effects</strong> (file edits, test runs — cheap to redo) from <strong>external side effects</strong> (Git PR, package publish, network calls). External actions go through the artifact/approval service with a recorded <strong>idempotency key</strong>, so a crash-then-replay does not open two PRs or publish twice. A control plane wraps the sandbox: a <strong>secret broker</strong> injects scoped short-lived tokens only when approved, an <strong>egress proxy/allowlist</strong> restricts network, and an <strong>artifact scanner</strong> + <strong>audit log</strong> cover the output.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph BOUND["Security boundary per run"]
+    SB["Sandbox (microVM): edit / shell / test"]
+  end
+  SB -->|network| EGRESS["Egress proxy + allowlist"]
+  SECRET["Secret broker (scoped, short-lived)"] -->|inject only when approved| SB
+  SB -->|external action| APPROVAL["Approval / artifact service (idempotency key)"]
+  APPROVAL --> GIT["Git PR / publish (scoped token)"]
+  SB --> AUDIT["Audit log + artifact scanner"]
+</pre>
+<figcaption><strong>Figure 4.</strong> The security boundary: sandboxed tools reach the network only via an egress allowlist, secrets are brokered on approval, and external actions go through an idempotent approval/artifact path.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  EDIT["Edit files in sandbox"] --> DIFF["Compute diff vs base"]
+  DIFF --> BRANCH["Create branch"]
+  BRANCH --> COMMIT["Commit with scoped token"]
+  COMMIT --> PR["Open pull request"]
+  PR --> REVIEW["Human review / CI"]
+</pre>
+<figcaption><strong>Figure 5.</strong> Working changes become a branch and commit via a scoped token, then a PR for human review and CI.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, per-tenant concurrency quotas, routing to the run orchestrator.</li>
+<li><strong>Orchestrator:</strong> a <strong>durable workflow engine</strong> (Temporal-style) so a background run survives restarts and resumes.</li>
+<li><strong>Sandboxes:</strong> a warm pool of <strong>Firecracker microVMs</strong> (or gVisor/Kata) — strong isolation, sub-second start; the repo is materialized via a <strong>copy-on-write overlay filesystem</strong> over a cached base image.</li>
+<li><strong>Run state &amp; artifacts:</strong> <strong>PostgreSQL</strong> for run/step state; <strong>blob storage (S3-like)</strong> for diffs, logs, and build artifacts; <strong>Redis</strong> for warm-pool bookkeeping and live log fan-out.</li>
+<li><strong>Repo / Git:</strong> the Git provider (GitHub/GitLab API) for clone + PR; commits go through a <strong>secret broker (Vault)</strong>-issued scoped token; an <strong>egress proxy/allowlist</strong> gates network.</li>
+<li><strong>LLM:</strong> the <strong>LLM/agent gateway</strong> for model calls.</li>
+<li><strong>Audit trail (durable sink):</strong> because the actor is autonomous, every command/tool/external action must land in an <strong>append-only audit store</strong> designed to be audit-grade — an append-only Postgres table or an immutable object-storage log partitioned by run/date (optionally hash-chained), with retention/WORM and access control. <strong>Kafka</strong> is the fanout <em>from</em> the audit write to consumers, not the system of record by itself.</li>
+</ul>
+<p><strong>Why these:</strong> isolation is the whole game → microVMs + egress proxy + Vault, not a shared host; run state is small/structured → SQL; diffs/logs are large/append → object storage; the warm pool and streaming are hot/ephemeral → Redis. There is no big relational DB on the critical path — the scarce resources are sandbox slots and LLM tokens.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Resumable runs, idempotent external effects:</strong> in-sandbox work (edits, test runs) is cheap to redo on resume, but external actions — <code>git push</code>, opening/updating a PR, calling a deploy API — must be idempotent (e.g. push to a deterministic branch, upsert the PR) so a retry after a crash does not create duplicates.</li>
+<li><strong>Sandbox isolation is a hard guarantee:</strong> a run cannot reach the network except through the egress allowlist, cannot read another tenant's repo or secrets, and is destroyed after the run (no state leaks between runs).</li>
+<li><strong>Secrets are brokered, never resident:</strong> the sandbox gets short-lived, scoped tokens from the broker on demand; long-lived credentials never enter agent-controlled space, so a compromised run has a small, time-boxed blast radius.</li>
+<li><strong>Eventually-consistent with the Git provider:</strong> the PR/commit state is owned by GitHub/GitLab; the platform reconciles its view with webhooks/polling rather than assuming its local state is authoritative.</li>
+<li><strong>Auditability:</strong> every command, tool call, and external action is durably recorded in an append-only, audit-grade store (immutable, retained, access-controlled) — not merely emitted to a stream — because the actor is an autonomous agent and the audit trail must withstand disputes/security review.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Use it when:</strong> you run untrusted/agent-generated code at scale, need per-run isolation and auditable Git side effects, and want background parallelism (many agents at once).</li>
+<li><strong>Overkill when:</strong> code is fully trusted and runs rarely — a plain CI runner or a single container is enough; you don't need microVMs and a warm pool.</li>
+<li><strong>Be careful when:</strong> agents can push/deploy to production — gate those behind human approval and scoped tokens; the failure mode (a wrong autonomous deploy) is far more expensive than a wrong suggestion.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Sandbox escape</strong> is the top risk — strong isolation (microVM), no host access, locked-down network.</li>
+<li><strong>Cold start</strong> hurts UX — warm pools + cached base images + copy-on-write repos.</li>
+<li><strong>Secret leakage:</strong> never expose raw long-lived credentials inside the sandbox; use short-lived scoped tokens.</li>
+<li><strong>Runaway runs:</strong> step/time/cost limits; detect no-progress loops.</li>
+<li><strong>Concurrency limits:</strong> cap sandboxes per tenant; recycle aggressively.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>The platform pairs a <strong>durable run</strong> with an <strong>isolated sandbox</strong> from a warm pool.</li>
+<li>Tools (edit/shell/test) run <strong>inside the sandbox</strong>; never on the host.</li>
+<li><strong>Copy-on-write repos + warm pools</strong> make start-up fast.</li>
+<li>Commits go through a <strong>scoped token</strong>; a PR gates human review.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Firecracker microVM (Agache et al., NSDI 2020); gVisor and Kata Containers docs; GitHub / GitLab REST API docs; Temporal durable-execution docs. Diagrams and write-up are original EngineerPro content.</em></p>

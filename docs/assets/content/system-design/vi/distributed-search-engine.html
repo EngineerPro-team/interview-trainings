@@ -1,0 +1,185 @@
+<p>Một <strong>distributed search engine</strong> (web search / full-text search quy mô lớn) trả lời keyword query trên hàng tỷ document với ranked result trong millisecond. Cấu trúc dữ liệu cốt lõi là <strong>inverted index</strong>; pattern scale cốt lõi là <strong>sharding + scatter-gather</strong>; đòn bẩy chất lượng cốt lõi là <strong>ranking</strong>.</p>
+
+<p>Search có hai tính cách: một path <strong>indexing offline</strong> (throughput-bound, có thể eventually consistent) và một path <strong>query online</strong> (latency-bound, nhạy tail). Giữ hai mối quan tâm đó tách biệt — và thành thật rằng kết quả search là một view <em>xấp xỉ, đã rank, eventually-fresh</em>, không phải một query database chính xác — là điều làm thiết kế mạch lạc.</p>
+
+<h3>Clarifying questions (chốt scope trước)</h3>
+<ul>
+<li><strong>Web search hay app/site search?</strong> Web scale nghĩa hàng tỷ doc + crawl; product/log search nhỏ hơn, có cấu trúc hơn, và có thể cần filter/facet.</li>
+<li><strong>Yêu cầu freshness?</strong> "Giây" (near-real-time, vd tweet) rất khác "giờ" (web crawl) và đổi thiết kế segment/refresh.</li>
+<li><strong>Bar relevance?</strong> BM25 keyword đơn giản vs ML learning-to-rank với behavioral feature — cái sau thêm feature/training pipeline.</li>
+<li><strong>Query shape?</strong> Keyword thuần, boolean filter, faceting, typo-tolerance, autocomplete — mỗi cái thêm index structure.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Ingest / crawl document và index chúng.</li>
+<li>Query theo keyword; trả về <strong>ranked</strong> result; paginate.</li>
+<li>Giữ result đủ <strong>fresh</strong>.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Query latency thấp</strong> (vài chục ms) với <strong>relevance</strong> tốt.</li>
+<li><strong>Scale</strong> tới hàng tỷ document và QPS cao.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Corpus:</strong> 10B document; inverted index lớn (posting list mỗi term) — phải shard ra nhiều máy.</li>
+<li><strong>Query:</strong> một query đụng vài term; với document sharding, mọi shard bị query và result merge → latency bị chặn bởi <strong>shard chậm nhất</strong> (tail).</li>
+<li><strong>QPS:</strong> hàng chục nghìn query/s → replicate shard cho read throughput; cache hot query.</li>
+<li><strong>Index size vs RAM:</strong> giữ hot posting list trong memory; nén posting list quyết liệt.</li>
+</ul>
+<p><strong>Ví dụ có số — vì sao tail latency là kẻ thù.</strong> Với document sharding, một query fanout tới <em>mọi</em> shard và chờ reply cuối cùng. Nếu mỗi shard trả ~10 ms ở p50 nhưng ~80 ms ở p99, thì một scatter-gather 50 shard gặp p99 ở <em>một</em> shard nào đó gần như mỗi request — nên latency tổng bám theo tail chậm, không phải median. Mitigation chồng lên: replicate mỗi shard và gửi tới replica ít tải nhất, dùng <strong>hedged request</strong> (bắn backup tới replica thứ hai nếu cái đầu chậm), và cap công việc per-shard (chỉ top-k). Đó là lý do "cứ thêm shard" có thể làm latency <em>tệ hơn</em> nếu bỏ qua tail.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /search?q=&cursor=</code> → <code>{results[], next_cursor}</code> (cursor / <code>search_after</code> trên một stable sort, không offset <code>page=</code> — deep offset pagination đắt và không ổn định giữa các shard).</li>
+<li><code>POST /index</code> — <code>{doc_id, text, metadata}</code> (ingest).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Một <strong>indexing pipeline</strong> biến document thành một inverted index trải trên các <strong>shard</strong> (mỗi cái replicated). Query service làm <strong>scatter-gather</strong>: gửi query tới mọi shard, mỗi shard trả top candidate của nó, rồi merge và rank.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  CRAWL["Crawler / ingest"] --> IDXP["Indexing pipeline"]
+  IDXP --> S1["Index shard 1 (+ replicas)"]
+  IDXP --> S2["Index shard 2 (+ replicas)"]
+  IDXP --> S3["Index shard 3 (+ replicas)"]
+  Q["Query"] --> QS["Query service"]
+  QS --> CACHE{"Query cache hit?"}
+  CACHE -->|hit| RESP["Ranked results"]
+  CACHE -->|miss| SCATTER["Scatter-gather"]
+  SCATTER --> S1
+  SCATTER --> S2
+  SCATTER --> S3
+  S1 --> RANK["Rank + merge"]
+  S2 --> RANK
+  S3 --> RANK
+  RANK -->|fill cache| CACHE
+  RANK --> RESP
+</pre>
+<figcaption><strong>Hình 1.</strong> Document được index vào các shard replicated; query trước hết check query cache, khi miss thì query service scatter tới mọi shard, gather top candidate, rank tập đã merge, rồi fill cache.</figcaption>
+</figure>
+
+<h2>Inverted index</h2>
+<p>Một <strong>inverted index</strong> map mỗi <strong>term</strong> tới một <strong>posting list</strong> các document chứa nó (kèm position và stat cho ranking). Một query intersect/union posting list của các term. Posting list được nén và, với hot term, giữ trong memory.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph INV["Inverted index"]
+    direction LR
+    T1["term 'system' -> docs 3, 7, 42, 88"]
+    T2["term 'design' -> docs 7, 42, 91"]
+  end
+  QQ["query: system design"] --> INTER["Intersect posting list"]
+  T1 --> INTER
+  T2 --> INTER
+  INTER --> HITS["Candidate docs: 7, 42"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Mỗi term trỏ tới một posting list document; một query nhiều term intersect các list để tìm candidate.</figcaption>
+</figure>
+
+<h2>Indexing pipeline</h2>
+<p>Ingestion <strong>tokenize</strong> text (lowercase, stem, bỏ stopword), rồi append mỗi token vào posting list của term nó trong shard đúng. Index được dựng dưới dạng <strong>segment</strong> bất biến được merge định kỳ; document mới searchable near-real-time một khi segment của nó được publish. Vì segment bất biến, một <strong>delete hoặc update</strong> không rewrite chúng: doc id được thêm vào một <strong>tombstone / delete bitmap</strong> và bị filter khỏi result; một update là delete + một version mới trong segment mới. Background merge xoá vật lý doc đã tombstone và thu hồi không gian.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  W["Write / update / delete"] --> SEG["Segment bất biến mới + delete bitmap"]
+  SEG --> SEARCH["Searchable: result filter theo delete bitmap"]
+  SEG --> MERGE["Background merge"]
+  MERGE --> DROP["Xoá vật lý doc tombstone, thu hồi không gian"]
+  DROP --> SMALLER["Ít segment hơn, lớn hơn sau merge"]
+</pre>
+<figcaption><strong>Hình 3.</strong> Segment bất biến xử lý delete/update qua tombstone bitmap; background merge xoá doc tombstone và gộp segment.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DOC["Document"] --> TOK["Tokenize: lowercase, stem, stopword"]
+  TOK --> SEG["Ghi vào in-memory segment"]
+  SEG --> PUB["Publish segment (searchable)"]
+  PUB --> MERGE["Background segment merge"]
+  MERGE --> SHARD["Shard inverted index"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Tokenize, ghi vào segment bất biến, publish cho near-real-time search, và merge segment ở background.</figcaption>
+</figure>
+
+<h2>Query: scatter-gather và ranking</h2>
+<p>Với <strong>document sharding</strong>, mỗi shard giữ một lát của corpus, nên một query phải đụng <em>mọi</em> shard. Mỗi shard trả local top-k bằng một score rẻ (vd BM25); query service merge chúng và áp một <strong>ranking</strong> nặng hơn (learning-to-rank dùng nhiều feature hơn). Latency bị chặn bởi shard chậm nhất, nên kiểm soát tail latency quan trọng.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant QS as Query service
+  participant S1 as Shard 1
+  participant S2 as Shard 2
+  U->>QS: query
+  par scatter tới mọi shard
+    QS->>S1: query
+    QS->>S2: query
+  end
+  S1-->>QS: local top-k (BM25)
+  S2-->>QS: local top-k (BM25)
+  QS->>QS: merge + learning-to-rank
+  QS-->>U: ranked page
+</pre>
+<figcaption><strong>Hình 5.</strong> Scatter-gather: mọi shard trả local top-k bằng score rẻ; query service merge và áp ranking nặng hơn.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Quyết định storage là state nào là durable index so với structure derived/rebuild được, và write hiển thị thế nào:</p>
+<ul>
+<li><strong>Lucene segment files (index, trên SSD):</strong> inverted index nằm dưới dạng <strong>segment bất biến</strong> trên local SSD mỗi shard — write tạo segment mới, không bao giờ sửa cái cũ, đó là cái làm read lock-free và merge an toàn.</li>
+<li><strong>Translog + commit/refresh:</strong> một <strong>translog</strong> write-ahead làm một doc mới durable trước khi nó vào committed segment; một <strong>refresh</strong> định kỳ làm nó searchable (near-real-time), và <strong>commit</strong> fsync segment — đây là núm freshness/durability.</li>
+<li><strong>Replica mỗi shard:</strong> mỗi shard có replica cho availability và read scale; primary order write, replica follow.</li>
+<li><strong>Raw documents (source of truth):</strong> doc gốc nằm trong một <strong>blob/object store</strong> hoặc source DB — index là một structure derived, rebuild được, không phải system of record.</li>
+<li><strong>Delete/update:</strong> một <strong>delete bitmap / tombstone</strong> đánh dấu doc bị xoá; một <strong>segment merge</strong> ở background reclaim chúng và gộp segment.</li>
+<li><strong>Query cache:</strong> kết quả query hot cache trước scatter; rebuild được.</li>
+<li><strong>Implementations:</strong> <strong>Lucene</strong> (library), <strong>Elasticsearch/OpenSearch</strong> (phân tán), Solr, Vespa (search + ML + vector), Typesense/Meilisearch (nhẹ); pair với một vector index cho hybrid semantic + keyword search (xem RAG).</li>
+</ul>
+
+<h2>Consistency, freshness &amp; guarantees</h2>
+<ul>
+<li><strong>Eventually fresh:</strong> doc mới index chỉ searchable sau khi segment của nó publish và replicate — kỳ vọng giây (NRT) tới phút, không tức thì. Nêu rõ target.</li>
+<li><strong>Ranked, không exact:</strong> result là xấp xỉ sắp theo relevance; với ANN/learning-to-rank không có một "result set đúng" duy nhất, khác query SQL.</li>
+<li><strong>Pagination ổn định:</strong> dùng <code>search_after</code> trên một stable sort key (vd score + doc id) để indexing đồng thời không dịch page; deep offset vừa chậm vừa không ổn.</li>
+<li><strong>Best-effort completeness:</strong> khi một shard fail có thể trả partial result (kèm cờ "degraded") thay vì fail cả query — một trade-off availability/accuracy cần nêu.</li>
+</ul>
+
+<h2>Tradeoffs &amp; khi nào không dùng</h2>
+<ul>
+<li><strong>Tốt cho:</strong> full-text search, relevance ranking, faceted/typo-tolerant search trên corpus lớn.</li>
+<li><strong>Sai cho:</strong> lookup transactional chính xác (dùng database), strong consistency / read-your-writes, hoặc analytics aggregation trên range khổng lồ (dùng OLAP store).</li>
+<li><strong>Cost lever:</strong> replica cho QPS/tail, compression + tiering cho index size; chất lượng relevance là một đầu tư riêng, liên tục (eval + LTR).</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Document vs term sharding:</strong> document sharding (mọi shard bị query) là lựa chọn phổ biến; term sharding dồn hot term — thường tệ hơn.</li>
+<li><strong>Tail latency:</strong> scatter-gather chờ shard chậm nhất — replicate, hedge request, và cap công việc mỗi shard.</li>
+<li><strong>Index freshness:</strong> segment bất biến + background merge cho near-real-time mà không phải rewrite cả index.</li>
+<li><strong>Hot query:</strong> query cache được check <em>trước</em> scatter và update sau merge; một phần nhỏ query chiếm phần lớn traffic.</li>
+<li><strong>Delete/update:</strong> segment bất biến cần tombstone/delete bitmap + background merge — không bao giờ rewrite segment tại chỗ.</li>
+<li><strong>Pagination:</strong> dùng cursor / <code>search_after</code> trên stable sort, không deep offset.</li>
+<li><strong>Posting-list size:</strong> nén; giữ hot list trong memory.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>Inverted index</strong> (term tới posting list) là cấu trúc cốt lõi.</li>
+<li><strong>Document sharding + scatter-gather</strong> scale corpus; tail latency là kẻ thù.</li>
+<li><strong>Segment bất biến + merge</strong> cho near-real-time indexing.</li>
+<li>Score per-shard rẻ rồi <strong>ranking</strong> nặng hơn trên tập đã merge.</li>
+<li><strong>Trị tail:</strong> replicate shard, hedge request, cap công việc per-shard — latency scatter-gather = shard chậm nhất.</li>
+<li>Result là <strong>ranked + eventually fresh</strong>, không exact — nói rõ, và dùng <code>search_after</code> cho pagination ổn định.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: Apache Lucene và Elasticsearch / OpenSearch docs (segment, merge, <code>search_after</code>); BM25 (Robertson &amp; Zaragoza); tài liệu learning-to-rank. Diagram và nội dung là content gốc của EngineerPro.</em></p>

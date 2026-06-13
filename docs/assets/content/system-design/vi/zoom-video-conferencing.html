@@ -1,0 +1,200 @@
+<p>Thiết kế hệ thống video-conferencing như <strong>Zoom</strong> là bài toán real-time media: chuyển audio và video giữa nhiều participant với latency dưới 150ms. Các quyết định thú vị xoay quanh <strong>media transport topology</strong> (mesh vs MCU vs SFU), signaling, bandwidth adaptation, và scale một meeting lên hàng trăm participant.</p>
+
+<p>Chuyển dịch tư duy then chốt: đây <em>không</em> phải hệ thống request/response hay store-and-forward. Media là <strong>real-time UDP vô dụng nếu trễ</strong> — một video frame tới trễ 400ms còn tệ hơn bị drop. Nên các công cụ thường ngày (durable queue, retry, strong consistency) là phản xạ sai; thiết kế tối ưu <strong>latency, bandwidth, và degradation êm dưới loss</strong>, và câu hỏi trung tâm chỉ là "ai relay packet và bao nhiêu bản copy." Mọi thứ khác (signaling, recording, chat) là một control-plane thường gắn lên cái media core đó.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Kích thước meeting?</strong> Call 1:1 và nhỏ có thể peer-to-peer/mesh; meeting lớn (50-1000) buộc dùng SFU và cascading — mục tiêu size chi phối cả topology.</li>
+<li><strong>Class latency?</strong> Conferencing tương tác cần dưới 150ms (SFU, UDP); webinar/broadcast one-to-many chịu được vài giây và dùng HLS/CDN thay thế.</li>
+<li><strong>Recording / compliance?</strong> Cloud recording, transcription, và retention thêm một media pipeline server-side và storage mà relaying thuần không cần.</li>
+<li><strong>Cần E2E encryption?</strong> End-to-end encryption thật giới hạn việc SFU và recording làm được (chỉ forward packet opaque) — một product trade-off thật.</li>
+<li><strong>Điều kiện network?</strong> Đường mobile/lossy làm simulcast, bandwidth adaptation, và FEC/retransmission thành first-class, không phải tùy chọn.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Call 1:1 và <strong>group</strong>; join qua meeting link.</li>
+<li><strong>Screen share</strong>, <strong>chat</strong> trong call, mute / camera toggle.</li>
+<li><strong>Recording</strong> lên cloud.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Latency thấp:</strong> mouth-to-ear dưới ~150 ms.</li>
+<li><strong>Scale:</strong> hàng trăm participant mỗi meeting; hàng triệu meeting đồng thời.</li>
+<li><strong>Resilience</strong> trước packet loss và bandwidth biến động; phủ toàn cầu.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Bitrate:</strong> ~1-2 Mbps mỗi stream video HD; audio ~50 Kbps.</li>
+<li><strong>Mesh blow-up:</strong> trong mesh N người, mỗi client gửi và nhận N-1 stream → upload tăng theo N. Ở N=10 là ~9× upload — bất khả thi trên đường truyền dân dụng nếu quá vài người.</li>
+<li><strong>SFU offload:</strong> với SFU mỗi client gửi <strong>1</strong> stream lên và nhận N-1 xuống. Meeting 50 người HD đẩy ~50-100 Mbps xuống mỗi viewer — nên cần simulcast + selective forwarding.</li>
+<li><strong>Server fan-out:</strong> capacity-plan theo egress Gbps mỗi SFU và shard meeting ra nhiều SFU.</li>
+</ul>
+<p><strong>Worked example.</strong> So sánh một call 10 người HD (~2 Mbps/stream). Trong full mesh mỗi người upload 9 stream = ~18 Mbps lên và download ~18 Mbps — phần lớn uplink nhà (~5-10 Mbps) đơn giản không kham nổi, nên mesh chết quá ~4-5 người. Với một <strong>SFU</strong> mỗi client upload đúng <strong>1</strong> stream (~2 Mbps) và download N-1; chi phí dời sang server. Giờ scale server: một town hall 1000 người mà 1000 người xem nhưng chỉ ~5 nói — forwarding ngây thơ là 1000×~10 stream active, nhưng với <strong>simulcast + forward N active-speaker gần nhất</strong> SFU chỉ relay stream của vài speaker (ở độ phân giải khớp mỗi viewer), nên egress là ~1000 viewer × ~2 Mbps ≈ 2 Gbps, mà bạn trải qua <strong>SFU cascade</strong> (các edge vùng mỗi cái fan-out cục bộ). Đó là lý do câu trả lời "scale meeting lớn" luôn là selective forwarding + cascading, không phải một máy to hơn.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /meetings</code> → <code>{meeting_id, join_token}</code>.</li>
+<li><code>POST /meetings/{id}/join</code> — trả về ICE servers + SFU edge được gán.</li>
+<li><strong>Signaling (WebSocket):</strong> <code>offer</code>, <code>answer</code>, <code>ice_candidate</code>, <code>publish</code>, <code>subscribe</code>, <code>mute</code>.</li>
+<li><strong>Media (WebRTC):</strong> SRTP trên UDP, negotiate qua kênh signaling.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Client trao đổi session metadata qua một WebSocket <strong>signaling</strong>, rồi gửi media qua WebRTC tới một <strong>SFU</strong> (Selective Forwarding Unit) theo region. TURN relay vượt NAT/firewall; một recording pipeline và chat sidecar gắn vào meeting.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Participant A"] --> SIG["Signaling service (WebSocket)"]
+  B["Participant B"] --> SIG
+  SIG --> ALLOC["Allocator: chọn SFU theo region"]
+  A --> SFU["SFU (media server, region)"]
+  B --> SFU
+  A -.NAT traversal.-> TURN["TURN / STUN relay"]
+  TURN --> SFU
+  SFU --> REC["Recording pipeline"]
+  REC --> BLOB["Blob storage"]
+  SFU --> CHAT["Chat sidecar"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Signaling thiết lập session và gán một SFU theo region; media chảy qua WebRTC (có TURN để vượt NAT), recording stream về blob storage.</figcaption>
+</figure>
+
+<h2>Transport topology: mesh vs MCU vs SFU</h2>
+<ul>
+<li><strong>Mesh:</strong> mỗi client gửi tới mọi client khác. Không tốn media server, nhưng upload client nổ theo N. Chỉ hợp 2-3 người.</li>
+<li><strong>MCU:</strong> server decode hết stream, composite thành một stream trộn, re-encode cho từng client. Bandwidth client rẻ, nhưng tốn CPU server khủng và thêm latency.</li>
+<li><strong>SFU:</strong> server <em>forward</em> stream mà không decode. Mỗi client upload một lần; SFU relay tới subscriber. Cân bằng tốt nhất — default hiện đại.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph MESH["Mesh (không server)"]
+    direction LR
+    M1["A"] --- M2["B"]
+    M2 --- M3["C"]
+    M1 --- M3
+  end
+  subgraph SFU["SFU (chỉ forward)"]
+    direction TB
+    S["SFU"]
+    SA["A"] --> S
+    SB["B"] --> S
+    SC["C"] --> S
+    S --> SA
+    S --> SB
+    S --> SC
+  end
+</pre>
+<figcaption><strong>Hình 2.</strong> Mesh nối trực tiếp mọi peer (upload tăng theo N); SFU nhận một upload mỗi client và forward có chọn lọc.</figcaption>
+</figure>
+
+<h2>Join một meeting</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant SIG as Signaling
+  participant SFU as SFU
+  C->>SIG: join(meeting_id)
+  SIG->>C: ICE servers + địa chỉ SFU
+  C->>SFU: WebRTC offer (publish media của tôi)
+  SFU-->>C: answer
+  C->>SFU: ICE candidates (connectivity)
+  SFU-->>C: subscribe các participant khác
+  Note over C,SFU: media giờ chảy qua SRTP/UDP
+</pre>
+<figcaption><strong>Hình 3.</strong> Signaling trả về ICE servers và một SFU; client publish media và subscribe người khác, rồi media chảy peer-tới-SFU.</figcaption>
+</figure>
+
+<h2>Simulcast và bandwidth adaptation</h2>
+<p>Publisher gửi vài <strong>layer</strong> chất lượng (simulcast: vd cao/trung/thấp). SFU forward layer vừa với bandwidth đo được của từng subscriber, và hạ xuống layer thấp khi nghẽn — nên một viewer chậm không kéo tụt cả phòng. Đây là mẹo cốt lõi giúp meeting SFU lớn chạy được.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  PUB["Publisher gửi 3 layer"] --> SFU["SFU selective forwarding"]
+  SFU -->|high layer| V1["Viewer link nhanh"]
+  SFU -->|low layer| V2["Viewer link chậm"]
+  SFU -->|audio only| V3["Viewer link rất tệ"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Simulcast: publisher phát nhiều layer chất lượng và SFU forward layer mà mỗi viewer chịu được.</figcaption>
+</figure>
+
+<h2>Scale meeting lớn: cascading SFU</h2>
+<p>Một SFU bị giới hạn bởi egress bandwidth và CPU. Với meeting rất lớn (hoặc participant rải toàn cầu), <strong>cascade</strong> SFU: mỗi region có một SFU local, và các SFU relay cho nhau. Participant chỉ nối tới SFU gần nhất, cắt traffic cross-region xuống còn một link inter-SFU mỗi stream.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph US["US region"]
+    SFU1["SFU US"]
+    A["A"] --> SFU1
+    B["B"] --> SFU1
+  end
+  subgraph EU["EU region"]
+    SFU2["SFU EU"]
+    C["C"] --> SFU2
+    D["D"] --> SFU2
+  end
+  SFU1 <-->|inter-SFU relay| SFU2
+</pre>
+<figcaption><strong>Hình 5.</strong> Cascading SFU: participant nối tới SFU gần; các SFU relay giữa region, nên mỗi stream vượt đại dương một lần thay vì theo từng viewer.</figcaption>
+</figure>
+
+<h2>Recording, presence, chat</h2>
+<p>Recording subscribe vào SFU như một participant im lặng, composite hoặc lưu theo từng stream, rồi ghi xuống blob storage. Presence và chat đi trên kênh signaling (hoặc sidecar) — khối lượng nhỏ so với media.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Cụ thể, cái gì chạy ở đâu — và datastore nào cho việc gì:</p>
+<ul>
+<li><strong>API gateway</strong> (vd Envoy / NGINX / managed gateway): TLS termination, auth, rate limiting, và route các REST call "create/join meeting" — tách khỏi realtime media path.</li>
+<li><strong>Signaling:</strong> một WebSocket service stateful; map "gateway/SFU nào giữ user này" nằm trong <strong>Redis</strong> (in-memory, TTL, nhanh).</li>
+<li><strong>Media (SFU):</strong> media server chuyên dụng (open-source: mediasoup, Janus, Jitsi, LiveKit) — máy CPU/bandwidth, không database.</li>
+<li><strong>TURN relay:</strong> relay kiểu coturn cho NAT traversal.</li>
+<li><strong>Meeting metadata</strong> (room, participant, setting): một DB quan hệ như <strong>PostgreSQL</strong> — nhỏ, có cấu trúc, transactional.</li>
+<li><strong>Events / analytics</strong> (join/leave, quality sample): produce vào <strong>Kafka</strong>, optionally aggregate bằng stream processor (<strong>Flink</strong>) cho dashboard chất lượng real-time.</li>
+<li><strong>Recording:</strong> file lớn bất biến → <strong>blob/object storage (S3-like)</strong>, có <strong>CDN</strong> đứng trước để playback; không bao giờ trong database.</li>
+<li><strong>Chat / presence:</strong> khối lượng nhỏ — đi trên kênh signaling; persist chat trong wide-column store (<strong>Cassandra</strong>) key theo meeting nếu cần history.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> meeting metadata nhỏ + quan hệ → SQL; session/presence map hot + ephemeral → Redis; recording lớn + write-once + read-hiếm → object storage + CDN; event firehose throughput cao append-only → Kafka (+ Flink). Bản thân media <em>không</em> được lưu — nó được forward.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Media best-effort, latency-first:</strong> media dùng UDP (RTP) — packet có thể mất hoặc đảo thứ tự, và packet trễ bị drop, không retry. Guarantee là "frame mới nhất có thể," không phải "mọi frame." Loss được giấu bằng FEC, retransmission chọn lọc (NACK), và concealment, không phải bằng block.</li>
+<li><strong>Control plane eventually-consistent:</strong> participant list, mute state, và presence hội tụ nhanh nhưng không strongly consistent — hai client có thể tạm bất đồng về ai đang nói; signaling server là trọng tài.</li>
+<li><strong>Signaling reliable, ordered:</strong> message signaling (join, offer/answer, ICE) <em>thực sự</em> cần delivery reliable, ordered — nên chúng chạy trên WebSocket/TCP, tách khỏi media.</li>
+<li><strong>Recording bất đồng bộ:</strong> recording pipeline tách khỏi call live; một recording có thể trễ hoặc được ráp sau khi meeting kết thúc, và durability của nó là của object store, không phải của SFU.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>SFU khi:</strong> call multi-party tương tác (3-1000) cần latency thấp — câu trả lời chuẩn cho conferencing.</li>
+<li><strong>Mesh/P2P khi:</strong> call 1:1 hoặc rất nhỏ mà bạn muốn chi phí server tối thiểu và latency thấp nhất, và uplink kham được.</li>
+<li><strong>MCU khi:</strong> client quá yếu để decode nhiều stream (compose một mixed stream phía server) — tốn CPU cao; hiếm khi là default bây giờ.</li>
+<li><strong>Không dùng cái này:</strong> broadcast/webinar one-to-many không tương tác phục vụ tốt hơn bằng <strong>HLS/DASH qua CDN</strong> (latency vài giây, fan-out rẻ khổng lồ) — đừng trả chi phí SFU cho một khán giả thụ động.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Đừng dùng mesh quá ~3 người</strong> — upload client là bức tường.</li>
+<li><strong>NAT/firewall:</strong> một phần đáng kể client cần TURN relay; tính capacity relay.</li>
+<li><strong>Một viewer chậm:</strong> không có simulcast thì SFU bị ép xuống một chất lượng chung thấp — simulcast cô lập theo từng subscriber.</li>
+<li><strong>Region selection:</strong> gán SFU theo latency client, không chỉ theo địa lý.</li>
+<li><strong>E2E encryption</strong> xung đột với compositing/recording phía server — một đánh đổi có chủ đích.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>SFU</strong> (forward, không decode) là điểm ngọt giữa mesh và MCU.</li>
+<li><strong>Simulcast + selective forwarding</strong> thích nghi theo từng subscriber và giữ meeting lớn mượt.</li>
+<li><strong>Cascading SFU</strong> scale participant và địa lý.</li>
+<li>Signaling, recording, presence, chat là các sidecar rẻ quanh media path.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: tài liệu công khai WebRTC / SFU. Diagram và nội dung là content gốc của EngineerPro.</em></p>

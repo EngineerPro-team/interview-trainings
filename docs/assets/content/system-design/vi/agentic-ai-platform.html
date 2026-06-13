@@ -1,0 +1,180 @@
+<p>Một <strong>agentic AI platform</strong> chạy các agent tự động: plan, gọi tool, observe kết quả, và lặp tới khi task xong. Khác một LLM call đơn lẻ, một agent run là một <strong>workflow dài, stateful, nhiều bước</strong> — nên thiết kế mượn từ durable workflow engine: checkpointing, idempotent step, tool sandboxing, memory, và guardrails. Nó nằm trên LLM inference platform.</p>
+
+<p>Khung tư duy ăn điểm phỏng vấn: ngừng nghĩ "LLM call" và bắt đầu nghĩ "<strong>workflow phân tán durable mà các step tình cờ non-deterministic và có thể gây side effect ngoài đời thực</strong>." Reframe đó buộc ra các requirement khó — mỗi step phải checkpoint để crash resume được, mỗi tool call phải idempotent hoặc có guard để retry không charge khách hai lần, và mỗi action phải sandboxed và policy-gated vì model là untrusted input đang quyết định làm gì.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Tool thực sự làm được gì?</strong> Read-only (search, fetch) rủi ro thấp; side-effecting (gửi email, chuyển tiền, deploy) đòi idempotency key, approval, và audit.</li>
+<li><strong>Tự động tới mức nào?</strong> Hoàn toàn tự động, hay có approval gate human-in-the-loop trước action rủi ro? Điều đó quyết định có cần state approval/pause-resume không.</li>
+<li><strong>Thời lượng run và resumability?</strong> Giây vs run hàng giờ quyết định state nằm in-memory hay trong một durable workflow store.</li>
+<li><strong>Isolation multi-tenant?</strong> Platform dùng chung qua nhiều tenant cần memory, secret, sandbox, và quota per-tenant — một security boundary, không chỉ config.</li>
+<li><strong>Giới hạn cost/loop?</strong> Cái gì chặn agent loop mãi hoặc đốt token vô hạn — step limit, token budget, một supervisor?</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Định nghĩa agent với một bộ <strong>tool</strong>; chạy task nhiều bước (plan tới act tới observe).</li>
+<li><strong>Tool calling</strong>; <strong>memory</strong> ngắn hạn và dài hạn.</li>
+<li><strong>Resume</strong> run bị gián đoạn; human-in-the-loop approval; full trace.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Reliability:</strong> step idempotent và run resumable.</li>
+<li><strong>Cost control:</strong> token budget và loop limit.</li>
+<li><strong>Safety:</strong> tool sandboxed, guardrails. Scale nhiều run đồng thời.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Run length:</strong> một agent run có thể là 10-100+ LLM call qua vài phút tới vài giờ — dài hơn một request rất nhiều, nên state phải durable, không phải in-memory.</li>
+<li><strong>Cost:</strong> mỗi step gửi context đang lớn dần tới LLM; một run 50 step với context 10k token có thể đốt ~500k+ token — context management và budget là thiết yếu.</li>
+<li><strong>Concurrency:</strong> hàng nghìn run đồng thời, đa số đang chờ LLM hoặc tool I/O → một orchestrator async, queue-driven, không phải một thread mỗi run.</li>
+<li><strong>Memory store:</strong> vector + key-value memory theo từng agent; read ở hầu hết step.</li>
+</ul>
+<p><strong>Worked example.</strong> Giả sử một run trung bình 30 step và mỗi step gửi lại một context lớn dần từ 2k tới ~15k token; tích phân cỡ 30 × ~8k ≈ <strong>240k input token</strong> cộng output — chỉ một run. Ở 10k run đồng thời, đó là hàng triệu token/s nhu cầu lên inference platform, nên context management (summarize/trim turn cũ, giữ tool result ngoài prompt khi có thể) không phải tùy chọn — nó trực tiếp điều khiển cost và latency mỗi step (context lớn = prefill chậm hơn). Toán concurrency: 10k run mỗi run block ~5s trên một LLM/tool call nghĩa là orchestrator chủ yếu đang <em>chờ</em>, nên model thread-per-run cần 10k thread; một orchestrator async, event-driven dựa trên một durable queue xử lý cùng tải trên vài worker. Tài nguyên khan hiếm là LLM/GPU và rate limit của tool ngoài, không phải CPU orchestrator.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /agents</code> — <code>{name, system_prompt, tools[]}</code> → <code>{agent_id}</code>.</li>
+<li><code>POST /agents/{id}/runs</code> — <code>{task, budget}</code> → <code>{run_id}</code> (async).</li>
+<li><code>GET /runs/{id}</code> → state, step, trace; <code>POST /runs/{id}/resume</code>.</li>
+<li><code>POST /runs/{id}/approve</code> — cổng human-in-the-loop.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Một <strong>orchestrator</strong> điều khiển mỗi run như một durable state machine: nó gọi <strong>LLM gateway</strong> để quyết định action kế tiếp, execute <strong>tool</strong> trong sandbox, read/write <strong>memory</strong>, quản <strong>context</strong>, và ghi mọi step vào trace. Run dài sống trên một queue, không phải một connection giữ mãi.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> ORCH["Agent orchestrator (durable run state)"]
+  ORCH --> POL["Policy / approval gate (human-in-the-loop)"]
+  ORCH --> LLM["LLM gateway (inference platform)"]
+  ORCH --> TOOLS["Tool service + sandbox executors"]
+  TOOLS --> REG["Tool registry + scopes"]
+  TOOLS --> SEC["Secret broker (scoped, short-lived)"]
+  ORCH --> MEM["Memory store (vector + KV, per-tenant)"]
+  ORCH --> CTX["Context manager"]
+  ORCH --> TRACE["Trace / observability + event stream (SSE)"]
+  Q["Run queue"] --> ORCH
+</pre>
+<figcaption><strong>Hình 1.</strong> Orchestrator điều phối LLM, tool sandboxed, memory, và context, persist run state để run dài sống sót qua restart.</figcaption>
+</figure>
+
+<h2>Agent loop</h2>
+<p>Cốt lõi là một vòng lặp: LLM <strong>plan</strong> action kế tiếp, platform <strong>act</strong> (gọi tool), feed lại <strong>observation</strong>, và lặp tới khi đạt goal hoặc chạm limit. Mỗi iteration là một durable step.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  START["Task"] --> PLAN["LLM: quyết định action kế tiếp"]
+  PLAN --> ACT{"Tool call hay final answer?"}
+  ACT -->|tool call| TOOL["Execute tool trong sandbox"]
+  TOOL --> OBS["Append observation vào context"]
+  OBS --> CHECK{"Đạt goal hay chạm limit?"}
+  CHECK -->|chưa| PLAN
+  CHECK -->|rồi| DONE["Trả result"]
+  ACT -->|final answer| DONE
+</pre>
+<figcaption><strong>Hình 2.</strong> Plan tới act tới observe, lặp lại. Loop limit và budget đảm bảo termination.</figcaption>
+</figure>
+
+<h2>Tool calling và sandboxing</h2>
+<p>Tool là cách agent tác động lên thế giới (search, code execution, API call). Chúng phải chạy trong một <strong>sandbox cô lập</strong> với resource limit và không truy cập secret mà nó không nên có — một tool là code untrusted được điều khiển bởi model. Orchestrator validate tool request của model, chạy nó, và trả về một observation có cấu trúc.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant O as Orchestrator
+  participant L as LLM gateway
+  participant S as Sandbox
+  O->>L: context + tool khả dụng
+  L-->>O: tool_call(search, query)
+  O->>O: validate request + budget
+  O->>S: chạy tool trong sandbox cô lập
+  S-->>O: result có cấu trúc
+  O->>L: result append như observation
+  L-->>O: action kế tiếp
+</pre>
+<figcaption><strong>Hình 3.</strong> Model request một tool; orchestrator validate và chạy nó trong sandbox, rồi feed kết quả lại như observation.</figcaption>
+</figure>
+
+<h2>Durable runs: checkpoint và resume</h2>
+<p>Vì một run trải vài phút/giờ và nhiều call có thể fail, coi nó như một <strong>durable workflow</strong> (kiểu Temporal). Sau mỗi step, persist run state (step index, context pointer, memory delta). Khi crash, restart, hay pause chờ human-approval, orchestrator <strong>resume</strong> từ checkpoint cuối.</p>
+<p><strong>An toàn side-effect của tool là phần tinh tế.</strong> Một tool có thể tạo side effect bên ngoài (API call, payment, PR) rồi crash <em>trước khi</em> checkpoint được ghi — replay ngây thơ sẽ gọi nó hai lần. Nên một tool step bản thân là một state machine nhỏ: <code>Planned → ToolRequested (ghi idempotency_key) → ToolResultRecorded → Checkpointed</code>. Orchestrator ghi request <em>trước khi</em> gọi tool, tool được gọi kèm idempotency key (hoặc orchestrator lookup result đã có), và chỉ một result đã ghi mới đẩy run tiến. Trace/state store redact secret và tenant-isolated; persist context summarize + pointer thay vì prompt thô.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  STEP["Execute step k"] --> CP["Checkpoint: state sau step k"]
+  CP --> NEXT["Step k+1"]
+  CRASH["Crash / pause / chờ approval"] --> RESUME["Resume từ checkpoint cuối"]
+  RESUME --> NEXT
+</pre>
+<figcaption><strong>Hình 4.</strong> Mỗi step checkpoint run state; resume tiếp tục từ checkpoint cuối sau crash hoặc pause human-in-the-loop.</figcaption>
+</figure>
+
+<h2>Memory và context management</h2>
+<p>Context window của LLM hữu hạn, nhưng một run dài tích luỹ history. <strong>Context manager</strong> giữ prompt trong budget: summarize step cũ, và chỉ retrieve <strong>memory</strong> dài hạn liên quan (một vector store) cho step hiện tại. Short-term memory là history step gần đây; long-term memory persist xuyên các run.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  HIST["Full run history"] --> CM["Context manager"]
+  MEM["Long-term memory (vector store)"] --> CM
+  CM --> SUM["Summarize step cũ"]
+  CM --> RET["Retrieve memory liên quan"]
+  SUM --> PROMPT["Prompt có giới hạn cho LLM call kế"]
+  RET --> PROMPT
+</pre>
+<figcaption><strong>Hình 5.</strong> Context manager summarize history và chỉ retrieve memory liên quan, giữ mỗi prompt trong token budget.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, quota/token budget theo tenant, route tới orchestrator.</li>
+<li><strong>Orchestrator:</strong> một <strong>durable workflow engine</strong> (Temporal / state machine tuỳ chỉnh) để một run nhiều bước sống sót qua crash và resume từ checkpoint.</li>
+<li><strong>Run state &amp; trace:</strong> step state trong <strong>PostgreSQL</strong> (nhỏ, transactional, queryable); artifact step lớn (tool output, log) trong <strong>blob storage</strong>; trace trong observability stack.</li>
+<li><strong>Memory:</strong> long-term trong một <strong>vector store</strong> (Milvus / pgvector / Pinecone), short-term/working memory trong <strong>Redis</strong>, cả hai namespaced theo tenant.</li>
+<li><strong>Tools:</strong> execute trong một <strong>sandbox</strong> (Firecracker microVM / gVisor / container); một <strong>secret broker</strong> (Vault) inject scoped short-lived credential.</li>
+<li><strong>Queue + LLM:</strong> <strong>Kafka / SQS</strong> cho scheduling run dài; <strong>LLM gateway</strong> (inference platform) cho model call; <strong>SSE/WebSocket</strong> cho progress streaming.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> run dài và dễ fail → một durable workflow engine, không phải request thread; run state có cấu trúc → SQL, artifact lớn → object storage; semantic memory → vector store, hot working state → Redis; tool code untrusted → sandbox + secret broker Vault. Split phản ánh hình dạng data, không phải một database cho tất cả.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Exactly-once intent, at-least-once execution:</strong> workflow engine bảo đảm một step <em>không bị mất</em> (retry từ checkpoint gần nhất), nên một tool call có side-effect phải <strong>idempotent</strong> (idempotency key) hoặc được guard bởi một step state machine, nếu không retry lặp lại action.</li>
+<li><strong>Run durable, resumable:</strong> sau mỗi step run state được commit; worker crash thì resume từ checkpoint gần nhất, không phải từ đầu — output LLM call được ghi lại nên không bị re-sample khi resume.</li>
+<li><strong>Policy là gate cứng, model output không được tin:</strong> model <em>đề xuất</em> action; một lớp authorization/approval quyết định chúng có execute không. Guardrails (allowlist, scope, human approval) enforce bên ngoài model.</li>
+<li><strong>Step non-deterministic, orchestration deterministic:</strong> LLM non-deterministic, nhưng orchestration (step nào chạy, kết quả, retry) là một log deterministic, replay được — đó là cái làm debug và audit khả thi.</li>
+<li><strong>Isolation:</strong> memory, secret, và sandbox per-tenant được cô lập; một run không đọc được state hay credential của run khác.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng một agentic platform</h2>
+<ul>
+<li><strong>Dùng khi:</strong> task thực sự cần reasoning nhiều bước với tool (research, coding, ops automation), run dài/resumable, và action có side effect thật cần audit và approval.</li>
+<li><strong>Thừa khi:</strong> một LLM call đơn (hoặc một prompt chain cố định) giải được — đừng xây workflow engine cho một classification hay summarization một phát.</li>
+<li><strong>Nguy hiểm khi:</strong> tool có side effect không đảo ngược được và bạn không thể làm idempotent hay gate bằng approval — chi phí một action tự động sai lớn hơn lợi ích. Bắt đầu read-only, thêm write tool sau approval.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Vòng lặp vô hạn / cost vượt kiểm soát:</strong> enforce step limit và token budget; phát hiện action lặp không tiến triển.</li>
+<li><strong>Tool safety:</strong> sandbox mọi thứ; không bao giờ đưa model credential thô hay quyền truy cập không giới hạn.</li>
+<li><strong>Context overflow:</strong> summarize + retrieve; đừng dump cả history mỗi step.</li>
+<li><strong>Non-determinism:</strong> trace và idempotent step làm run debug được và resume được.</li>
+<li><strong>Multi-agent:</strong> pattern orchestrator-worker (một planner uỷ thác cho sub-agent) scale task phức tạp nhưng nhân chi phí.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Một agent run là một <strong>durable, multi-step workflow</strong>, không phải một call.</li>
+<li><strong>Vòng plan-act-observe</strong> với budget và limit là cốt lõi.</li>
+<li><strong>Sandbox tool</strong>; model đang điều khiển action untrusted.</li>
+<li><strong>Checkpoint/resume</strong> + idempotent step làm run dài tin cậy.</li>
+<li><strong>Context management + memory</strong> giữ prompt có giới hạn và grounded.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: ReAct (Yao et al., 2022); Temporal durable-execution docs; LangGraph / LangChain agent docs; OpenAI và Anthropic tool/function-calling và safety docs; Firecracker/gVisor cho tool sandboxing. Diagram và nội dung là content gốc của EngineerPro.</em></p>

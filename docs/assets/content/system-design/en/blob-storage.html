@@ -1,0 +1,185 @@
+<p><strong>Blob (object) storage</strong> like Amazon S3 stores arbitrary bytes under a <code>bucket/key</code> name with extreme <strong>durability</strong> at exabyte scale. This building-block design covers the write/read path, <strong>replication vs erasure coding</strong>, metadata sharding, multipart upload, and garbage collection.</p>
+
+<p>The defining insight is to <strong>separate metadata from data</strong> and treat them as two different problems: metadata is small, numerous, and needs fast indexed lookup; data is huge, immutable, and needs cheap durable bytes. Almost every design decision (sharding, durability scheme, consistency) follows from that split, so a strong answer keeps the two planes distinct throughout.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Object size profile?</strong> Mostly small objects (KB) stresses metadata and per-object overhead; large media (GB-TB) stresses the data path and needs multipart + chunking.</li>
+<li><strong>Read/write/delete mix and hot vs cold?</strong> Hot read-heavy data wants replication; cold archival data wants erasure coding for cost.</li>
+<li><strong>Consistency expectation?</strong> Read-after-write for new objects is standard; what about overwrites and list-after-write (often weaker)?</li>
+<li><strong>Durability/availability target?</strong> "11 nines" durability and the regional/AZ failure model drive the replication/EC and placement choices.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li><code>PUT</code> / <code>GET</code> / <code>DELETE</code> an object; <code>LIST</code> a bucket.</li>
+<li><strong>Multipart upload</strong> for large objects; <strong>versioning</strong>; presigned URLs.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Durability</strong> ~11 nines; high availability.</li>
+<li><strong>Scale</strong> to exabytes and trillions of objects.</li>
+<li><strong>Read-after-write</strong> consistency for new objects.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Durability math:</strong> with a ~0.8% annual disk failure rate, 3 replicas give ~6 nines; erasure coding (e.g. 8+4) reaches ~11 nines — the reason EC is preferred for cold data.</li>
+<li><strong>Storage overhead:</strong> 3x replication = 200% overhead; 8+4 erasure coding = 50% overhead — big cost difference at exabyte scale.</li>
+<li><strong>Metadata:</strong> trillions of objects × ~1 KB metadata = petabytes of metadata alone — it must be sharded.</li>
+<li><strong>Object size spread:</strong> from tiny (KB) to huge (TB) — pack small objects into larger files; split big ones into chunks.</li>
+</ul>
+<p><strong>Worked example — replication vs erasure coding cost.</strong> To store 1 EB of usable data: <strong>3× replication</strong> needs ~3 EB of raw disk (200% overhead) but any single copy serves a read with low latency. <strong>8+4 erasure coding</strong> needs ~1.5 EB raw (50% overhead) — that is <em>half the hardware</em> at exabyte scale, i.e. enormous savings — but a read may have to fetch and decode k=8 shards (more IO + CPU + tail latency), and a single lost shard triggers a reconstruction read across 8 nodes. The rule of thumb that falls out: replication for hot/latency-sensitive data, erasure coding for cold/cost-sensitive data, and re-encode replicated objects to EC as they cool.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>PUT /{bucket}/{key}</code> — body is the object → <code>{etag, version_id}</code>.</li>
+<li><code>GET /{bucket}/{key}</code> → object bytes.</li>
+<li><code>DELETE /{bucket}/{key}</code>; <code>GET /{bucket}?list&prefix=</code> → keys.</li>
+<li><strong>Multipart:</strong> <code>POST .../uploads</code> (init), <code>PUT part</code>, <code>POST complete</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Separate <strong>metadata</strong> from <strong>data</strong> so each scales independently: a stateless API tier, a sharded metadata service (key to location), and data nodes that store the actual bytes as append-only chunks.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  C["Client"] --> API["API service (stateless)"]
+  API --> META["Metadata service (sharded): key to location"]
+  API --> PLACE["Placement / location service"]
+  API --> DN1["Data node 1"]
+  API --> DN2["Data node 2"]
+  API --> DN3["Data node 3"]
+  GC["Garbage collector"] -.reclaim.-> DN1
+  LIFE["Lifecycle manager"] -.tiering.-> DN3
+</pre>
+<figcaption><strong>Figure 1.</strong> Metadata and data scale separately: a stateless API tier, sharded metadata, a placement service, and append-only data nodes (with GC and lifecycle tiering).</figcaption>
+</figure>
+
+<h2>Write path</h2>
+<p>On PUT, the API picks a placement group, writes the bytes to several data nodes, waits for a <strong>write quorum</strong> to acknowledge durably, then commits the metadata entry. Read-after-write holds because metadata is committed only after data is durable.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant API as API service
+  participant P as Placement
+  participant D as Data nodes
+  participant M as Metadata
+  C->>API: PUT bucket/key (bytes)
+  API->>P: choose placement group
+  API->>D: write chunk to N nodes
+  D-->>API: W acks (write quorum)
+  API->>M: commit key to location + etag
+  API-->>C: 200 etag
+</pre>
+<figcaption><strong>Figure 2.</strong> Write to a quorum of data nodes first, then commit metadata — so a GET after a 200 always finds durable data.</figcaption>
+</figure>
+
+<h2>Replication vs erasure coding</h2>
+<p>Two ways to survive disk failures:</p>
+<ul>
+<li><strong>Replication:</strong> keep N full copies. Simple, fast recovery, low read latency — but high storage cost (3x = 200% overhead).</li>
+<li><strong>Erasure coding:</strong> split an object into k data shards plus m parity shards (e.g. 8+4); any k of the k+m can reconstruct it. Much cheaper (50% overhead for 8+4) and more durable — but reconstruction reads several shards, adding latency.</li>
+</ul>
+<p>Rule of thumb: replication for hot/latency-sensitive data, erasure coding for cold/cost-sensitive data.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  OBJ["Object"] --> MODE{"Hot or cold?"}
+  MODE -->|hot| REP["3x replication: 200% overhead, fast read"]
+  MODE -->|cold| EC["Erasure coding 8+4: 50% overhead, 11 nines"]
+  REP --> DUR["Durable + available"]
+  EC --> DUR
+</pre>
+<figcaption><strong>Figure 3.</strong> Replication (cheap to read, costly to store) vs erasure coding (cheap to store, costlier to reconstruct) — choose by access pattern.</figcaption>
+</figure>
+
+<h2>Metadata sharding and listing</h2>
+<p>Metadata (key to location, size, version) is itself huge, so it is <strong>sharded</strong> — commonly by a hash of <code>bucket+key</code>. That makes point lookups O(1) but makes <code>LIST prefix</code> hard (keys are scattered). A common fix: keep a separate, range-partitioned index ordered by key for listing, accepting that listing is eventually consistent and slower than a GET.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  K["bucket + key"] --> H["hash to metadata shard"]
+  H --> S1["Shard 1"]
+  H --> S2["Shard 2"]
+  H --> S3["Shard 3"]
+  L["LIST prefix"] --> IDX["Range-ordered key index (for listing)"]
+</pre>
+<figcaption><strong>Figure 4.</strong> Hash-sharded metadata gives fast point lookups; a separate key-ordered index serves prefix listing.</figcaption>
+</figure>
+
+<h2>Multipart upload</h2>
+<p>Uploading a 5 TB object in one request is fragile. <strong>Multipart upload</strong> splits it into parts uploaded independently (and in parallel); on <em>complete</em>, the service stitches the parts into one logical object. A failed part is retried alone, not the whole upload.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant API as API service
+  C->>API: init multipart upload
+  API-->>C: upload_id
+  par upload parts in parallel
+    C->>API: PUT part 1 (etag1)
+    C->>API: PUT part 2 (etag2)
+    C->>API: PUT part 3 (etag3)
+  end
+  C->>API: complete (upload_id, part etags)
+  API->>API: assemble object from parts
+  API-->>C: 200 object etag
+</pre>
+<figcaption><strong>Figure 5.</strong> Multipart upload: parts go up independently and in parallel; complete assembles them, so a single failed part is cheap to retry.</figcaption>
+</figure>
+
+<h2>Garbage collection and lifecycle</h2>
+<p>Deletes and overwrites leave orphaned chunks; a <strong>garbage collector</strong> reclaims space not referenced by any live metadata entry (mark-and-sweep). A <strong>lifecycle manager</strong> tiers cold objects to cheaper storage (e.g. Glacier) and can re-encode replicated data to erasure coding as it cools.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>Managed:</strong> AWS S3, Google Cloud Storage, Azure Blob, Cloudflare R2 — the default for most teams.</li>
+<li><strong>Self-hosted:</strong> MinIO (S3-compatible), Ceph, SeaweedFS; Facebook's Haystack/f4 are the classic in-house designs.</li>
+<li><strong>Metadata layer:</strong> often a sharded relational/KV store (e.g. <strong>FoundationDB</strong>, DynamoDB, or sharded Postgres) — separate from the data nodes.</li>
+<li><strong>Pairs with:</strong> a <strong>CDN</strong> in front for read-heavy media, and lifecycle tiering to a cold class (Glacier) for archives.</li>
+</ul>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Read-after-write for new objects:</strong> achieved by committing metadata only after the data write quorum is durable — a GET after a 200 always resolves. (Modern S3 made this strong for all operations; older systems were eventual.)</li>
+<li><strong>Overwrites / deletes are trickier:</strong> with versioning, a PUT creates a new version and the metadata pointer flips atomically; without it, concurrent overwrites need last-writer-wins or conditional writes (<code>If-Match</code> on etag).</li>
+<li><strong>Listing is often weaker</strong> than point reads: the key-ordered index is updated asynchronously, so a just-written key may appear in LIST slightly later.</li>
+<li><strong>Durability is independent of availability:</strong> 11 nines durability (you won't lose bytes) does not mean 11 nines availability (you might briefly not be able to read them during a failure) — state both targets separately.</li>
+</ul>
+
+<h2>Tradeoffs &amp; when not to use object storage</h2>
+<ul>
+<li><strong>Great for:</strong> large immutable blobs — media, backups, logs, ML datasets, static assets (often fronted by a CDN).</li>
+<li><strong>Wrong for:</strong> small mutable records with low latency (use a database/KV), append-in-place or partial in-place edits (objects are immutable — you rewrite), or strong cross-object transactions.</li>
+<li><strong>Cost lever:</strong> lifecycle-tier cold objects to cheaper classes and re-encode to EC; most cost is storage-months, not requests.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Metadata is the bottleneck</strong> at object scale — shard it; it is petabytes on its own.</li>
+<li><strong>Listing is expensive</strong> with hash sharding — keep a separate ordered index.</li>
+<li><strong>Small-object overhead:</strong> pack many small objects into large append-only files to avoid per-object cost.</li>
+<li><strong>EC reconstruction cost:</strong> reading cold data may touch several shards — fine for cold, not for hot.</li>
+<li><strong>Read-after-write:</strong> commit metadata only after a durable write quorum.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Separate <strong>metadata</strong> from <strong>data</strong>; shard both.</li>
+<li><strong>Replication</strong> for hot data, <strong>erasure coding</strong> for cold — durability vs cost.</li>
+<li>Commit metadata after a <strong>write quorum</strong> for read-after-write.</li>
+<li><strong>Multipart upload</strong> + <strong>GC</strong> + <strong>lifecycle tiering</strong> handle scale and cost.</li>
+<li><strong>State the guarantees:</strong> read-after-write for new objects (metadata committed after a durable data quorum); listing is often weaker; durability ≠ availability.</li>
+<li><strong>Objects are immutable</strong> — model updates as new versions/overwrites, not in-place edits.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: AWS S3 docs; Facebook Haystack and f4 papers; Backblaze posts on erasure coding and drive durability; Reed-Solomon coding material. Diagrams and write-up are original EngineerPro content.</em></p>

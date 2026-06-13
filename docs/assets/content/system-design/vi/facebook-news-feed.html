@@ -1,0 +1,183 @@
+<p>Một <strong>news feed</strong> hiển thị cho mỗi user một luồng post được cá nhân hoá và rank từ những người/page họ follow. Phần khó là <strong>fanout</strong> (một post mới đến feed của hàng triệu follower thế nào) và <strong>ranking</strong> (hiển thị post nào trước). Chương này thiết kế feed kiểu Facebook, nhấn vào ranking/ML-serving path.</p>
+
+<p>Đặc tính định nghĩa một feed là nó <strong>read-dominated ~100:1</strong> — hàng tỷ lần mở feed so với số post ít hơn nhiều. Một sự thật đó chi phối quyết định trung tâm: làm việc đắt (ráp feed) ở <strong>write time</strong> (push post vào feed precomputed của mọi follower) hay ở <strong>read time</strong> (gom và rank on the fly)? Push cho read nhanh nhưng nổ với celebrity; pull rẻ khi write nhưng chậm khi read. Câu trả lời thực tế là một <strong>hybrid</strong>, và nói rõ chính xác lằn ranh nằm đâu là cái phỏng vấn đang test.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Chronological hay ranked?</strong> Feed reverse-chronological đơn giản hơn nhiều; ML ranking thêm một feature store, model serving, và một stage candidate-generation.</li>
+<li><strong>Phân bố follower?</strong> Nếu một số account có hàng chục triệu follower (celebrity/page), fanout-on-write thuần là bất khả thi — cần hybrid.</li>
+<li><strong>Freshness SLA?</strong> Post mới phải xuất hiện trong vài giây, hay một phút là ổn? Điều đó set mức precompute vs compute-on-read.</li>
+<li><strong>Phạm vi feed?</strong> Chỉ friend, follow graph, cộng content recommended/"discovery"? Recommendation thêm một candidate source riêng ngoài social graph.</li>
+<li><strong>Kỳ vọng consistency?</strong> User chịu được feed eventually-consistent (một post xuất hiện hơi trễ) nhưng không chịu mất post hay thứ tự lệch hẳn khi refresh.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Đăng post (text, ảnh, video).</li>
+<li>Follow / friend account khác (social graph).</li>
+<li>Lấy news feed đã <strong>rank</strong>; paginate.</li>
+<li>Like / comment; counter cập nhật.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Feed latency thấp</strong> (feed load trong vài chục ms).</li>
+<li><strong>Freshness</strong> — post mới xuất hiện nhanh.</li>
+<li><strong>Scale</strong> — hàng tỷ user và graph edge.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Users:</strong> 1B DAU, mỗi người mở feed ~10×/ngày → ~10B feed read/ngày ≈ <strong>~115k reads/s</strong> trung bình, peak gấp vài lần.</li>
+<li><strong>Writes:</strong> ~100M post/ngày ≈ ~1.2k post/s — read áp đảo write ~100:1, nên tối ưu read.</li>
+<li><strong>Fanout cost:</strong> trung bình ~200 follower → một post fanout tới ~200 feed; celebrity 50M follower thành 50M write — lý do cần hybrid.</li>
+<li><strong>Feed cache:</strong> lưu ~vài trăm post-id mỗi user trong memory; 1B user × ~1 KB ≈ ~1 TB feed-id cache (shard ra Redis fleet).</li>
+</ul>
+<p><strong>Worked example.</strong> Làm rõ ngưỡng hybrid cụ thể. Một post trung bình (~200 follower) tốn ~200 inbox write — tầm thường, nên <strong>fanout-on-write</strong>: khi đăng, push post-id vào feed list cached của mỗi follower. Giờ một celebrity 50M follower: fanout-on-write nghĩa là 50M inbox write cho một post, và nếu vài nghìn celebrity đăng lúc peak thì đó là hàng tỷ write/s amplification — cộng phần lớn phí cho follower inactive. Nên trên một ngưỡng (cỡ ~10k-100k follower) account bị đánh dấu <strong>fanout-on-read</strong>: post của họ <em>không</em> bị push; thay vào đó, lúc read feed service pull post gần đây từ vài trăm celebrity bạn follow và merge với inbox precomputed. Feed của một user = "feed precomputed của tôi (từ author thường)" ∪ "post mới pull (từ author celebrity)", rồi rank. Write cost giữ bounded và read cost chỉ tăng theo số ít account lớn bạn follow — đó là lý do hybrid thắng.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /posts</code> — <code>{author_id, content, media_ref}</code> → <code>{post_id}</code>.</li>
+<li><code>GET /feed?cursor=</code> → <code>{items[], next_cursor}</code> (đã rank, cursor-paginate).</li>
+<li><code>POST /follow</code> — <code>{follower_id, target_id}</code>.</li>
+<li><code>POST /posts/{id}/like</code>, <code>POST /posts/{id}/comments</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User"] --> POST["Post service"]
+  POST --> PSTORE["Post store"]
+  POST --> FAN["Fanout service (Kafka)"]
+  FAN --> FCACHE["Feed cache (Redis): user to post-ids"]
+  U --> FEED["Feed service"]
+  FEED --> FCACHE
+  FEED --> RANK["Ranking service"]
+  RANK --> FEAT["Feature store + model"]
+  FEED --> PSTORE
+  FEED --> CDN["Media via CDN"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Write đi qua post service và pipeline fanout vào feed cache theo từng user; read hydrate post-id, rank, và lấy media từ CDN.</figcaption>
+</figure>
+
+<h2>Fanout on write vs read</h2>
+<ul>
+<li><strong>Fanout on write (push):</strong> khi tạo post, append id của nó vào feed cache của mọi follower. Read sau đó là lookup cache rẻ. Giá: write amplification khổng lồ cho account nổi tiếng.</li>
+<li><strong>Fanout on read (pull):</strong> dựng feed lúc read bằng cách gom post gần đây từ các account đã follow. Write rẻ, read đắt.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph WRITE["Fanout on write"]
+    P1["Post mới"] --> F1["Append id vào feed cache mỗi follower"]
+    F1 --> R1["Read = lookup cache (nhanh)"]
+  end
+  subgraph READ["Fanout on read"]
+    P2["Post mới"] --> S2["Chỉ lưu lại"]
+    Q2["Read = gom từ account đã follow (chậm)"] --> S2
+  end
+</pre>
+<figcaption><strong>Hình 2.</strong> Push tính sẵn feed (read nhanh, write nặng); pull tính lúc read (write rẻ, read nặng).</figcaption>
+</figure>
+
+<h2>Write path (feed publishing)</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Author
+  participant PS as Post service
+  participant FAN as Fanout (Kafka)
+  participant FC as Feed cache
+  A->>PS: POST /posts
+  PS->>PS: persist post
+  PS-->>A: post_id
+  PS->>FAN: emit post-created event
+  FAN->>FC: append post_id vào feed mỗi follower (push)
+  Note over FAN,FC: celebrity bỏ qua ở đây (xử lý lúc read)
+</pre>
+<figcaption><strong>Hình 3.</strong> Publishing persist post và emit event; fanout worker push post-id vào feed cache của follower thường một cách bất đồng bộ.</figcaption>
+</figure>
+
+<h2>Read path và ranking</h2>
+<p>Feed hiện đại không phải reverse-chronological — nó được <strong>rank</strong>. Read path là một pipeline nhỏ: gom candidate post-id (từ feed cache cộng post celebrity được pull), <strong>hydrate feature</strong> (recency, affinity, engagement signal), <strong>score</strong> bằng ML model, sort, và trả một page.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  REQ["GET /feed"] --> CAND["Candidate generation: feed cache + post celebrity pulled"]
+  CAND --> HYD["Feature hydration: affinity, recency, engagement"]
+  HYD --> SCORE["Model scoring (ranking service)"]
+  SCORE --> SORT["Sort + paginate (cursor)"]
+  SORT --> RESP["Trả ranked page"]
+</pre>
+<figcaption><strong>Hình 4.</strong> Read path: candidate generation, feature hydration, ML scoring, rồi sort và cursor-paginate.</figcaption>
+</figure>
+
+<h2>Hybrid model (celebrity problem)</h2>
+<p>Push thuần vỡ với celebrity (một post = hàng chục triệu write). Cách sửa là <strong>hybrid</strong>: push cho account thường, nhưng <em>không</em> push post từ account nhiều follower — thay vào đó pull lúc read và merge. Đa số account nhỏ (push rẻ); vài account khổng lồ (pull on demand rẻ).</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  POST["Post mới"] --> CHECK{"Author follower nhiều?"}
+  CHECK -->|account thường| PUSH["Push id vào feed follower"]
+  CHECK -->|celebrity| SKIP["Bỏ push; chỉ lưu"]
+  READ["Feed read"] --> MERGE["Merge feed đã push + post celebrity pulled"]
+  PUSH --> MERGE
+  SKIP --> MERGE
+</pre>
+<figcaption><strong>Hình 5.</strong> Hybrid fanout: push cho nhiều account nhỏ, pull-and-merge cho vài celebrity — chặn write amplification.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, route cho endpoint post/feed/like.</li>
+<li><strong>Posts:</strong> một <strong>wide-column store (Cassandra)</strong> key theo author/post id — append-heavy, khổng lồ, scale ngang.</li>
+<li><strong>Social graph (follow):</strong> một store tối ưu cho graph — sharded MySQL với caching layer (pattern TAO của Meta) hoặc một graph DB — cho lookup "ai follow ai".</li>
+<li><strong>Feed cache:</strong> <strong>Redis</strong> giữ list post-id theo từng user (feed precomputed) — hot, in-memory, điểm dừng đầu của read path.</li>
+<li><strong>Fanout:</strong> <strong>Kafka</strong> mang event post-created tới fanout worker bất đồng bộ.</li>
+<li><strong>Ranking:</strong> một <strong>feature store</strong> (Redis / Cassandra) + một model-serving service; counter (like/view) qua <strong>Redis</strong> hoặc một stream processor (<strong>Flink</strong>) cho real-time aggregation.</li>
+<li><strong>Media:</strong> <strong>blob storage (S3-like)</strong> + <strong>CDN</strong>; post chỉ lưu reference.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> feed precomputed phải sub-ms → Redis; post append-heavy ở scale khổng lồ → wide-column; graph có access pattern riêng (adjacency lookup) → một graph/edge store; media lớn + bất biến → blob + CDN; fanout và counter là stream → Kafka/Flink. Một DB quan hệ không scale nổi bất kỳ cái nào trong số này.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Feed eventually consistent:</strong> fanout bất đồng bộ, nên một post có thể mất vài giây để xuất hiện ở mọi feed — chấp nhận được cho feed, và nói rõ. Bạn tối ưu read latency và freshness, không phải linearizability.</li>
+<li><strong>Ranking best-effort, xấp xỉ:</strong> thứ tự là score của một model, recompute theo thời gian; hai lần refresh có thể khác nhẹ. Counter (like/view) là <em>xấp xỉ và eventually consistent</em> — exactness không đáng coordination ở scale này.</li>
+<li><strong>Pagination ổn định:</strong> dùng cursor/snapshot (post-id + timestamp) để page xuống không trùng hoặc skip khi post mới tới — read feed nhất quán trong một session dù global feed đổi.</li>
+<li><strong>Không mất post:</strong> bản thân post write (vào posts store) là durable và authoritative; feed cache là một view derived, rebuild được — nếu thiếu một feed entry, có thể recompute bằng pull từ posts store + graph.</li>
+<li><strong>Read-your-writes cho author:</strong> bạn nên thấy post của mình ngay — thường xử lý bằng cách inject nó vào feed của chính bạn đồng bộ ngay cả khi fanout tới người khác chạy async.</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng thiết kế này</h2>
+<ul>
+<li><strong>Hybrid fanout khi:</strong> một social graph lớn với phân bố follower lệch (đa số nhỏ, một số khổng lồ) và traffic read-heavy — feed/timeline kinh điển.</li>
+<li><strong>Fanout-on-write thuần khi:</strong> follower bounded và tương tự nhau (vd team activity feed) — đơn giản nhất, read nhanh nhất, không có celebrity problem.</li>
+<li><strong>Fanout-on-read thuần khi:</strong> write hiếm hoặc graph nhỏ xíu — đừng bận precompute.</li>
+<li><strong>Thiết kế khác khi:</strong> "feed" thực ra là một global ranked list giống nhau cho mọi người (vd trang trending) — đó là một list cached, recompute định kỳ, không phải fanout per-user.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Celebrity write storm:</strong> không bao giờ push post 50M follower — hybrid là bắt buộc.</li>
+<li><strong>Feed cache invalidation:</strong> delete/block phải xoá id; giữ feed có giới hạn (top N) và re-hydrate page cũ từ store.</li>
+<li><strong>Ranking latency:</strong> feature hydration là bước chậm — cache feature và giới hạn số candidate.</li>
+<li><strong>Cursor pagination</strong> (không offset) — feed thay đổi dưới chân user.</li>
+<li><strong>Thundering herd</strong> trên counter của post viral — dùng sharded/approximate counter.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>Read áp đảo</strong> — tính sẵn feed bằng fanout-on-write cho đa số user.</li>
+<li><strong>Hybrid fanout</strong> giải bài write-amplification của celebrity.</li>
+<li>Feed là một <strong>ranking pipeline</strong>: candidate → feature → model score → sort.</li>
+<li><strong>Feed cache</strong> post-id + media CDN giữ read nhanh.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: bài viết Meta Engineering về News Feed và TAO social graph; tài liệu công khai về fanout (push/pull) và learning-to-rank cho feed ranking. Diagram và nội dung là content gốc của EngineerPro.</em></p>

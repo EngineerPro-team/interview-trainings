@@ -1,0 +1,250 @@
+<p>Designing a chat system like <strong>Telegram</strong> is about moving small messages between hundreds of millions of devices with low latency, correct ordering, and seamless multi-device sync. This chapter builds a Telegram-style messenger from first principles: the connection layer, message storage and ordering, multi-device sync, group fanout, presence, and end-to-end encrypted secret chats.</p>
+
+<p>The crux of chat design is two deceptively hard guarantees living on top of an otherwise simple "store-and-forward" system: <strong>per-chat ordering</strong> (every device sees the same message order) and <strong>multi-device sync</strong> (a message read on the phone shows as read on the laptop). The trick that makes both tractable is a <strong>per-chat monotonic sequence number</strong> — once each message has an authoritative position, ordering, dedup, and "what have I not seen yet" sync all reduce to comparing integers.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>1:1, small groups, or huge channels?</strong> A million-member broadcast channel is a different problem (shared log, pull) than a 1:1 chat (push) — clarify the largest group size.</li>
+<li><strong>Multi-device required?</strong> If one account spans phone + desktop + web, you need a server-side per-device sync cursor, not just per-user.</li>
+<li><strong>End-to-end encryption?</strong> If secret chats are E2E, the server can't read or fan out content — it only routes ciphertext between two devices (no multi-device, no server search).</li>
+<li><strong>Ordering strength?</strong> Per-chat total order is the usual answer; global ordering across chats is unnecessary and expensive.</li>
+<li><strong>Retention?</strong> Store-forever history vs ephemeral/expiring messages changes the storage and cost model.</li>
+</ul>
+
+<h2>Requirements</h2>
+
+<h3>Functional</h3>
+<ul>
+<li>1:1 and <strong>group</strong> chats with text and media.</li>
+<li><strong>Delivery and read receipts</strong> (sent, delivered, seen).</li>
+<li><strong>Multi-device sync</strong> — the same account stays consistent across phone, desktop, web.</li>
+<li><strong>Offline delivery</strong> — messages queued while a recipient is offline.</li>
+<li><strong>Presence</strong> (online / last seen) and typing indicators.</li>
+<li><strong>Secret chats</strong> with end-to-end encryption (device-to-device).</li>
+</ul>
+
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low latency</strong> message delivery (tens of ms within a region).</li>
+<li><strong>Ordering</strong> — messages in a chat are seen in a consistent order on every device.</li>
+<li><strong>Durability</strong> — an acknowledged message is never lost.</li>
+<li><strong>Scale</strong> — 100M+ daily users, millions of concurrent connections.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Users:</strong> 100M DAU, ~40 messages sent/user/day → ~4B messages/day ≈ <strong>46k writes/s</strong> average, ~5x peak ≈ <strong>230k writes/s</strong>.</li>
+<li><strong>Storage:</strong> ~300 bytes/message (metadata + text) × 4B/day ≈ 1.2 TB/day; with 3x replication ≈ <strong>3.6 TB/day</strong> (media goes to blob storage separately).</li>
+<li><strong>Connections:</strong> ~10-20M concurrent devices; at ~50k connections/gateway → <strong>~200-400 gateways</strong>.</li>
+<li><strong>Fanout:</strong> a 1:1 chat is ~1 delivery, but a 100k-member channel turns one write into 100k reads — the reason large groups use a shared log.</li>
+</ul>
+<p><strong>Worked example.</strong> Take the fanout decision concretely. A 1:1 message is one write + one push — trivial. A 50-member group with push-on-write is 1 write → 50 deliveries; at 230k writes/s of group traffic that is millions of pushes/s, but still cheap because each member's "inbox" is just a pointer advance. Now a <strong>1,000,000-member channel</strong>: push-on-write would mean 1 message → 1M inbox writes — a write amplification that melts the system and wastes work on the ~90% of members who are offline or never open it. So large channels flip to <strong>pull / shared log</strong>: the message is written <em>once</em> to the channel's log, and each client reads from its last-seen sequence number when it opens the chat. This is the classic fanout-on-write (small chats, low latency) vs fanout-on-read (huge channels, avoid amplification) split — the same trade-off as a social feed, decided per chat by membership size.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /sendMessage</code> — <code>{chat_id, client_msg_id, text | media_ref}</code> → <code>{seq, date}</code> (client_msg_id makes the send idempotent).</li>
+<li><code>GET /getUpdates</code> — <code>{pts, limit}</code> → <code>{updates[], new_pts}</code> (multi-device sync).</li>
+<li><code>GET /getHistory</code> — <code>{chat_id, from_seq, limit}</code> → list of messages.</li>
+<li><code>POST /markRead</code> — <code>{chat_id, up_to_seq}</code>.</li>
+<li><code>POST /sendTyping</code> — <code>{chat_id}</code> (ephemeral, short TTL).</li>
+<li><strong>WebSocket events (server to client):</strong> <code>new_message</code>, <code>read_receipt</code>, <code>presence</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<p>Clients hold a <strong>persistent connection</strong> (WebSocket / long-lived TCP) to a stateless <strong>gateway</strong>. The gateway forwards to a message service that persists into a per-chat store and fans out to recipients. A session registry tracks which gateway currently holds each device, so a message can be pushed to an online recipient; a push service handles the offline case.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Sender device"] --> GW1["Gateway A (stateless)"]
+  B["Recipient device"] --> GW2["Gateway B (stateless)"]
+  GW1 --> MS["Message service"]
+  MS --> STORE["Message store (per-chat)"]
+  MS --> SESS["Session registry: device to gateway"]
+  MS --> FAN["Fanout"]
+  FAN --> GW2
+  FAN --> PUSH["Push service (APNs / FCM)"]
+  PUSH -.offline.-> B
+</pre>
+<figcaption><strong>Figure 1.</strong> Stateless gateways hold the long-lived connections; the message service persists, looks up the recipient's gateway in the session registry, and fans out (or falls back to push when offline).</figcaption>
+</figure>
+
+<h2>Connection layer and sessions</h2>
+
+<p>Connections are <em>stateful</em> but the gateways are <em>logically stateless</em>: any gateway can serve any user, and the mapping "this device is connected to that gateway" lives in a shared <strong>session registry</strong> (e.g. Redis). When a device connects, the gateway registers it; when the message service needs to deliver, it looks up the gateway and forwards. A heartbeat keeps the entry fresh and detects dead connections.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant D as Device
+  participant GW as Gateway
+  participant REG as Session registry
+  D->>GW: connect + auth token
+  GW->>REG: register device -> this gateway (TTL)
+  loop every N seconds
+    D->>GW: heartbeat
+    GW->>REG: refresh TTL
+  end
+  Note over GW,REG: on disconnect or TTL expiry, entry is removed
+</pre>
+<figcaption><strong>Figure 2.</strong> A device registers its gateway in a shared registry with a TTL refreshed by heartbeats, so delivery can always find an online device.</figcaption>
+</figure>
+
+<h2>Sending a message</h2>
+
+<p>Every message carries a <strong>client-generated id</strong> (idempotency key) so retries do not create duplicates. The subtle part is <em>who</em> assigns the order: under concurrent sends from multiple message-service instances, you need a single <strong>ordering authority per chat</strong> — a <strong>chat sequencer / partition owner</strong> (one owner per <code>chat_id</code>, or a log partitioned by <code>chat_id</code> with a single consumer, or a conditional counter via LWT). That owner dedups by <code>client_msg_id</code>, allocates the next monotonic <code>seq</code>, then persists to the durable message store before the sender is acked. A wide-column store alone (clustering by <code>seq</code>) only <em>stores</em> an already-assigned order — it does not safely allocate one under contention.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant S as Sender
+  participant MS as Message service
+  participant SEQ as Chat sequencer (owner of chat_id)
+  participant ST as Message store
+  participant R as Recipient (online)
+  S->>MS: send(chatId, clientMsgId, text)
+  MS->>SEQ: route by chat_id
+  SEQ->>SEQ: dedup clientMsgId, allocate next seq
+  SEQ->>ST: persist message at seq = 42
+  ST-->>SEQ: stored (durable)
+  SEQ-->>MS: seq = 42
+  MS-->>S: ack (seq = 42)
+  MS->>R: deliver(seq = 42)
+  R-->>MS: delivered / seen receipt
+</pre>
+<figcaption><strong>Figure 3.</strong> A per-chat <strong>sequencer</strong> (single owner per chat) dedups the client message id and allocates the monotonic <code>seq</code>, then persists durably before the ack — the store keeps the order, the sequencer creates it.</figcaption>
+</figure>
+
+<h2>Storage and ordering</h2>
+
+<p>Once the sequencer has assigned each message a per-chat <code>seq</code>, messages are stored keyed by chat and ordered by that sequence number. A wide-column store (e.g. Cassandra) partitioned by <code>chat_id</code> with <code>seq</code> as the clustering key gives cheap appends and efficient "fetch the last N messages" / "fetch since seq" reads. The clustering key only sorts an order that already exists — it is not what allocates the order.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph CHAT["Partition: chat_id = 777"]
+    direction TB
+    M1["seq 40 | from A | hello"]
+    M2["seq 41 | from B | hi"]
+    M3["seq 42 | from A | how are you"]
+    M1 --> M2 --> M3
+  end
+  Q1["fetch last N"] --> CHAT
+  Q2["fetch since seq 41"] --> CHAT
+</pre>
+<figcaption><strong>Figure 4.</strong> One partition per chat, clustered by sequence number — appends are cheap and range reads ("since seq X") are a single partition scan.</figcaption>
+</figure>
+
+<h2>Multi-device sync</h2>
+
+<p>A Telegram account is <strong>cloud-based</strong>: messages live on the server, and every device reconciles to the same state. Each account keeps a global <strong>update sequence</strong> (Telegram calls it <code>pts</code> — "points"). A device stores the last <code>pts</code> it has seen; on reconnect it calls "give me updates since <code>pts</code>" and replays whatever it missed. New events advance <code>pts</code>, so devices converge no matter when they were last online.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  EV["New event (message, read, edit)"] --> SEQ["Advance account update seq (pts)"]
+  SEQ --> LOG["Per-account update log"]
+  P["Phone: last pts = 100"] -->|getUpdates since 100| LOG
+  W["Web: last pts = 95"] -->|getUpdates since 95| LOG
+  LOG -->|replay 96..105| W
+  LOG -->|replay 101..105| P
+</pre>
+<figcaption><strong>Figure 5.</strong> A per-account update sequence (pts) lets each device pull exactly the events it missed, so phone, web, and desktop converge to the same state.</figcaption>
+</figure>
+
+<h2>Group chats</h2>
+
+<p>Two models, mirroring news-feed fanout:</p>
+<ul>
+<li><strong>Fanout on write (small groups):</strong> copy the message into each member's delivery path when sent. Fast reads, more write amplification.</li>
+<li><strong>Shared log (large groups / channels):</strong> store one copy in the group's message log; members read from it. Avoids huge write amplification for a channel with millions of subscribers.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  SENDER["Member sends to group 9"] --> GLOG["Group message log (chat_id = 9)"]
+  GLOG --> F1["Online members: push via gateways"]
+  GLOG --> F2["Offline members: push notification"]
+  GLOG --> F3["On open: getUpdates since pts"]
+</pre>
+<figcaption><strong>Figure 6.</strong> Large groups keep a single shared log; online members are pushed, offline members get a notification and sync on open — avoiding per-member copies.</figcaption>
+</figure>
+
+<h2>Presence and typing</h2>
+
+<p>Presence is high-volume and low-value-per-event, so it is kept cheap: a device sends a periodic <strong>heartbeat</strong>; missing a few marks it offline ("last seen"). Typing indicators are ephemeral fan-out events with a short TTL — never persisted.</p>
+
+<h2>Secret chats (end-to-end encryption)</h2>
+
+<p>Normal "cloud chats" are encrypted in transit and at rest but the server can read them (needed for multi-device sync). <strong>Secret chats</strong> are end-to-end encrypted and bound to two devices: keys are derived with a Diffie-Hellman exchange, and the server only relays opaque ciphertext — it cannot read content and cannot sync the secret chat to other devices.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Device A
+  participant SRV as Server (relay only)
+  participant B as Device B
+  A->>SRV: DH public part
+  SRV->>B: forward
+  B->>SRV: DH public part
+  SRV->>A: forward
+  Note over A,B: both derive the same shared key
+  A->>SRV: encrypted blob (opaque)
+  SRV->>B: relay encrypted blob
+  Note over SRV: server cannot decrypt
+</pre>
+<figcaption><strong>Figure 7.</strong> Secret chats: the server only relays Diffie-Hellman handshake parts and opaque ciphertext; the key never leaves the two devices.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>Which datastore for which job is most of the design:</p>
+<ul>
+<li><strong>API gateway</strong> (Envoy / NGINX): auth, rate limiting, and routing for the REST/login surface, in front of the WebSocket gateways.</li>
+<li><strong>Connection gateways:</strong> stateful WebSocket servers; the device→gateway <strong>session registry</strong> is in <strong>Redis</strong> (TTL refreshed by heartbeats).</li>
+<li><strong>Ordering authority:</strong> a <strong>per-chat sequencer</strong> assigns the monotonic <code>seq</code> — a single partition owner per <code>chat_id</code>, or a <strong>log partitioned by <code>chat_id</code></strong> (Kafka/Pulsar) with one consumer per partition, or a conditional counter row (LWT). This is the piece that makes ordering correct under concurrent sends; the message store does <em>not</em> allocate the order.</li>
+<li><strong>Messages:</strong> a <strong>wide-column store (Cassandra / ScyllaDB)</strong> partitioned by <code>chat_id</code>, clustered by <code>seq</code> — it <em>stores</em> messages in the order the sequencer already assigned: cheap appends, efficient "fetch since seq" range reads, horizontally scalable. This is the workhorse store, not the sequencer.</li>
+<li><strong>Account / contacts / settings:</strong> a relational DB (<strong>PostgreSQL</strong>) — modest size, relational, transactional.</li>
+<li><strong>Fanout / update stream:</strong> <strong>Kafka</strong> carries post-and-fanout events to gateways and the push service.</li>
+<li><strong>Media (photos, video, files):</strong> <strong>blob/object storage (S3-like)</strong> + <strong>CDN</strong>; the message only stores a reference, never the bytes.</li>
+<li><strong>Push to offline devices:</strong> APNs / FCM via a push service.</li>
+</ul>
+<p><strong>Why these:</strong> messages are append-heavy, per-chat ordered, and enormous in aggregate → a wide-column store beats a single relational DB; the presence/session map is hot + ephemeral → Redis; media is large + immutable → object storage + CDN; account data is small + relational → SQL. Secret-chat ciphertext is just opaque bytes the server relays and stores without keys.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Per-chat total order, not global:</strong> a per-chat <strong>sequencer</strong> (single owner per chat) allocates the monotonic <code>seq</code> after deduping the client message id, so every device renders the same order within a chat. The wide-column store keeps that order; it does not create it. There is no cross-chat ordering guarantee, and that's fine.</li>
+<li><strong>At-least-once delivery + idempotent apply:</strong> a message may be delivered more than once (retries, reconnect), so clients dedup by <code>(chat_id, seq)</code> / message id. Senders attach a client-generated id so a resend doesn't create a duplicate.</li>
+<li><strong>Durability before ack:</strong> a message is persisted (and replicated) before the sender gets "sent" — an acknowledged message is never lost, even if the recipient is offline for days (it's pulled by seq on reconnect).</li>
+<li><strong>Read-your-writes via sync cursor:</strong> each device tracks its last-applied seq; on reconnect it pulls everything after it, so multi-device stays consistent (read receipts and deletes propagate the same way).</li>
+<li><strong>E2E secret chats trade features for privacy:</strong> end-to-end encryption means no server-side fanout, search, or multi-device cloud history — the server only routes ciphertext between two specific devices.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Fits:</strong> consumer/team messaging needing low latency, multi-device, history, and a mix of 1:1, groups, and large channels.</li>
+<li><strong>Simplify when:</strong> you only need 1:1 ephemeral chat (e.g. in-app support) — a single push channel without the wide-column log and channel/pull machinery may be enough.</li>
+<li><strong>Different design when:</strong> the product is really live broadcast to millions (use a feed/log + CDN), or it's an event bus between services (use Kafka directly) — chat semantics (per-recipient read state, presence) add cost you don't need there.</li>
+</ul>
+
+<h2>Scaling and pitfalls</h2>
+<ul>
+<li><strong>Connection scaling:</strong> millions of persistent connections — shard across many stateless gateways; keep per-connection memory small.</li>
+<li><strong>Hot group / channel:</strong> a channel with millions of members must use the shared-log model and read fanout, not write fanout.</li>
+<li><strong>Ordering under retries:</strong> the client message id dedups; the per-chat sequence number gives a single source of truth for order.</li>
+<li><strong>Thundering herd on reconnect:</strong> after a network blip, many devices call getUpdates at once — bound the replay window and rate-limit.</li>
+<li><strong>Media:</strong> never push bytes through the message path — upload to blob storage / CDN and send a reference.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Stateless <strong>gateways</strong> + a shared <strong>session registry</strong> decouple "who is connected where" from delivery.</li>
+<li>A <strong>client message id</strong> (idempotency) plus a <strong>per-chat sequence number</strong> give dedup and a single ordering authority.</li>
+<li>A per-account <strong>update sequence (pts)</strong> is the backbone of multi-device sync.</li>
+<li>Large groups use a <strong>shared log + read fanout</strong>; small chats can fan out on write.</li>
+<li><strong>Secret chats</strong> trade multi-device sync for true end-to-end encryption.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Reference: public Telegram / MTProto documentation and general distributed-systems material. Diagrams and write-up are original EngineerPro content.</em></p>

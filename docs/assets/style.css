@@ -288,18 +288,16 @@
 :root[data-theme="dark"] .hero__sub strong {
   color: var(--orange-2);
 }
-:root[data-theme="dark"] .book-author__name {
-  color: #fff;
+:root[data-theme="dark"] .book-author-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
 }
-:root[data-theme="dark"] .book-author__role {
-  color: rgba(255, 255, 255, 0.78);
+:root[data-theme="dark"] .sd-authors .book-author-card {
+  background: var(--surface);
+  border-color: var(--line);
 }
-:root[data-theme="dark"] .book-author {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.22);
-}
-:root[data-theme="dark"] .book-author:hover {
-  background: rgba(255, 255, 255, 0.2);
+:root[data-theme="dark"] .sd-authors .book-author-card__name {
+  color: var(--text);
 }
 
 /* Stats card — labels need way more contrast on the dark glass card */
@@ -3901,51 +3899,146 @@ a.faq-cta:hover { transform: translateY(-1px); }
   font-style: italic;
   margin: 0 0 1.5rem;
 }
+.sd-hero__copy .book-hero__sub {
+  font-style: normal;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 1rem;
+  max-width: 36rem;
+}
 .book-hero__authors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  width: 100%;
   margin-bottom: 1.75rem;
 }
-.book-author {
-  display: inline-flex;
+.book-author-card {
+  display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 0.85rem 0.45rem 0.45rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  color: #fff !important;
-  text-decoration: none !important;
-  transition: background 0.2s, transform 0.15s;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: #fff;
 }
-.book-author:hover {
-  background: rgba(255, 255, 255, 0.14);
-  transform: translateY(-1px);
-}
-.book-author__avatar {
-  width: 30px;
-  height: 30px;
+.book-author-card__avatar {
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
   font-family: "Space Grotesk", sans-serif;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 1.35rem;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+}
+.book-author-card__avatar--photo {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.book-author-card__avatar--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  display: block;
+}
+.book-author-card__body {
+  min-width: 0;
+  flex: 1;
+}
+.book-author-card__name {
+  margin: 0 0 0.2rem;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.2;
   color: #fff;
 }
-.book-author__meta {
+.book-author-card__role {
+  margin: 0 0 0.35rem;
+  font-size: 0.86rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.62);
+}
+.book-author-card__org {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.88);
+}
+.book-author-card__org strong {
+  color: #5ec8ff;
+  font-weight: 700;
+}
+.book-author-card__actions {
   display: flex;
-  flex-direction: column;
-  line-height: 1.15;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
-.book-author__name {
-  font-size: 0.88rem;
+.book-author-card__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.72rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
   font-weight: 600;
+  text-decoration: none !important;
+  color: #fff !important;
+  transition: transform 0.15s, filter 0.15s;
 }
-.book-author__role {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.65);
+.book-author-card__btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.book-author-card__btn--linkedin {
+  background: #0a66c2;
+}
+.book-author-card__btn--portfolio {
+  background: #7c3aed;
+}
+.book-author-card__btn-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.sd-authors .book-author-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+}
+.sd-authors .book-author-card__name {
+  color: var(--text);
+}
+.sd-authors .book-author-card__role {
+  color: var(--muted);
+}
+.sd-authors .book-author-card__org {
+  color: var(--text);
+}
+.sd-authors .book-author-card__avatar {
+  border-color: var(--line);
+}
+@media (max-width: 720px) {
+  .book-hero__authors {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 420px) {
+  .book-author-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 .book-hero__cta {
   display: flex;
@@ -4080,6 +4173,297 @@ a.faq-cta:hover { transform: translateY(-1px); }
   font-size: 0.85rem;
   background: linear-gradient(135deg, var(--navy), var(--navy-2));
   color: #fff;
+}
+.book-chapter--soon {
+  opacity: 0.72;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.sd-soon-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: var(--line);
+  color: var(--muted);
+}
+/* System Design hero — shares book-hero gradient; cover art on the right */
+.sd-hero {
+  background: radial-gradient(900px 500px at 10% 0%, rgba(24, 98, 255, 0.2), transparent 58%),
+    radial-gradient(800px 480px at 95% 20%, rgba(255, 122, 24, 0.16), transparent 55%),
+    linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 100%);
+}
+.sd-hero__inner {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  grid-template-areas:
+    "copy art"
+    "meta meta";
+  gap: 2.25rem 3rem;
+  align-items: center;
+}
+.sd-hero__copy {
+  grid-area: copy;
+  align-self: center;
+}
+.sd-hero__art {
+  grid-area: art;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  align-self: center;
+}
+.sd-hero__meta {
+  grid-area: meta;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.sd-hero__meta .sd-authors {
+  margin-bottom: 0.65rem;
+}
+.sd-hero-cover {
+  margin: 0;
+  width: 100%;
+  max-width: 600px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transform: perspective(900px) rotateY(-3deg);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+.sd-hero-cover:hover {
+  transform: perspective(900px) rotateY(0deg) translateY(-4px);
+  box-shadow: 0 32px 72px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.sd-hero-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+.sd-credit--hero {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0 0 0.65rem;
+}
+.sd-errata-note--hero {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+  max-width: 36rem;
+}
+.sd-errata-note--hero a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sd-errata-note--hero a:hover {
+  color: #fff;
+}
+.sd-attribution--hero {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+.sd-hero .sd-authors .book-author-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+  color: #fff;
+}
+.sd-hero .sd-authors .book-author-card__name {
+  color: #fff;
+}
+.sd-hero .sd-authors .book-author-card__role {
+  color: rgba(255, 255, 255, 0.62);
+}
+.sd-hero .sd-authors .book-author-card__org {
+  color: rgba(255, 255, 255, 0.88);
+}
+.sd-hero .sd-authors .book-author-card__avatar {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.section__head--tight {
+  margin-top: 0.5rem;
+}
+@media (max-width: 860px) {
+  .sd-hero__inner {
+    grid-template-areas:
+      "copy"
+      "art"
+      "meta";
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+  .sd-hero__art {
+    justify-content: center;
+  }
+  .sd-hero-cover {
+    max-width: min(100%, 560px);
+    margin-inline: auto;
+    transform: none;
+  }
+  .sd-hero-cover:hover {
+    transform: translateY(-2px);
+  }
+  .sd-hero__meta {
+    padding-top: 0;
+    border-top: none;
+  }
+}
+.sd-credit {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0.5rem 0 0.75rem;
+}
+.sd-authors {
+  margin-bottom: 0.75rem;
+}
+.sd-attribution {
+  font-size: 0.88rem;
+  margin-top: 0.35rem;
+}
+.sd-disclaimer {
+  margin: 1.5rem 0 0.25rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(220, 160, 40, 0.45);
+  background: rgba(220, 160, 40, 0.08);
+  max-width: 52rem;
+}
+.sd-disclaimer__title {
+  margin: 0 0 0.65rem;
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: var(--navy);
+  line-height: 1.35;
+}
+:root[data-theme="dark"] .sd-disclaimer__title {
+  color: var(--text);
+}
+.sd-disclaimer__body {
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+.sd-disclaimer__body p {
+  margin: 0 0 0.75rem;
+}
+.sd-disclaimer__body p:last-child {
+  margin-bottom: 0;
+}
+.sd-disclaimer__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+.sd-chapter-foot {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.sd-chapter-ref {
+  font-size: 0.88rem;
+  margin-top: 0.5rem;
+}
+.sd-chapter-promo {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(220, 160, 40, 0.35);
+  background: rgba(220, 160, 40, 0.06);
+}
+.sd-chapter-promo__lead {
+  margin: 0 0 0.85rem;
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.45;
+}
+:root[data-theme="dark"] .sd-chapter-promo__lead {
+  color: var(--text);
+}
+.sd-chapter-promo__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+.sd-chapter-promo__cta .btn {
+  font-size: 0.86rem;
+  padding: 0.5rem 0.9rem;
+}
+.sd-prerender-chapters {
+  display: grid;
+  gap: 0.35rem;
+}
+.sd-figure {
+  margin: 1rem 0 1.25rem;
+}
+.sd-figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+/* Mermaid diagram figures (v2 chapters) */
+.sd-figure--diagram {
+  margin: 1.5rem 0 1.75rem;
+  text-align: center;
+}
+.sd-figure--diagram .mermaid {
+  margin: 0 auto;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  /* keep the raw definition tidy before Mermaid swaps it for an SVG */
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.sd-figure--diagram .mermaid[data-processed="true"] {
+  font-size: inherit;
+  line-height: inherit;
+}
+.sd-figure--diagram .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+.sd-figure--diagram figcaption {
+  margin-top: 0.65rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.sd-figure--diagram figcaption strong {
+  color: var(--navy);
+}
+:root[data-theme="dark"] .sd-figure--diagram .mermaid {
+  background: #0f1830;
+}
+.sd-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.25rem;
+  font-size: 0.92rem;
+}
+.sd-table th,
+.sd-table td {
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+.sd-table th {
+  background: var(--paper);
+  font-weight: 600;
 }
 .book-chapter__title {
   flex: 1;

@@ -1,0 +1,185 @@
+<p>An <strong>observability pipeline</strong> ingests the three telemetry pillars — <strong>metrics, logs, and traces</strong> — from a fleet of services, stores them efficiently, and powers dashboards and alerting. The challenges are extreme <strong>ingest throughput</strong>, <strong>cardinality</strong> control, and cost-aware retention.</p>
+
+<p>The defining tension is that observability is the system you rely on <em>exactly when everything else is on fire</em> — during an incident the input volume spikes hardest. So the design must degrade gracefully under its own worst case (backpressure, sampling, load-shedding), and the dominant cost driver is not raw volume but <strong>cardinality</strong>. A strong answer treats it as a cost/SNR problem, not just a "store all the data" problem.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Which pillars and which matters most?</strong> Metrics (cheap, aggregatable), logs (verbose, costly), traces (sampled) have very different storage and query needs.</li>
+<li><strong>Retention &amp; resolution?</strong> Full-resolution for days vs rolled-up for months vs cold archive for years — drives downsampling/tiering.</li>
+<li><strong>Multi-tenant?</strong> Per-team isolation, quotas, and RBAC change the ingest and storage model.</li>
+<li><strong>Loss tolerance?</strong> Can you drop debug logs under overload (yes) but never error/security events (no)? This defines the shedding policy.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Ingest metrics, logs, and traces from many services.</li>
+<li>Query / dashboard; <strong>alerting</strong> on rules.</li>
+<li>Trace correlation; retention with downsampling.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Very high ingest</strong> throughput; reasonable query latency.</li>
+<li><strong>Cost-aware</strong> retention; <strong>prioritized loss policy</strong> — preserve error/security/SLO signals, sample/drop low-value logs/traces under overload (a small set of critical metric streams may be durable no-loss).</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Volume:</strong> 10k hosts each emitting thousands of metric series + logs → millions of data points/s and TBs of logs/day.</li>
+<li><strong>Cardinality:</strong> a metric with a high-cardinality label (user_id) can explode into millions of series — the number-one cost driver; control it.</li>
+<li><strong>Storage tiers:</strong> raw at full resolution for days, downsampled rollups for months, cold archive for years — cost drops by orders of magnitude per tier.</li>
+<li><strong>Read:write skew:</strong> writes hugely outnumber reads (dashboards/alerts) — optimize ingest and compression.</li>
+</ul>
+<p><strong>Worked example — the cardinality bomb.</strong> A time series is identified by its metric name plus the <em>set</em> of label values. Take <code>http_requests_total</code> with labels <code>method</code> (5), <code>status</code> (10), <code>endpoint</code> (200): that is 5 × 10 × 200 = 10,000 series — fine. Now add <code>user_id</code> (10M users): the count multiplies to 100 <em>billion</em> series, each needing its own in-memory index entry and chunk. The TSDB falls over not on data <em>volume</em> but on <em>series count</em>. The fix is a policy at ingest: drop, hash/bucket, or aggregate away unbounded labels (<code>user_id</code>, <code>request_id</code>, raw URLs) before they ever create a series — and put that high-cardinality detail in <em>logs/traces</em> (which are queried by time + a few keys), not metrics.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><strong>Ingest (OTLP):</strong> agents push metrics / logs / spans.</li>
+<li><code>GET /query</code> — time-series / log / trace query (e.g. PromQL-like).</li>
+<li><code>POST /alerts</code> — <code>{rule, threshold, channel}</code>.</li>
+<li><code>GET /trace/{id}</code> → full span tree.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>Agents (OpenTelemetry) ship telemetry to an <strong>ingest gateway</strong> buffered by a durable queue; a stream processor aggregates and routes each signal to its specialized store (time-series DB, log store, trace store). A query service and alert manager sit on top.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  AG["Agents (OpenTelemetry)"] --> ING["Ingest gateway: rate limit + backpressure"]
+  ING --> RED["Redaction (PII / secrets) + tenant tag"]
+  RED --> BUF["Buffer (Kafka)"]
+  BUF --> SP["Stream processor: aggregate / downsample / sample"]
+  SP --> TSDB["Time-series DB (metrics)"]
+  SP --> LOGS["Log store / OLAP"]
+  SP --> TRACE["Trace store"]
+  TSDB --> QRY["Query service"]
+  LOGS --> QRY
+  TRACE --> QRY
+  QRY --> DASH["Dashboards"]
+  TSDB --> ALERT["Alert manager"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Agents to a buffered ingest gateway, a stream processor routes each pillar to its store, and a query service plus alert manager sit on top.</figcaption>
+</figure>
+
+<h2>The three pillars</h2>
+<p>Each pillar has a different shape and a purpose-built store:</p>
+<ul>
+<li><strong>Metrics:</strong> numeric time series, aggregatable — stored in a <strong>time-series DB</strong> with heavy compression and rollups.</li>
+<li><strong>Logs:</strong> high-volume text events — stored in a columnar / OLAP store; indexed sparingly to control cost.</li>
+<li><strong>Traces:</strong> span trees of a request across services — stored with <strong>sampling</strong> (you cannot keep every trace).</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  T["Telemetry"] --> M["Metrics: numeric series, aggregatable"]
+  T --> L["Logs: text events, high volume"]
+  T --> R["Traces: span trees, sampled"]
+  M --> TSDB["Time-series DB + rollups"]
+  L --> OLAP["Columnar / OLAP store"]
+  R --> TR["Trace store (sampled)"]
+</pre>
+<figcaption><strong>Figure 2.</strong> Metrics, logs, and traces each go to a store tuned to their shape and access pattern.</figcaption>
+</figure>
+
+<h2>Ingest: push vs pull and cardinality</h2>
+<p>Metrics can be <strong>pulled</strong> (the collector scrapes targets) or <strong>pushed</strong> (services emit). Pull is easy to discover and scale behind a load balancer; push suits short-lived jobs. Either way, the killer problem is <strong>cardinality</strong>: a label like <code>user_id</code> turns one metric into millions of series. Drop or aggregate high-cardinality labels at ingest.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  SRC["Metric with labels"] --> CARD{"Label cardinality high?"}
+  CARD -->|low| KEEP["Store as a series"]
+  CARD -->|high e.g. user_id| DROP["Drop / aggregate the label at ingest"]
+  KEEP --> TSDB["Time-series DB"]
+  DROP --> TSDB
+</pre>
+<figcaption><strong>Figure 3.</strong> Cardinality control at ingest: high-cardinality labels are dropped or aggregated before they explode the series count.</figcaption>
+</figure>
+
+<h2>Query and alerting</h2>
+<p>Dashboards query the stores over time ranges. The <strong>alert manager</strong> periodically evaluates rules against metrics, deduplicates and groups firing alerts, and routes them to channels with escalation. Alerting is itself a small streaming/eval system on top of the metrics store.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant AM as Alert manager
+  participant TSDB as Time-series DB
+  participant N as Notifier
+  loop every interval
+    AM->>TSDB: evaluate rule (e.g. error rate above threshold)
+    TSDB-->>AM: result
+    alt threshold breached
+      AM->>AM: dedup + group
+      AM->>N: route alert (page / chat) with escalation
+    end
+  end
+</pre>
+<figcaption><strong>Figure 4.</strong> The alert manager evaluates rules on a schedule, deduplicates, and routes firing alerts with escalation.</figcaption>
+</figure>
+
+<h2>Backpressure, sampling, and safety</h2>
+<p>During an incident the input spikes (a log storm), so the pipeline must degrade gracefully instead of falling over: the ingest gateway applies <strong>rate limiting and backpressure</strong>, and under overload it <strong>sheds load by sampling/dropping low-value signals</strong> (debug logs) while <strong>prioritizing</strong> error and security events — never blocking producers. Note this is prioritization, not a hard guarantee: truly no-loss critical streams need reserved capacity or a durable no-loss buffer. Traces use <strong>tail sampling</strong>: collect a trace's spans, wait a short decision window, and keep the ones with errors or high latency. Logs and traces routinely carry secrets/PII, so a <strong>redaction</strong> processor runs at ingest and stores are tenant-scoped with RBAC and sensitivity-based retention.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  IN["Incoming telemetry (spiky)"] --> GATE{"Over capacity?"}
+  GATE -->|no| KEEP["Ingest normally"]
+  GATE -->|yes| SHED["Shed: sample/drop debug logs, keep errors + security"]
+  KEEP --> TAIL["Trace tail sampling: keep errors / slow"]
+  SHED --> TAIL
+  TAIL --> RED["Redact PII / secrets"]
+  RED --> STORE["Stores (tenant-scoped, RBAC, retention by sensitivity)"]
+</pre>
+<figcaption><strong>Figure 5.</strong> Under load the gateway sheds low-value signals while prioritizing errors/security; tail sampling keeps interesting traces; redaction and RBAC protect sensitive data.</figcaption>
+</figure>
+
+<h2>Retention and tiering</h2>
+<p>Keeping everything at full resolution forever is unaffordable. Data is <strong>downsampled</strong> (rolled up to coarser intervals) as it ages and tiered to cheaper storage, finally landing in a cold archive — the same hot/cold lifecycle as storage systems.</p>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>Instrumentation:</strong> OpenTelemetry (vendor-neutral SDKs + collector) is the emerging standard.</li>
+<li><strong>Metrics:</strong> Prometheus + Grafana + Alertmanager; Thanos / Grafana Mimir / VictoriaMetrics for long-term + scale.</li>
+<li><strong>Logs:</strong> Grafana Loki, the ELK stack (Elasticsearch), or ClickHouse (columnar, cheap at scale).</li>
+<li><strong>Traces:</strong> Jaeger or Grafana Tempo.</li>
+<li><strong>Managed:</strong> Datadog, Honeycomb, New Relic. Ingest buffering almost always uses <strong>Kafka</strong>.</li>
+</ul>
+
+<h2>Guarantees &amp; tradeoffs</h2>
+<ul>
+<li><strong>Best-effort, lossy by design:</strong> under overload the pipeline samples/drops low-value signals — it does not guarantee every datapoint, it <em>prioritizes</em> the important ones (errors, security, SLO metrics); truly no-loss critical streams need reserved capacity / durable buffering.</li>
+<li><strong>Eventually queryable:</strong> there is ingest + processing lag, so dashboards and alerts see data a few seconds behind reality — fine for monitoring, not for transactional truth.</li>
+<li><strong>Precision degrades with age:</strong> downsampling trades resolution for cost, so old data answers "trend" questions, not "what happened at 12:00:03.5".</li>
+<li><strong>Metrics vs logs vs traces is a deliberate split:</strong> aggregate signals in metrics, high-cardinality detail in logs, causality in traces — putting the wrong thing in the wrong pillar is the classic cost mistake.</li>
+</ul>
+
+<h2>When (not) to use this pipeline</h2>
+<ul>
+<li><strong>Great for:</strong> monitoring, alerting, debugging, capacity planning, SLO tracking across a fleet.</li>
+<li><strong>Wrong for:</strong> billing/audit records that must be exact and complete (use a durable, no-sample event log), or as a primary analytics warehouse (use OLAP/lakehouse).</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Cardinality is the cost bomb</strong> — never put unbounded labels (user_id, request_id) on metrics.</li>
+<li><strong>Trace sampling:</strong> you cannot keep every trace — head/tail sampling keeps the interesting ones.</li>
+<li><strong>Logs are expensive to index:</strong> store columnar, index sparingly, search by time + service first.</li>
+<li><strong>Ingest spikes</strong> (incident = log storm) — buffer with a queue, never block producers.</li>
+<li><strong>Downsampling</strong> loses precision — keep raw only as long as needed.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Three pillars, three <strong>purpose-built stores</strong>, one buffered ingest pipeline.</li>
+<li><strong>Cardinality control</strong> at ingest is the most important cost lever.</li>
+<li><strong>Trace sampling</strong> and <strong>downsampling/tiering</strong> keep it affordable.</li>
+<li><strong>Alerting</strong> is rule evaluation + dedup + routing on the metrics store.</li>
+<li><strong>It is lossy by design:</strong> <strong>prioritize</strong> the important signals under overload (truly no-loss critical streams need reserved capacity/durable buffering), not every datapoint — and put high-cardinality detail in logs/traces, not metrics.</li>
+<li><strong>Design for the incident:</strong> the worst input spike is exactly when you need it most, so backpressure and shedding are first-class.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: OpenTelemetry docs (OTLP, tail sampling); Prometheus / Thanos / Grafana Mimir; Grafana Loki and ClickHouse / Elasticsearch for logs; Jaeger / Grafana Tempo for traces. Diagrams and write-up are original EngineerPro content.</em></p>

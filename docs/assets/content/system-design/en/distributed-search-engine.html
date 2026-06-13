@@ -1,0 +1,185 @@
+<p>A <strong>distributed search engine</strong> (web search / large-scale full-text search) answers keyword queries over billions of documents with ranked results in milliseconds. The core data structure is the <strong>inverted index</strong>; the core scaling pattern is <strong>sharding + scatter-gather</strong>; the core quality lever is <strong>ranking</strong>.</p>
+
+<p>Search has a split personality: an <strong>offline indexing</strong> path (throughput-bound, can be eventually consistent) and an <strong>online query</strong> path (latency-bound, tail-sensitive). Keeping those two concerns separate — and being honest that search results are an <em>approximate, ranked, eventually-fresh</em> view, not a precise database query — is what makes the design coherent.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Web search or app/site search?</strong> Web scale means billions of docs + crawl; product/log search is smaller, more structured, and may need filters/facets.</li>
+<li><strong>Freshness requirement?</strong> "Seconds" (near-real-time, e.g. tweets) is very different from "hours" (web crawl) and changes the segment/refresh design.</li>
+<li><strong>Relevance bar?</strong> Simple BM25 keyword match vs ML learning-to-rank with behavioral features — the latter adds a feature/training pipeline.</li>
+<li><strong>Query shape?</strong> Pure keyword, boolean filters, faceting, typo-tolerance, autocomplete — each adds index structures.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Ingest / crawl documents and index them.</li>
+<li>Query by keywords; return <strong>ranked</strong> results; paginate.</li>
+<li>Keep results reasonably <strong>fresh</strong>.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low query latency</strong> (tens of ms) with good <strong>relevance</strong>.</li>
+<li><strong>Scale</strong> to billions of documents and high QPS.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Corpus:</strong> 10B documents; the inverted index is large (posting lists per term) — must be sharded across many machines.</li>
+<li><strong>Query:</strong> a query touches a few terms; with document sharding, every shard is queried and results merged → latency bounded by the <strong>slowest shard</strong> (tail).</li>
+<li><strong>QPS:</strong> tens of thousands of queries/s → replicate shards for read throughput; cache hot queries.</li>
+<li><strong>Index size vs RAM:</strong> keep hot posting lists in memory; compress posting lists aggressively.</li>
+</ul>
+<p><strong>Worked example — why tail latency is the enemy.</strong> With document sharding, a query fans out to <em>every</em> shard and waits for the last reply. If each shard answers in ~10 ms at p50 but ~80 ms at p99, then a 50-shard scatter-gather sees a p99 on <em>some</em> shard almost every request — so the overall latency tracks the slow tail, not the median. Mitigations stack: replicate each shard and send to the least-loaded replica, issue <strong>hedged requests</strong> (fire a backup to a second replica if the first is slow), and cap per-shard work (top-k only). This is why "just add shards" can make latency <em>worse</em> if you ignore the tail.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /search?q=&cursor=</code> → <code>{results[], next_cursor}</code> (cursor / <code>search_after</code> on a stable sort, not offset <code>page=</code> — deep offset pagination is expensive and unstable across shards).</li>
+<li><code>POST /index</code> — <code>{doc_id, text, metadata}</code> (ingest).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>An <strong>indexing pipeline</strong> turns documents into an inverted index spread over <strong>shards</strong> (each replicated). A query service does <strong>scatter-gather</strong>: send the query to all shards, each returns its top candidates, then merge and rank.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  CRAWL["Crawler / ingest"] --> IDXP["Indexing pipeline"]
+  IDXP --> S1["Index shard 1 (+ replicas)"]
+  IDXP --> S2["Index shard 2 (+ replicas)"]
+  IDXP --> S3["Index shard 3 (+ replicas)"]
+  Q["Query"] --> QS["Query service"]
+  QS --> CACHE{"Query cache hit?"}
+  CACHE -->|hit| RESP["Ranked results"]
+  CACHE -->|miss| SCATTER["Scatter-gather"]
+  SCATTER --> S1
+  SCATTER --> S2
+  SCATTER --> S3
+  S1 --> RANK["Rank + merge"]
+  S2 --> RANK
+  S3 --> RANK
+  RANK -->|fill cache| CACHE
+  RANK --> RESP
+</pre>
+<figcaption><strong>Figure 1.</strong> Documents are indexed into replicated shards; a query first checks the query cache, and on a miss the query service scatters to all shards, gathers top candidates, ranks the merged set, then fills the cache.</figcaption>
+</figure>
+
+<h2>The inverted index</h2>
+<p>An <strong>inverted index</strong> maps each <strong>term</strong> to a <strong>posting list</strong> of documents containing it (with positions and stats for ranking). A query intersects/unions the posting lists of its terms. Posting lists are compressed and, for hot terms, kept in memory.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph INV["Inverted index"]
+    direction LR
+    T1["term 'system' -> docs 3, 7, 42, 88"]
+    T2["term 'design' -> docs 7, 42, 91"]
+  end
+  QQ["query: system design"] --> INTER["Intersect posting lists"]
+  T1 --> INTER
+  T2 --> INTER
+  INTER --> HITS["Candidate docs: 7, 42"]
+</pre>
+<figcaption><strong>Figure 2.</strong> Each term points to a posting list of documents; a multi-term query intersects the lists to find candidates.</figcaption>
+</figure>
+
+<h2>Indexing pipeline</h2>
+<p>Ingestion <strong>tokenizes</strong> text (lowercase, stem, drop stopwords), then appends each token to its term's posting list in the right shard. Indexes are built as immutable <strong>segments</strong> that are periodically merged; new documents become searchable in near-real-time once their segment is published. Because segments are immutable, a <strong>delete or update</strong> does not rewrite them: the doc id is added to a <strong>tombstone / delete bitmap</strong> and filtered out of results; an update is a delete + a new version in a fresh segment. Background merge physically drops tombstoned docs and reclaims space.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  W["Write / update / delete"] --> SEG["New immutable segment + delete bitmap"]
+  SEG --> SEARCH["Searchable: results filtered by delete bitmap"]
+  SEG --> MERGE["Background merge"]
+  MERGE --> DROP["Physically drop tombstoned docs, reclaim space"]
+  DROP --> SMALLER["Fewer, larger merged segments"]
+</pre>
+<figcaption><strong>Figure 3.</strong> Immutable segments handle deletes/updates via a tombstone bitmap; background merge drops tombstoned docs and consolidates segments.</figcaption>
+</figure>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DOC["Document"] --> TOK["Tokenize: lowercase, stem, stopwords"]
+  TOK --> SEG["Write to in-memory segment"]
+  SEG --> PUB["Publish segment (searchable)"]
+  PUB --> MERGE["Background segment merge"]
+  MERGE --> SHARD["Shard inverted index"]
+</pre>
+<figcaption><strong>Figure 4.</strong> Tokenize, write to an immutable segment, publish for near-real-time search, and merge segments in the background.</figcaption>
+</figure>
+
+<h2>Query: scatter-gather and ranking</h2>
+<p>With <strong>document sharding</strong>, each shard holds a slice of the corpus, so a query must hit <em>every</em> shard. Each shard returns its local top-k by a cheap score (e.g. BM25); the query service merges them and applies a heavier <strong>ranking</strong> (learning-to-rank using more features). Latency is bounded by the slowest shard, so tail latency control matters.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant QS as Query service
+  participant S1 as Shard 1
+  participant S2 as Shard 2
+  U->>QS: query
+  par scatter to all shards
+    QS->>S1: query
+    QS->>S2: query
+  end
+  S1-->>QS: local top-k (BM25)
+  S2-->>QS: local top-k (BM25)
+  QS->>QS: merge + learning-to-rank
+  QS-->>U: ranked page
+</pre>
+<figcaption><strong>Figure 5.</strong> Scatter-gather: every shard returns local top-k by a cheap score; the query service merges and applies heavier ranking.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>The storage decision is which state is the durable index versus a derived/rebuildable structure, and how writes become visible:</p>
+<ul>
+<li><strong>Lucene segment files (the index, on SSD):</strong> the inverted index lives as <strong>immutable segments</strong> on local SSD per shard — writes create new segments, never mutate old ones, which is what makes reads lock-free and merges safe.</li>
+<li><strong>Translog + commit/refresh:</strong> a write-ahead <strong>translog</strong> makes a new doc durable before it's in a committed segment; a periodic <strong>refresh</strong> makes it searchable (near-real-time), and <strong>commit</strong> fsyncs segments — this is the freshness/durability knob.</li>
+<li><strong>Replicas per shard:</strong> each shard has replicas for availability and read scale; the primary orders writes, replicas follow.</li>
+<li><strong>Raw documents (source of truth):</strong> the original docs live in a <strong>blob/object store</strong> or source DB — the index is a derived, rebuildable structure, not the system of record.</li>
+<li><strong>Deletes/updates:</strong> a <strong>delete bitmap / tombstones</strong> mark docs gone; a background <strong>segment merge</strong> policy reclaims them and consolidates segments.</li>
+<li><strong>Query cache:</strong> hot query results cached before scatter; rebuildable.</li>
+<li><strong>Implementations:</strong> <strong>Lucene</strong> (library), <strong>Elasticsearch/OpenSearch</strong> (distributed), Solr, Vespa (search + ML + vectors), Typesense/Meilisearch (lightweight); pair with a vector index for hybrid semantic + keyword search (see RAG).</li>
+</ul>
+
+<h2>Consistency, freshness &amp; guarantees</h2>
+<ul>
+<li><strong>Eventually fresh:</strong> a newly indexed doc becomes searchable only after its segment is published and replicated — expect seconds (NRT) to minutes, not instant. State your target.</li>
+<li><strong>Ranked, not exact:</strong> results are a relevance-ordered approximation; with ANN/learning-to-rank there is no single "correct" result set, unlike a SQL query.</li>
+<li><strong>Pagination stability:</strong> use <code>search_after</code> on a stable sort key (e.g. score + doc id) so concurrent indexing does not shift pages; deep offset is both slow and unstable.</li>
+<li><strong>Best-effort completeness:</strong> under a shard failure you may return partial results (with a "degraded" flag) rather than fail the whole query — an availability/accuracy trade-off to call out.</li>
+</ul>
+
+<h2>Tradeoffs &amp; when not to use it</h2>
+<ul>
+<li><strong>Great for:</strong> full-text search, relevance ranking, faceted/typo-tolerant search over large corpora.</li>
+<li><strong>Wrong for:</strong> exact transactional lookups (use a database), strong consistency / read-your-writes, or analytics aggregations over huge ranges (use an OLAP store).</li>
+<li><strong>Cost lever:</strong> replicas for QPS/tail, compression + tiering for index size; relevance quality is a separate, ongoing investment (eval + LTR).</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Document vs term sharding:</strong> document sharding (every shard queried) is the common choice; term sharding concentrates hot terms — usually worse.</li>
+<li><strong>Tail latency:</strong> scatter-gather waits for the slowest shard — replicate, hedge requests, and cap per-shard work.</li>
+<li><strong>Index freshness:</strong> immutable segments + background merge give near-real-time without rewriting the whole index.</li>
+<li><strong>Hot queries:</strong> the query cache is checked <em>before</em> scatter and updated after merge; a small fraction of queries are most traffic.</li>
+<li><strong>Deletes/updates:</strong> immutable segments require a tombstone/delete bitmap + background merge — never rewrite a segment in place.</li>
+<li><strong>Pagination:</strong> use cursor / <code>search_after</code> on a stable sort, not deep offset.</li>
+<li><strong>Posting-list size:</strong> compress; keep hot lists in memory.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>The <strong>inverted index</strong> (term to posting list) is the core structure.</li>
+<li><strong>Document sharding + scatter-gather</strong> scales the corpus; tail latency is the enemy.</li>
+<li><strong>Immutable segments + merge</strong> give near-real-time indexing.</li>
+<li>Cheap per-shard scoring then heavier <strong>ranking</strong> on the merged set.</li>
+<li><strong>Tame the tail:</strong> replicate shards, hedge requests, cap per-shard work — scatter-gather latency = the slowest shard.</li>
+<li>Results are <strong>ranked + eventually fresh</strong>, not exact — say so, and use <code>search_after</code> for stable pagination.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Apache Lucene and Elasticsearch / OpenSearch docs (segments, merges, <code>search_after</code>); BM25 (Robertson &amp; Zaragoza); learning-to-rank material. Diagrams and write-up are original EngineerPro content.</em></p>

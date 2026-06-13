@@ -1,0 +1,189 @@
+<p>A food-delivery platform like <strong>Grab Food</strong> is a three-sided marketplace — eaters, merchants, and drivers — glued together by <strong>geospatial search</strong>, an <strong>order lifecycle</strong>, and real-time <strong>driver dispatch</strong>. This chapter designs it from first principles.</p>
+
+<p>What makes this more than a CRUD app is the collision of two very different workloads: a <strong>correctness-critical order state machine</strong> (money, no double orders, no lost orders) sitting next to a <strong>high-volume, ephemeral location stream</strong> (hundreds of thousands of driver pings/s that are worthless a few seconds later). A strong answer keeps these on separate paths — durable, transactional storage for orders; in-memory geo indexes for location — and treats <strong>dispatch</strong> (assigning one driver to one order, exactly once) as the hard concurrency problem at the center.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Optimize for what?</strong> Fastest delivery, lowest cost, or driver utilization? The matching objective changes the dispatch algorithm.</li>
+<li><strong>Batching / pooled deliveries?</strong> Can one driver carry multiple orders? That turns dispatch into a routing/optimization problem, not 1:1.</li>
+<li><strong>Geographic scope?</strong> City-by-city (shard by region) vs one global system — delivery is inherently local, which simplifies sharding.</li>
+<li><strong>Who can be assigned an order?</strong> Drivers near the <em>merchant</em> (not the eater), available, and headed the right way — clarify the matching constraints.</li>
+<li><strong>Payment timing?</strong> Authorize at order, capture on delivery? This shapes the order saga and refund/compensation paths.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Browse nearby restaurants; place an order.</li>
+<li>Merchant accepts and prepares; a driver is assigned.</li>
+<li>Live tracking of the driver; payment; ratings.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low-latency</strong> nearby search and matching.</li>
+<li><strong>Reliable order state</strong> — no lost or double orders.</li>
+<li><strong>Real-time</strong> location updates; regional high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Orders:</strong> 10M orders/day ≈ <strong>~115 orders/s</strong> average, ~5x peak at meal times ≈ ~600/s.</li>
+<li><strong>Driver pings:</strong> 1M active drivers sending location every 4s → <strong>~250k location writes/s</strong> — the heaviest stream; keep it in memory.</li>
+<li><strong>Search:</strong> nearby query must scan only a few geo cells, not the whole city — index by H3/geohash.</li>
+<li><strong>Storage:</strong> orders are small (~1 KB) and bounded; location is hot-but-ephemeral (TTL in a geo cache).</li>
+</ul>
+<p><strong>Worked example.</strong> The two workloads size completely differently. Orders: 10M/day ≈ 115/s average, ~600/s peak — tiny; this is the part that needs ACID transactions, a saga, and idempotency keys, and a sharded SQL store handles it comfortably. Location: 1M active drivers pinging every 4s = <strong>~250k writes/s</strong>, each tiny and obsolete within seconds. Writing 250k/s into a durable DB would be absurd and pointless — so location lives in an <strong>in-memory geo index</strong> (e.g. Redis with H3/geohash cells), last-write-wins, with a TTL; you never replicate it for durability because a lost ping is replaced in 4 seconds. Search: a "restaurants near me" query reads only the viewer's H3 cell + neighbors (a handful of cells), so it scans dozens of candidates, not the city. The lesson the example teaches: <strong>match storage to the data's value and lifetime</strong> — durability where money is, throughput-and-forget where location is.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /restaurants?lat=&lng=&radius=</code> → nearby restaurants.</li>
+<li><code>POST /orders</code> — <code>{eater_id, restaurant_id, items[], payment}</code> → <code>{order_id, state}</code>.</li>
+<li><code>POST /orders/{id}/accept</code> (merchant), <code>POST /orders/{id}/assign</code> (dispatch).</li>
+<li><code>GET /orders/{id}/track</code> → live driver location + ETA.</li>
+<li><strong>Driver stream:</strong> <code>POST /drivers/{id}/location</code> (high-frequency).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  E["Eater app"] --> SRCH["Search service (geo index)"]
+  E --> ORD["Order service (state machine)"]
+  M["Merchant app"] --> ORD
+  D["Driver app"] --> LOC["Location service (geo cache)"]
+  ORD --> DISP["Dispatch / matching service"]
+  DISP --> LOC
+  ORD --> PAY["Payment"]
+  ORD --> NOTIF["Notification"]
+  DISP --> ETA["ETA service"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Search and order services front the eater; the location service ingests driver pings; dispatch matches orders to nearby drivers.</figcaption>
+</figure>
+
+<h2>Geospatial index</h2>
+<p>"Restaurants near me" and "drivers near this restaurant" both need fast radius queries. Indexing raw lat/lng is slow; instead map the globe into <strong>hierarchical cells</strong> (H3 hexagons or geohash). A point maps to a cell id; a radius query reads its cell plus neighboring cells. Drivers are bucketed into cells in an in-memory store keyed by cell id.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  PT["lat/lng"] --> CELL["Map to cell id (H3 / geohash)"]
+  CELL --> Q{"Radius query"}
+  Q --> C0["Center cell"]
+  Q --> C1["Neighbor cells"]
+  C0 --> RES["Candidate drivers / restaurants in cells"]
+  C1 --> RES
+</pre>
+<figcaption><strong>Figure 2.</strong> Points map to hierarchical cells; a radius query reads the center cell plus neighbors, turning geo search into cheap key lookups.</figcaption>
+</figure>
+
+<h2>Order lifecycle (state machine)</h2>
+<p>An order is a <strong>state machine</strong>: each transition is validated and persisted, and external steps (payment, merchant accept) are wrapped so a failure cannot leave the order inconsistent. Idempotency keys on transitions make retries safe.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Created
+  Created --> Paid: payment authorized
+  Paid --> Accepted: merchant accepts
+  Accepted --> Assigned: driver matched
+  Assigned --> PickedUp: driver collects
+  PickedUp --> Delivered: handed to eater
+  Delivered --> [*]
+  Created --> Cancelled: timeout / reject
+  Paid --> Cancelled: refund
+</pre>
+<figcaption><strong>Figure 3.</strong> The order state machine — validated, persisted transitions with compensating paths (cancel/refund) for failures.</figcaption>
+</figure>
+
+<h2>Dispatch and matching</h2>
+<p>When an order is ready to assign, dispatch queries the location service for nearby available drivers, scores them (distance, ETA, current load, direction), and offers the order. Matching is often <strong>batched</strong> over a short window so it can optimize globally (assign the set of orders to drivers that minimizes total wait) rather than greedily.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant O as Order service
+  participant DP as Dispatch
+  participant L as Location service
+  participant CS as Claim store (Order DB)
+  participant DR as Driver
+  O->>DP: order ready to assign
+  DP->>L: nearby available drivers in cells
+  L-->>DP: candidate drivers + positions
+  DP->>DP: score and pick best (batched window)
+  DP->>CS: conditional claim (WHERE order.status = unassigned), set claim token + TTL
+  alt claim won
+    CS-->>DP: claimed (token)
+    DP->>DR: offer order (claim token)
+    DR-->>DP: accept
+    DP->>CS: confirm claim -> status = assigned
+    DP-->>O: assigned
+  else lost / decline / TTL expires
+    CS-->>DP: claim failed / released
+    DP->>DP: try next candidate
+  end
+</pre>
+<figcaption><strong>Figure 4.</strong> Dispatch scores candidates, then makes an <strong>atomic conditional claim</strong> on the order (only if still unassigned) with a claim token + TTL before offering; accept confirms the claim, a decline/timeout releases it and tries the next driver. The conditional write is what guarantees exactly one driver per order even with racing dispatch workers.</figcaption>
+</figure>
+
+<h2>Live tracking</h2>
+<p>The driver app streams location to the location service; the eater app subscribes (WebSocket / long-poll) to the assigned driver's positions to draw the moving pin and recompute ETA. Raw pings stay in a hot geo cache with a TTL; only sparse waypoints are persisted for history.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DR["Driver app"] -->|location every 4s| LOC["Location service (geo cache, TTL)"]
+  LOC --> SUB["Tracking subscription"]
+  SUB --> EA["Eater app: moving pin + ETA"]
+  LOC -->|sparse waypoints| HIST["History store"]
+</pre>
+<figcaption><strong>Figure 5.</strong> High-frequency pings live in a TTL geo cache and stream to the subscribed eater; only sparse waypoints are persisted.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing across eater/merchant/driver apps.</li>
+<li><strong>Restaurant search:</strong> <strong>Elasticsearch</strong> for text + filters, with an <strong>H3/geohash</strong> geo index for "near me".</li>
+<li><strong>Driver locations:</strong> <strong>Redis</strong> (geo commands / in-memory cell buckets) — the 250k pings/s hot, ephemeral stream; persist only sparse waypoints to a wide-column store.</li>
+<li><strong>Orders:</strong> the order state machine is a consistency boundary, so prefer <strong>PostgreSQL / sharded SQL</strong> (transactional, the booking saga + idempotency keys live here). A wide-column DB (Cassandra) works only if you make transitions safe explicitly — conditional writes/LWT, one writer per order, or event-sourced state — and is otherwise better kept for append-only trip/order history.</li>
+<li><strong>Events / dispatch:</strong> <strong>Kafka</strong> for order and location events; a stream processor (<strong>Flink</strong>) for real-time supply/demand and surge.</li>
+<li><strong>Payments:</strong> a dedicated payment service / PSP; <strong>blob storage</strong> for receipts/invoices.</li>
+</ul>
+<p><strong>Why these:</strong> driver location is a firehose that must never hit a disk DB → Redis geo; orders need ACID-ish state transitions → a transactional DB; search needs text + geo → Elasticsearch + H3; the analytics/surge layer is a stream → Kafka + Flink. The split is by access pattern: hot-ephemeral vs transactional vs search vs streaming.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Order state is strongly consistent:</strong> transitions (placed → accepted → assigned → picked up → delivered) go through one authoritative store with transactional/conditional updates, so an order is never in two states or processed twice.</li>
+<li><strong>Exactly-one driver per order:</strong> dispatch assigns a driver with an atomic conditional write (claim only if still unassigned) — the same single-winner pattern as a distributed lock — so two drivers can't both "win" the same order.</li>
+<li><strong>Idempotent payments via saga:</strong> the order/payment flow is a saga with idempotency keys and compensations; a retry after a timeout never double-charges, and a failed step rolls back (refund/void).</li>
+<li><strong>Best-effort, eventually-consistent location:</strong> driver positions are last-write-wins with TTL; a missed ping is simply replaced — there is no durability or ordering guarantee on location, by design.</li>
+<li><strong>At-least-once events:</strong> order/location events on Kafka are at-least-once; consumers (surge, analytics, tracking) must be idempotent.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Fits:</strong> real-time, location-based marketplaces (food, groceries, courier) with a three-sided match and a money-carrying order lifecycle.</li>
+<li><strong>Simplify when:</strong> scheduled (non-real-time) delivery or a single region with low volume — you may not need an in-memory geo firehose or stream processors; a relational DB + periodic batch matching can suffice.</li>
+<li><strong>Different design when:</strong> there's no live location/dispatch (e.g. mail-order e-commerce) — that's a catalog + checkout + fulfillment problem, without the geospatial real-time core.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Location write storm:</strong> 250k pings/s must not hit a database — in-memory geo cache, persist sparsely.</li>
+<li><strong>Hot zones:</strong> downtown at lunch is a hotspot cell — shard cells and cap per-cell work.</li>
+<li><strong>Order consistency:</strong> wrap payment + accept in a saga with idempotency keys; never double-charge.</li>
+<li><strong>Greedy vs batched matching:</strong> batching a short window yields better global assignments than first-come.</li>
+<li><strong>Boundary effects:</strong> a driver just across a cell edge — always search neighbor cells.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>A three-sided marketplace = search + order state machine + dispatch.</li>
+<li><strong>Hierarchical geo cells</strong> turn radius queries into key lookups.</li>
+<li>The order is a <strong>validated state machine</strong> with saga-style compensations.</li>
+<li>Driver location is <strong>hot and ephemeral</strong> — memory + TTL, persist sparsely.</li>
+<li><strong>Batched matching</strong> beats greedy assignment.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Uber H3 hexagonal grid docs and geohash material; public on-demand dispatch / delivery engineering posts; the saga pattern (Garcia-Molina &amp; Salem) for the order flow. Diagrams and write-up are original EngineerPro content.</em></p>

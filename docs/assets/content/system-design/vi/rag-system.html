@@ -1,0 +1,190 @@
+<p><strong>Retrieval-Augmented Generation (RAG)</strong> grounds một LLM trên dữ liệu của bạn: retrieve các passage liên quan nhất cho một câu hỏi, rồi cho model trả lời dùng chúng (kèm citation). Thiết kế là hai pipeline — một <strong>ingestion/indexing</strong> offline và một <strong>retrieval + generation</strong> online — cộng một vector index cho similarity search.</p>
+
+<p>Insight cốt lõi cho phỏng vấn: RAG biến "model không biết dữ liệu của tôi / hallucinate" thành một <strong>bài toán retrieval</strong>. Chất lượng answer bị chặn bởi cái bạn retrieve — nếu passage đúng không nằm trong top-k, không prompt engineering nào cứu được answer. Nên phần lớn công sức thiết kế đổ vào <strong>recall, ranking, freshness, và access control</strong>, không phải lời gọi generation.</p>
+
+<h3>Clarifying questions (scope trước)</h3>
+<ul>
+<li><strong>Corpus gì và fresh tới đâu?</strong> Doc tĩnh (re-index hàng đêm) vs dữ liệu thay đổi liên tục (incremental, near-real-time indexing) đổi hoàn toàn thiết kế ingestion.</li>
+<li><strong>Dữ liệu private/multi-tenant?</strong> Nếu answer phải tôn trọng permission per-user, ACL filter thuộc <em>bên trong</em> retrieval — một yêu cầu correctness và security, không phải add-on.</li>
+<li><strong>Budget latency vs quality?</strong> Có cho phép một reranker và/hoặc multi-step retrieval không, hay đây là path chặt dưới 200ms?</li>
+<li><strong>Cần citation / groundedness?</strong> Nếu answer phải audit được, mỗi chunk cần source metadata ổn định và answer phải cite nó.</li>
+<li><strong>Scale corpus?</strong> Triệu vs tỷ chunk quyết định flat vs sharded ANN và có quantize hay không.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Ingest document (chunk, embed, index).</li>
+<li>Trả lời một query với text <strong>grounded</strong> và <strong>citation</strong>.</li>
+<li>Incremental update khi document thay đổi.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Retrieval latency thấp</strong>; <strong>recall và precision</strong> tốt.</li>
+<li><strong>Freshness</strong> của index; scale tới hàng tỷ vector.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Corpus:</strong> 10M document × ~10 chunk mỗi cái = 100M chunk → 100M embedding vector.</li>
+<li><strong>Vector size:</strong> 100M × 768 dims × 4 bytes ≈ <strong>~300 GB</strong> vector thô → shard ra nhiều node; nén bằng quantization (PQ).</li>
+<li><strong>Query latency:</strong> exact nearest-neighbor trên 100M vector quá chậm → ANN index trả top-k trong millisecond.</li>
+<li><strong>Ingestion cost:</strong> embed 100M chunk là một GPU job one-time lớn; re-embed khi đổi model mới là phần đắt.</li>
+</ul>
+<p><strong>Worked example.</strong> 100M chunk ở 768-dim FP32 là ~300 GB vector. Một HNSW graph thêm cỡ cùng order về graph link, nên dự trù memory cỡ hàng trăm GB — buộc phải sharding qua nhiều node hoặc quantization. Product quantization (PQ) có thể nén mỗi vector 768-dim từ ~3 KB xuống ~100-200 byte (~15-30x), đưa 300 GB còn ~10-20 GB đổi lấy mất chút recall — trade-off recall/memory kinh điển. Phía write, embed 100M chunk ở ~1k chunk/s trên pool GPU là ~28 giờ compute one-time; phần đau là <strong>đổi embedding model phải re-embed toàn bộ corpus</strong>, nên model version là first-class của index (bạn version và rebuild, không trộn embedding space).</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /ingest</code> — <code>{doc_id, content}</code> → chunked, embedded, indexed.</li>
+<li><code>POST /query</code> — <code>{question, top_k}</code> → <code>{answer, citations[]}</code>.</li>
+<li><code>POST /search</code> — <code>{query, top_k}</code> → raw chunk retrieved (không generation).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p><strong>Ingestion pipeline</strong> biến document thành vector đã index; <strong>query path</strong> retrieve, rerank, dựng prompt, và gọi LLM gateway. Một vector store cộng một keyword index hậu thuẫn retrieval.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DOC["Documents"] --> ING["Ingestion: chunk + embed"]
+  ING --> VEC["Vector store (ANN index)"]
+  ING --> KW["Keyword index (BM25)"]
+  Q["Query + user identity"] --> RET["Retriever"]
+  RET -->|ACL-filtered query| VEC
+  RET -->|ACL-filtered query| KW
+  VEC --> CAND["Allowed candidates (over-fetch, đã áp ACL)"]
+  KW --> CAND
+  CAND --> RERANK["Reranker"]
+  RERANK --> CTX["Context builder"]
+  CTX --> LLM["LLM gateway"]
+  LLM --> ANS["Grounded answer + citations"]
+</pre>
+<figcaption><strong>Hình 1.</strong> Ingestion index document vào vector store và keyword index; query path retrieve, rerank, dựng context, và sinh câu trả lời grounded.</figcaption>
+</figure>
+
+<h2>Ingestion pipeline</h2>
+<p>Document được <strong>chunk</strong> (chia thành passage có size hợp với retrieval và context window), mỗi chunk được biến thành một <strong>embedding</strong> bởi embedding model, và vector được ghi vào index kèm source metadata (để citation). Chunking strategy quan trọng: quá lớn làm loãng relevance, quá nhỏ mất context.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  D["Document"] --> CH["Chunk thành passage"]
+  CH --> EM["Embedding model"]
+  EM --> V["Vector + source metadata"]
+  V --> IDX["Ghi vào vector index"]
+  V --> KWI["Ghi vào keyword index"]
+</pre>
+<figcaption><strong>Hình 2.</strong> Chunk, embed, và index kèm source metadata để passage retrieved có thể được cite.</figcaption>
+</figure>
+
+<h2>Vector index (ANN)</h2>
+<p>Exact nearest-neighbor trên 100M+ vector quá chậm, nên RAG dùng <strong>approximate nearest neighbor (ANN)</strong>. Hai họ phổ biến:</p>
+<ul>
+<li><strong>HNSW</strong> (graph): dựng một navigable small-world graph; recall và latency tuyệt, memory cao hơn.</li>
+<li><strong>IVF-PQ</strong> (inverted file + product quantization): cluster vector và nén chúng; memory thấp hơn, recall/latency tune được.</li>
+</ul>
+<p>Đánh đổi là tam giác kinh điển <strong>recall vs latency vs memory</strong>; chọn theo corpus size và SLA.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  QV["Query vector"] --> ANN{"Loại ANN index"}
+  ANN -->|HNSW graph| H["Navigate small-world graph: recall cao, memory nhiều"]
+  ANN -->|IVF-PQ| I["Probe cluster gần nhất, nén: memory ít"]
+  H --> TOPK["Top-k chunk gần nhất"]
+  I --> TOPK
+</pre>
+<figcaption><strong>Hình 3.</strong> ANN trả top-k neighbor xấp xỉ; HNSW thiên recall/latency, IVF-PQ thiên memory — một đánh đổi tune được.</figcaption>
+</figure>
+
+<h2>Query path: hybrid retrieval và rerank</h2>
+<p>Vector search bắt nghĩa; keyword search (BM25) bắt term chính xác (tên, mã). <strong>Hybrid retrieval</strong> chạy cả hai và merge, rồi một <strong>reranker</strong> (cross-encoder) sắp lại candidate đã merge theo relevance thật với query. Các passage top thành context của LLM.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant R as Retriever
+  participant V as Vector store
+  participant K as Keyword index
+  participant RR as Reranker
+  participant L as LLM
+  U->>R: câu hỏi + identity
+  R->>V: top-k theo embedding (ACL filter trên metadata)
+  R->>K: top-k theo keyword (ACL filter trên metadata)
+  V-->>R: allowed candidate
+  K-->>R: allowed candidate
+  R->>RR: allowed candidate đã merge
+  RR-->>R: passage top đã rerank
+  R->>L: câu hỏi + passage
+  L-->>U: grounded answer + citation
+</pre>
+<figcaption><strong>Hình 4.</strong> Hybrid retrieval (vector + keyword) merge candidate; reranker chọn passage tốt nhất trước generation.</figcaption>
+</figure>
+
+<h2>Access control</h2>
+<p>RAG trên dữ liệu private phải tôn trọng <strong>permission</strong>: mỗi chunk mang tenant + ACL label (và một <code>source_uri</code>) từ ingestion, và ACL được <strong>đẩy vào chính retrieval query</strong> — một metadata filter trên vector/keyword search (hoặc over-fetch rồi filter trước merge) — không áp sau top-k. Filter sau một global top-k vừa là security risk (forbidden chunk tới app layer) vừa là recall bug (top-k có thể toàn chunk user không được xem, sau filter còn rỗng). Filter bên trong query giữ recall đúng và model không bao giờ thấy context cấm.</p>
+
+<h2>Freshness và evaluation</h2>
+<p>Document thay đổi, nên ingestion là <strong>incremental</strong> và <strong>versioned</strong>: một indexing job ghi một doc version mới, atomically swap active version, tombstone chunk cũ, và background compaction thu hồi chúng. Mỗi chunk giữ <code>chunk_id</code> ổn định, <code>doc_version</code>, và <code>embedding_model_version</code> để re-embed và delete propagate sạch. Citation mang <code>doc_id</code>, <code>chunk_id</code>, <code>source_uri</code>, <code>title</code>, <code>span</code>, và <code>version</code>. Chất lượng đo bằng một vòng <strong>eval</strong> — retrieval recall và <strong>groundedness</strong> của answer (có được citation hỗ trợ không, có hallucinate không?) trên một golden set cộng online feedback.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  UPD["Document cập nhật"] --> JOB["Indexing job: re-chunk + re-embed (doc_version mới)"]
+  JOB --> NEWV["Ghi chunk version mới (kèm ACL label)"]
+  NEWV --> SWAP["Atomically swap active version"]
+  SWAP --> TOMB["Tombstone chunk cũ"]
+  TOMB --> COMPACT["Background compaction thu hồi tombstone"]
+</pre>
+<figcaption><strong>Hình 5.</strong> Indexing incremental, versioned: ghi version mới, swap atomic, tombstone chunk cũ, compact ở background — delete và re-embed nhất quán.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth + rate limiting đứng trước query và ingest endpoint.</li>
+<li><strong>Vector store:</strong> một ANN store chuyên dụng — <strong>FAISS</strong> (library), <strong>Milvus / Qdrant / Weaviate</strong> (service), <strong>pgvector</strong> (extension Postgres), hoặc <strong>Pinecone</strong> (managed). HNSW hoặc IVF-PQ bên dưới.</li>
+<li><strong>Keyword index:</strong> <strong>Elasticsearch / OpenSearch</strong> (BM25) cho nửa lexical của hybrid retrieval.</li>
+<li><strong>Raw document + chunk:</strong> bản gốc trong <strong>blob/object storage (S3-like)</strong>; chunk text + metadata + ACL label trong relational/KV store (<strong>PostgreSQL</strong> / DynamoDB).</li>
+<li><strong>Ingestion pipeline:</strong> <strong>Kafka</strong> cho document-change stream, một batch/stream processor (<strong>Spark / Flink</strong>) để chunk + embed ở scale, và một embedding model serve trên GPU (Triton / vLLM).</li>
+<li><strong>Reranker:</strong> một cross-encoder model service; <strong>LLM gateway</strong> cho generation; <strong>Redis</strong> để cache hot query result / embedding.</li>
+</ul>
+<p><strong>Vì sao chọn vậy:</strong> lựa chọn storage theo access pattern — semantic similarity → vector index (không phải B-tree); exact-term match → inverted index; source file lớn bất biến → object storage; metadata + permission nhỏ có cấu trúc → relational/KV store; job ingest/reindex throughput cao → Kafka + batch engine. Không một database nào làm tốt cả bốn, nên RAG cố ý polyglot.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Eventually fresh, không transactional:</strong> có độ trễ giữa lúc document đổi và lúc index phản ánh (re-chunk → re-embed → publish). Nói rõ freshness SLA; đừng hứa read-after-write trên corpus.</li>
+<li><strong>Best-effort recall, không exact:</strong> ANN trả top-k <em>xấp xỉ</em> — tune recall vs latency, và dùng hybrid (vector + keyword) để exact-term match không bị embedding bỏ sót.</li>
+<li><strong>ACL là guarantee cứng:</strong> permission filter enforce bên trong retrieval, nên user không bao giờ bị hiển thị (hoặc cite) một chunk họ không được truy cập — kể cả khi mất recall.</li>
+<li><strong>Groundedness, không phải truth:</strong> RAG bảo đảm answer <em>được dựng từ passage retrieved kèm citation</em>; nó không bảo đảm source đúng. Hiện citation để người kiểm chứng.</li>
+<li><strong>Versioned index:</strong> trong một query, retrieval đọc một index version nhất quán; đổi embedding model trigger full rebuild sang version mới, swap atomically (tombstone cho delete ở giữa).</li>
+</ul>
+
+<h2>Khi nào (không) nên dùng RAG</h2>
+<ul>
+<li><strong>Tuyệt cho:</strong> question-answering trên knowledge private/thay đổi, giảm hallucination, và bất kỳ answer nào phải cite source — mà không cần retrain model.</li>
+<li><strong>Thừa khi:</strong> knowledge nhỏ, tĩnh vừa prompt (cứ bỏ vào context), hoặc task reasoning/transform thuần không cần fact ngoài.</li>
+<li><strong>Sai công cụ khi:</strong> câu hỏi cần aggregation/join trên structured data (dùng SQL/analytics, tùy chọn như một tool model gọi), hoặc khi source of truth đổi nhanh hơn tốc độ index được và cần freshness nghiêm ngặt.</li>
+</ul>
+
+<h2>Pitfalls và điểm cần bàn</h2>
+<ul>
+<li><strong>Chunking bị đánh giá thấp:</strong> ranh giới chunk tệ phá recall — tune size và overlap.</li>
+<li><strong>Vector-only miss term chính xác:</strong> thêm keyword/hybrid retrieval và một reranker.</li>
+<li><strong>Index cũ:</strong> hỗ trợ incremental upsert/delete; full re-embed chỉ khi đổi model.</li>
+<li><strong>Permission leakage:</strong> filter theo ACL/tenant <em>trước</em> rerank và generation; không bao giờ để một chunk cấm tới model hay citation.</li>
+<li><strong>Vector storage overhead:</strong> vector thô tính thiếu memory thật — HNSW graph link, metadata, chunk text, tombstone/version, và replica nhân lên; IVF-PQ nén nhưng đánh đổi recall.</li>
+<li><strong>Hallucination:</strong> chỉ dẫn model trả lời chỉ từ context và cite; eval groundedness.</li>
+<li><strong>Cost re-embed</strong> cả corpus khi nâng cấp embedding-model — lên kế hoạch migration.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>RAG = offline <strong>chunk-embed-index</strong> + online <strong>retrieve-rerank-generate</strong>.</li>
+<li><strong>ANN</strong> (HNSW / IVF-PQ) làm similarity search nhanh ở scale; tune recall vs latency vs memory.</li>
+<li><strong>Hybrid retrieval + reranking</strong> thắng vector search thuần.</li>
+<li>Hỗ trợ <strong>incremental indexing</strong> và đo <strong>groundedness</strong>.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>Tham khảo: HNSW (Malkov &amp; Yashunin, 2016); FAISS / ScaNN / Milvus docs; tài liệu BM25 và hybrid-retrieval; cross-encoder reranking docs; tài liệu RAG-evaluation công khai (groundedness / RAGAS). Diagram và nội dung là content gốc của EngineerPro.</em></p>

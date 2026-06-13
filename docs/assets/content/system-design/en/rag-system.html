@@ -1,0 +1,190 @@
+<p><strong>Retrieval-Augmented Generation (RAG)</strong> grounds an LLM in your own data: retrieve the most relevant passages for a question, then have the model answer using them (with citations). The design is two pipelines — an offline <strong>ingestion/indexing</strong> path and an online <strong>retrieval + generation</strong> path — plus a vector index for similarity search.</p>
+
+<p>The core insight for an interview: RAG turns "the model doesn't know my data / hallucinates" into a <strong>retrieval problem</strong>. Answer quality is bounded by what you retrieve — if the right passage isn't in the top-k, no prompt engineering saves the answer. So most of the design effort goes into <strong>recall, ranking, freshness, and access control</strong>, not the generation call itself.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>What corpus and how fresh?</strong> Static docs (re-index nightly) vs constantly changing data (incremental, near-real-time indexing) change the ingestion design completely.</li>
+<li><strong>Private/multi-tenant data?</strong> If answers must respect per-user permissions, ACL filtering belongs <em>inside</em> retrieval — a correctness and security requirement, not an add-on.</li>
+<li><strong>Latency vs quality budget?</strong> Can you afford a reranker and/or multi-step retrieval, or is this a tight sub-200ms path?</li>
+<li><strong>Citations / groundedness required?</strong> If the answer must be auditable, every chunk needs stable source metadata and the answer must cite it.</li>
+<li><strong>Corpus scale?</strong> Millions vs billions of chunks decides flat vs sharded ANN and whether you quantize.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Ingest documents (chunk, embed, index).</li>
+<li>Answer a query with <strong>grounded</strong> text and <strong>citations</strong>.</li>
+<li>Incremental updates as documents change.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low retrieval latency</strong>; good <strong>recall and precision</strong>.</li>
+<li><strong>Freshness</strong> of the index; scale to billions of vectors.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Corpus:</strong> 10M documents × ~10 chunks each = 100M chunks → 100M embedding vectors.</li>
+<li><strong>Vector size:</strong> 100M × 768 dims × 4 bytes ≈ <strong>~300 GB</strong> of raw vectors → shard across nodes; compress with quantization (PQ).</li>
+<li><strong>Query latency:</strong> exact nearest-neighbor over 100M vectors is too slow → approximate (ANN) index returns top-k in milliseconds.</li>
+<li><strong>Ingestion cost:</strong> embedding 100M chunks is a big one-time GPU job; re-embedding on model change is the expensive part.</li>
+</ul>
+<p><strong>Worked example.</strong> 100M chunks at 768-dim FP32 is ~300 GB of vectors. An HNSW graph adds roughly the same order of magnitude in graph links, so plan for memory on the order of hundreds of GB — which forces either sharding across nodes or quantization. Product quantization (PQ) can compress each 768-dim vector from ~3 KB to ~100-200 bytes (~15-30x), bringing 300 GB down to ~10-20 GB at the cost of some recall — the classic recall/memory trade. On the write side, embedding 100M chunks at, say, ~1k chunks/s on a GPU pool is ~28 hours of one-time compute; the painful part is that <strong>changing the embedding model re-embeds the entire corpus</strong>, so model version is a first-class part of the index (you version and rebuild, you don't mix embedding spaces).</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>POST /ingest</code> — <code>{doc_id, content}</code> → chunked, embedded, indexed.</li>
+<li><code>POST /query</code> — <code>{question, top_k}</code> → <code>{answer, citations[]}</code>.</li>
+<li><code>POST /search</code> — <code>{query, top_k}</code> → raw retrieved chunks (no generation).</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>The <strong>ingestion pipeline</strong> turns documents into indexed vectors; the <strong>query path</strong> retrieves, reranks, builds a prompt, and calls the LLM gateway. A vector store plus a keyword index back retrieval.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  DOC["Documents"] --> ING["Ingestion: chunk + embed"]
+  ING --> VEC["Vector store (ANN index)"]
+  ING --> KW["Keyword index (BM25)"]
+  Q["Query + user identity"] --> RET["Retriever"]
+  RET -->|ACL-filtered query| VEC
+  RET -->|ACL-filtered query| KW
+  VEC --> CAND["Allowed candidates (over-fetch, ACL applied)"]
+  KW --> CAND
+  CAND --> RERANK["Reranker"]
+  RERANK --> CTX["Context builder"]
+  CTX --> LLM["LLM gateway"]
+  LLM --> ANS["Grounded answer + citations"]
+</pre>
+<figcaption><strong>Figure 1.</strong> Ingestion indexes documents into a vector store and a keyword index; the query path retrieves, reranks, builds context, and generates a grounded answer.</figcaption>
+</figure>
+
+<h2>Ingestion pipeline</h2>
+<p>Documents are <strong>chunked</strong> (split into passages sized for retrieval and the context window), each chunk is turned into an <strong>embedding</strong> by an embedding model, and the vectors are written to the index with their source metadata (for citations). Chunking strategy matters: too big dilutes relevance, too small loses context.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  D["Document"] --> CH["Chunk into passages"]
+  CH --> EM["Embedding model"]
+  EM --> V["Vectors + source metadata"]
+  V --> IDX["Write to vector index"]
+  V --> KWI["Write to keyword index"]
+</pre>
+<figcaption><strong>Figure 2.</strong> Chunk, embed, and index with source metadata so retrieved passages can be cited.</figcaption>
+</figure>
+
+<h2>The vector index (ANN)</h2>
+<p>Exact nearest-neighbor over 100M+ vectors is too slow, so RAG uses <strong>approximate nearest neighbor (ANN)</strong>. Two common families:</p>
+<ul>
+<li><strong>HNSW</strong> (graph): builds a navigable small-world graph; excellent recall and latency, higher memory.</li>
+<li><strong>IVF-PQ</strong> (inverted file + product quantization): clusters vectors and compresses them; lower memory, tunable recall/latency.</li>
+</ul>
+<p>The trade-off is the classic <strong>recall vs latency vs memory</strong> triangle; pick per corpus size and SLA.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  QV["Query vector"] --> ANN{"ANN index type"}
+  ANN -->|HNSW graph| H["Navigate small-world graph: high recall, more memory"]
+  ANN -->|IVF-PQ| I["Probe nearest clusters, compressed: less memory"]
+  H --> TOPK["Top-k nearest chunks"]
+  I --> TOPK
+</pre>
+<figcaption><strong>Figure 3.</strong> ANN returns top-k approximate neighbors; HNSW favors recall/latency, IVF-PQ favors memory — a tunable trade-off.</figcaption>
+</figure>
+
+<h2>Query path: hybrid retrieval and rerank</h2>
+<p>Vector search captures meaning; keyword search (BM25) captures exact terms (names, codes). <strong>Hybrid retrieval</strong> runs both and merges, then a <strong>reranker</strong> (a cross-encoder) reorders the merged candidates by true relevance to the query. The top passages become the LLM's context.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant R as Retriever
+  participant V as Vector store
+  participant K as Keyword index
+  participant RR as Reranker
+  participant L as LLM
+  U->>R: question + identity
+  R->>V: top-k by embedding (ACL filter on metadata)
+  R->>K: top-k by keywords (ACL filter on metadata)
+  V-->>R: allowed candidates
+  K-->>R: allowed candidates
+  R->>RR: merged allowed candidates
+  RR-->>R: reranked top passages
+  R->>L: question + passages
+  L-->>U: grounded answer + citations
+</pre>
+<figcaption><strong>Figure 4.</strong> Hybrid retrieval (vector + keyword) merges candidates; a reranker selects the best passages before generation.</figcaption>
+</figure>
+
+<h2>Access control</h2>
+<p>RAG over private data must respect <strong>permissions</strong>: each chunk carries tenant + ACL labels (and a <code>source_uri</code>) from ingestion, and the ACL is <strong>pushed into the retrieval query itself</strong> — a metadata filter on the vector/keyword search (or over-fetch then filter before merge) — not applied after top-k. Filtering after a global top-k is both a security risk (forbidden chunks reach the app layer) and a recall bug (the top-k can be entirely chunks the user cannot see, leaving nothing after the filter). Filtering inside the query keeps recall correct and the model never sees forbidden context.</p>
+
+<h2>Freshness and evaluation</h2>
+<p>Documents change, so ingestion is <strong>incremental</strong> and <strong>versioned</strong>: an indexing job writes a new document version, atomically swaps the active version, tombstones stale chunks, and a background compaction reclaims them. Each chunk keeps a stable <code>chunk_id</code>, <code>doc_version</code>, and <code>embedding_model_version</code> so re-embeds and deletes propagate cleanly. Citations carry <code>doc_id</code>, <code>chunk_id</code>, <code>source_uri</code>, <code>title</code>, <code>span</code>, and <code>version</code>. Quality is measured with an <strong>eval</strong> loop — retrieval recall and answer <strong>groundedness</strong> (is the answer supported by the citations, not hallucinated?) over a golden set plus online feedback.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  UPD["Updated document"] --> JOB["Indexing job: re-chunk + re-embed (new doc_version)"]
+  JOB --> NEWV["Write new version chunks (with ACL labels)"]
+  NEWV --> SWAP["Atomically swap active version"]
+  SWAP --> TOMB["Tombstone old chunks"]
+  TOMB --> COMPACT["Background compaction reclaims tombstones"]
+</pre>
+<figcaption><strong>Figure 5.</strong> Incremental, versioned indexing: write the new version, swap atomically, tombstone old chunks, compact in the background — deletes and re-embeds stay consistent.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth + rate limiting in front of the query and ingest endpoints.</li>
+<li><strong>Vector store:</strong> a purpose-built ANN store — <strong>FAISS</strong> (library), <strong>Milvus / Qdrant / Weaviate</strong> (services), <strong>pgvector</strong> (Postgres extension), or <strong>Pinecone</strong> (managed). HNSW or IVF-PQ under the hood.</li>
+<li><strong>Keyword index:</strong> <strong>Elasticsearch / OpenSearch</strong> (BM25) for the lexical half of hybrid retrieval.</li>
+<li><strong>Raw documents + chunks:</strong> originals in <strong>blob/object storage (S3-like)</strong>; chunk text + metadata + ACL labels in a relational/KV store (<strong>PostgreSQL</strong> / DynamoDB).</li>
+<li><strong>Ingestion pipeline:</strong> <strong>Kafka</strong> for the document-change stream, a batch/stream processor (<strong>Spark / Flink</strong>) to chunk + embed at scale, and an embedding model served on GPUs (Triton / vLLM).</li>
+<li><strong>Reranker:</strong> a cross-encoder model service; <strong>LLM gateway</strong> for generation; <strong>Redis</strong> to cache hot query results / embeddings.</li>
+</ul>
+<p><strong>Why these:</strong> the storage choice follows the access pattern — semantic similarity → a vector index (not a B-tree); exact-term match → an inverted index; large immutable source files → object storage; small structured metadata + permissions → a relational/KV store; the high-volume ingest/reindex job → Kafka + a batch engine. No single database does all four well, so RAG is deliberately polyglot.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>Eventually fresh, not transactional:</strong> there is a lag between a document changing and the index reflecting it (re-chunk → re-embed → publish). State the freshness SLA; don't promise read-after-write on the corpus.</li>
+<li><strong>Best-effort recall, not exact:</strong> ANN returns <em>approximate</em> top-k — tune recall vs latency, and use hybrid (vector + keyword) so exact-term matches aren't missed by the embedding.</li>
+<li><strong>ACL is a hard guarantee:</strong> the permission filter is enforced inside retrieval, so a user can never be shown (or cited) a chunk they cannot access — even at the cost of recall.</li>
+<li><strong>Groundedness, not truth:</strong> RAG guarantees the answer is <em>built from retrieved passages with citations</em>; it does not guarantee the source is correct. Surface citations so a human can verify.</li>
+<li><strong>Versioned index:</strong> within one query, retrieval reads a consistent index version; an embedding-model change triggers a full rebuild into a new version, swapped atomically (tombstones for deletes in between).</li>
+</ul>
+
+<h2>When (not) to use RAG</h2>
+<ul>
+<li><strong>Great for:</strong> question-answering over private/changing knowledge, reducing hallucination, and any answer that must cite sources — without retraining the model.</li>
+<li><strong>Overkill for:</strong> small, static knowledge that simply fits in the prompt (just put it in context), or pure reasoning/transform tasks that don't need external facts.</li>
+<li><strong>Wrong tool for:</strong> questions needing aggregation/joins over structured data (use SQL/analytics, optionally as a tool the model calls), or when the source of truth changes faster than you can index and strict freshness is required.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Chunking is underrated:</strong> bad chunk boundaries wreck recall — tune size and overlap.</li>
+<li><strong>Vector-only misses exact terms:</strong> add keyword/hybrid retrieval and a reranker.</li>
+<li><strong>Stale index:</strong> support incremental upsert/delete; full re-embed only on model change.</li>
+<li><strong>Permission leakage:</strong> filter by ACL/tenant <em>before</em> rerank and generation; never let a forbidden chunk reach the model or a citation.</li>
+<li><strong>Vector storage overhead:</strong> raw vectors undercount real memory — HNSW graph links, metadata, chunk text, tombstones/versions, and replicas multiply it; IVF-PQ compresses at a recall cost.</li>
+<li><strong>Hallucination:</strong> instruct the model to answer only from context and cite; evaluate groundedness.</li>
+<li><strong>Cost of re-embedding</strong> the whole corpus on an embedding-model upgrade — plan migrations.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>RAG = offline <strong>chunk-embed-index</strong> + online <strong>retrieve-rerank-generate</strong>.</li>
+<li><strong>ANN</strong> (HNSW / IVF-PQ) makes similarity search fast at scale; tune recall vs latency vs memory.</li>
+<li><strong>Hybrid retrieval + reranking</strong> beats pure vector search.</li>
+<li>Support <strong>incremental indexing</strong> and measure <strong>groundedness</strong>.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: HNSW (Malkov &amp; Yashunin, 2016); FAISS / ScaNN / Milvus docs; BM25 and hybrid-retrieval material; cross-encoder reranking docs; public RAG-evaluation material (groundedness / RAGAS). Diagrams and write-up are original EngineerPro content.</em></p>

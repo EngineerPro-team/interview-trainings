@@ -1,0 +1,183 @@
+<p>A <strong>Content Delivery Network (CDN)</strong> serves content from servers close to the user, cutting latency and offloading the origin. It is the building block behind streaming, large downloads, and fast web assets. The core problems are <strong>request routing</strong>, a <strong>cache hierarchy</strong>, and <strong>invalidation</strong>.</p>
+
+<p>The whole value proposition is a single number — the <strong>edge cache hit ratio</strong> — because everything else (latency, origin load, cost) follows from it. So a strong design is really an argument about how to keep that ratio high (routing, hierarchy, cache-key hygiene) and how to stay correct when content changes (invalidation) without tanking it.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Static, dynamic, or both?</strong> Static assets cache for hours/days; dynamic/personalized content needs micro-TTL, edge compute, or must bypass cache — very different answers.</li>
+<li><strong>Public or private content?</strong> Private content forces signed URLs/cookies and access-aware cache keys so one user's response is never served to another.</li>
+<li><strong>How fresh must updates be?</strong> "Eventually (minutes)" → TTL; "instantly" → active purge or versioned URLs.</li>
+<li><strong>Object size profile?</strong> Many small web assets vs few huge video segments change eviction, tiering, and range-request handling.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Cache and serve static (and some dynamic) content from edge locations.</li>
+<li><strong>Invalidate / purge</strong> content; origin shielding; TLS termination.</li>
+<li>Signed URLs for access control.</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Low global latency</strong>; high availability.</li>
+<li><strong>High cache hit ratio</strong> (protect the origin); huge egress bandwidth.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Hit ratio economics:</strong> a 95% edge hit ratio means the origin sees only 5% of traffic — the difference between one origin and a meltdown.</li>
+<li><strong>PoP count:</strong> hundreds of edge PoPs worldwide so most users are within tens of ms.</li>
+<li><strong>Object mix:</strong> a small set of hot objects serves most requests (cache them everywhere); a long tail is pulled on demand.</li>
+<li><strong>Egress:</strong> CDNs serve the majority of internet bytes — capacity is bandwidth at the edge, not compute.</li>
+</ul>
+<p><strong>Worked example — why hit ratio dominates.</strong> Say total demand is 10 Tbps. At a 95% edge hit ratio the origin only needs to serve ~5% = ~500 Gbps; push the ratio to 99% and the origin drops to ~100 Gbps — a 5× reduction in origin/transit cost from a 4-point ratio change. That is why a few percent of hit ratio is worth large engineering effort (better cache keys, shielding, pre-positioning), and why a cache-busting mistake (e.g. a per-user query param in the cache key) is catastrophic: it can collapse the ratio toward 0 and melt the origin.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /{asset}</code> — served by the nearest edge (transparent to the client).</li>
+<li><code>POST /purge</code> — <code>{url | tag}</code> invalidate cached content.</li>
+<li>Origin pull config: cache-control TTLs, cache keys, signed-URL rules.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+<p>A client request is routed to a nearby <strong>edge PoP</strong>; on a miss the edge fetches from a <strong>regional shield</strong>, which in turn fetches from the <strong>origin</strong> — so the origin sees very little traffic. A control plane pushes config and purges across the network.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User"] --> ROUTE["Request routing (Anycast / GeoDNS)"]
+  ROUTE --> EDGE["Edge PoP cache (nearest)"]
+  EDGE -->|miss| SHIELD["Regional shield cache"]
+  SHIELD -->|miss| ORIGIN["Origin"]
+  CTRL["Control plane: config + purge"] -.-> EDGE
+  CTRL -.-> SHIELD
+</pre>
+<figcaption><strong>Figure 1.</strong> Route to the nearest edge; misses cascade edge to shield to origin, so the origin is shielded. A control plane distributes config and purges.</figcaption>
+</figure>
+
+<h2>Request routing</h2>
+<p>Getting a user to a nearby healthy edge is the first job. Two common techniques:</p>
+<ul>
+<li><strong>Anycast:</strong> many PoPs announce the same IP; the network routes the user to the topologically nearest one. Simple, fast failover, less precise control.</li>
+<li><strong>GeoDNS:</strong> DNS returns a different edge IP based on the resolver's location / latency / health. More control, but DNS caching slows changes.</li>
+</ul>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  REQ["User request"] --> M{"Routing method"}
+  M -->|Anycast| AN["Same IP from many PoPs; network picks nearest"]
+  M -->|GeoDNS| GD["DNS returns nearest healthy edge IP"]
+  AN --> EDGE["Nearest edge PoP"]
+  GD --> EDGE
+</pre>
+<figcaption><strong>Figure 2.</strong> Anycast (network-level nearest) vs GeoDNS (DNS-level nearest) route the user to a close, healthy edge.</figcaption>
+</figure>
+
+<h2>Cache hierarchy</h2>
+<p>A single tier would stampede the origin on misses. A <strong>hierarchy</strong> — edge then regional shield then origin — means many edges share a shield, so the origin sees one fetch per object per region, not per edge. Each tier applies cache keys, TTLs, and LRU eviction.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  E1["Edge A"] --> SH["Regional shield"]
+  E2["Edge B"] --> SH
+  E3["Edge C"] --> SH
+  SH --> O["Origin (one fetch per object per region)"]
+</pre>
+<figcaption><strong>Figure 3.</strong> Many edges funnel misses through a shared shield, collapsing origin fetches to one per object per region.</figcaption>
+</figure>
+
+<h2>Private content and signed URLs</h2>
+<p>Not everything is public. For private content the edge verifies a <strong>signed URL or signed cookie</strong> (HMAC with an expiry) before serving, and the response is marked <code>private</code>/<code>no-store</code> or cached under an access-aware cache key — so a private object is never served to another user from cache. The cache key must include only access-safe dimensions; user-specific headers stay out unless the response is private.</p>
+
+<h2>Cache miss flow</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant E as Edge PoP
+  participant S as Shield
+  participant O as Origin
+  U->>E: GET /asset
+  alt edge hit
+    E-->>U: cached object (fast)
+  else edge miss
+    E->>S: fetch /asset
+    alt shield hit
+      S-->>E: object
+    else shield miss
+      S->>O: fetch /asset
+      O-->>S: object (set TTL)
+    end
+    E-->>U: object (now cached at edge)
+  end
+</pre>
+<figcaption><strong>Figure 4.</strong> A hit serves immediately; a miss cascades edge to shield to origin, caching on the way back.</figcaption>
+</figure>
+
+<h2>Invalidation and purge</h2>
+<p>When content changes, stale cached copies must go. Options: <strong>TTL expiry</strong> (simple, eventual), or active <strong>purge</strong> that the control plane propagates to all PoPs (fast, more work). A purge goes to the control plane, fans out to every PoP, and is <strong>eventually consistent</strong> with acks/retries and a version/tag — so a global purge has latency and can partially fail, which is why <strong>versioned URLs</strong> (a content hash in the path) are preferred: a new version is a new URL, so caches never serve stale bytes and no purge is needed.</p>
+<p>On a miss, the edge applies <strong>request coalescing (single-flight)</strong>: many concurrent misses for the same object collapse into one upstream fetch, preventing a cache stampede on the shield/origin.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  CHANGE["Content updated"] --> STRAT{"Invalidation strategy"}
+  STRAT -->|TTL| TTL["Wait for TTL to expire (eventual)"]
+  STRAT -->|active purge| PURGE["Control plane purges all PoPs"]
+  STRAT -->|versioned URL| VER["New hash in URL = new object"]
+</pre>
+<figcaption><strong>Figure 5.</strong> Three ways to avoid serving stale content: TTL expiry, active purge, or versioned URLs (the cleanest).</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<p>A common confusion: "where does a CDN actually store data?" A CDN has <em>no single database</em> — it is a tiered cache in front of someone else's durable store. The data lives in several distinct layers, each chosen for its access pattern:</p>
+<ul>
+<li><strong>Edge cache (the data plane's storage):</strong> each PoP keeps cached objects in a <strong>tiered local store</strong> — hot objects in <strong>RAM</strong>, the larger warm set on <strong>SSD/NVMe</strong> — managed by the cache engine (<strong>Varnish / NGINX / Apache Traffic Server</strong>) with an LRU/LFU eviction policy. This is ephemeral and rebuildable: losing a PoP loses no data, just cache warmth.</li>
+<li><strong>Origin (the source of truth):</strong> the durable copy lives in <strong>blob/object storage (S3-like / GCS)</strong> for media and large files, or the application's own origin servers/DB for dynamic responses. The CDN never owns durability — it caches what the origin owns.</li>
+<li><strong>Cache index/metadata:</strong> an in-memory structure per edge mapping cache key → object location + TTL + ETag; this is the "do I have it and is it fresh?" lookup, not a persisted DB.</li>
+<li><strong>Config &amp; routing state:</strong> cache rules, origin mappings, and PoP health are distributed to edges via a <strong>config store / control plane</strong> (etcd/Consul-style or a proprietary push system); GeoDNS/Anycast config drives routing.</li>
+<li><strong>TLS certificates:</strong> per-domain certs stored at the edge (and a secret store at the control plane) so PoPs can terminate HTTPS.</li>
+<li><strong>Logs &amp; analytics:</strong> access logs stream off the edge into <strong>Kafka</strong> → a data warehouse / time-series store for hit-ratio, billing, and traffic analytics — kept off the request hot path.</li>
+</ul>
+<p><strong>The rest of the landscape:</strong> most teams <em>buy</em> a managed CDN (Cloudflare, Fastly, Akamai, AWS CloudFront, Google Cloud CDN) rather than build; self-hosting means running Varnish/NGINX/ATS at each PoP. For dynamic/personalized content, <strong>edge compute</strong> (Cloudflare Workers, Lambda@Edge, Fastly Compute) runs logic at the PoP. The origin/app sets <code>Cache-Control</code> and emits versioned URLs to control all of the above.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<p>A CDN is fundamentally an <strong>eventually-consistent</strong> cache, and being explicit about that is the depth interviewers want:</p>
+<ul>
+<li><strong>Freshness is best-effort:</strong> until a TTL expires or a purge lands, an edge can serve a stale copy. If you need strict freshness, the answer is <em>versioned URLs</em> (new content = new URL), not faster purges.</li>
+<li><strong>Purge is eventually consistent:</strong> a global purge fans out with acks/retries and can partially fail; design for "most PoPs within seconds, a tail later", not instant global truth.</li>
+<li><strong>Read-your-writes does not hold</strong> across edges by default — a user who just uploaded may hit a different PoP with the old object; bind such reads to a versioned URL or bypass cache.</li>
+<li><strong>Routing is approximate:</strong> Anycast follows BGP (can land on a non-ideal PoP under network policy); GeoDNS depends on resolver location and is slowed by DNS caching. Neither guarantees the truly nearest PoP.</li>
+</ul>
+
+<h2>Tradeoffs &amp; when not to use a CDN</h2>
+<ul>
+<li><strong>Great for:</strong> static assets, media segments, large downloads, software updates, cacheable API responses — anything read far more than written.</li>
+<li><strong>Marginal for:</strong> highly personalized or rapidly-changing content (low hit ratio) — use micro-TTL + stale-while-revalidate or edge compute, or accept origin serving.</li>
+<li><strong>Wrong for:</strong> write paths and strongly-consistent reads — those go to the origin/DB, not a cache.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Cache stampede / thundering herd:</strong> many misses for the same object hit the origin at once — use request coalescing at the edge.</li>
+<li><strong>Hot vs long tail:</strong> push hot objects everywhere; pull the tail on demand.</li>
+<li><strong>Cache key design:</strong> include only meaningful dimensions; a bad key (e.g. query order) fragments the cache.</li>
+<li><strong>Invalidation is hard:</strong> prefer versioned URLs to global purges where possible.</li>
+<li><strong>Dynamic content:</strong> cache micro-TTL or use edge compute; not everything is cacheable.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li><strong>Routing</strong> (Anycast / GeoDNS) gets users to a near, healthy edge.</li>
+<li>A <strong>cache hierarchy</strong> (edge to shield to origin) protects the origin and raises hit ratio.</li>
+<li><strong>Invalidation</strong> via TTL, purge, or — best — versioned URLs.</li>
+<li>Capacity is <strong>edge bandwidth and hit ratio</strong>, not origin compute — a few points of hit ratio move origin cost multiplicatively.</li>
+<li>A CDN is an <strong>eventually-consistent cache</strong>: freshness is best-effort, purge is eventual — prefer versioned URLs for correctness.</li>
+<li><strong>Cache-key hygiene</strong> is the make-or-break detail: a per-user dimension in the key destroys the hit ratio.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: Cloudflare / Fastly / Akamai engineering docs and blogs; RFC 9111 (HTTP caching) and <code>Cache-Control</code>; public Anycast / GeoDNS explainers; signed-URL / signed-cookie docs. Diagrams and write-up are original EngineerPro content.</em></p>

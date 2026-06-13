@@ -1,0 +1,179 @@
+<p>A <strong>flight-booking</strong> system has a read-heavy search problem (millions browsing) wrapped around a strict-consistency booking problem (a seat must never be sold twice). This chapter designs search caching, the <strong>seat hold</strong>, and a <strong>booking saga</strong> across inventory and payment.</p>
+
+<p>The defining shape is two systems with opposite needs glued together: a <strong>massively read-heavy search</strong> (cacheable, eventually consistent, optimize for QPS) and a <strong>tiny but strict booking core</strong> (a seat is a unique resource sold at most once, spanning inventory + payment, must be idempotent). The bridge between "I saw this price" and "I bought it" is the <strong>seat hold with a TTL</strong> — a temporary reservation that turns a race into a two-phase "reserve, then pay" so the user isn't charged for a seat someone else grabbed. Getting the hold and the booking saga right is the whole game.</p>
+
+<h3>Clarifying questions (scope it first)</h3>
+<ul>
+<li><strong>Single airline or aggregator (GDS)?</strong> Owning inventory is a consistency problem you control; aggregating third-party inventory adds external availability calls and stale-price handling.</li>
+<li><strong>Hold semantics?</strong> How long is a seat held during checkout, and what happens on expiry? This defines the TTL and the release path.</li>
+<li><strong>Multi-leg / multi-passenger?</strong> Booking several seats/legs atomically (all-or-nothing) is harder than one seat — clarify atomicity scope.</li>
+<li><strong>Payment timing?</strong> Authorize then capture (the clean flow given a hold) vs charge upfront — shapes the saga and compensation.</li>
+<li><strong>Search freshness?</strong> Can results be cached for seconds/minutes, or must price/availability be live at search time?</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Functional</h3>
+<ul>
+<li>Search flights (incl. multi-leg) by route and date.</li>
+<li><strong>Hold</strong> a seat while the user pays; then confirm the booking.</li>
+<li>Cancel / refund; look up a booking by reference (PNR).</li>
+</ul>
+<h3>Non-functional</h3>
+<ul>
+<li><strong>Consistency:</strong> a seat is sold at most once (no double-booking).</li>
+<li><strong>Read scalability:</strong> search QPS dwarfs booking QPS.</li>
+<li><strong>Idempotent booking</strong> under retries; high availability.</li>
+</ul>
+
+<h2>Back-of-the-envelope estimation</h2>
+<ul>
+<li><strong>Read:write skew:</strong> ~1000 searches per booking — optimize the read path hard (cache, read replicas).</li>
+<li><strong>Search QPS:</strong> 100M searches/day ≈ <strong>~1.2k/s</strong> average, large peaks; results are cacheable for seconds.</li>
+<li><strong>Inventory contention:</strong> a popular flight has limited seats; holds + conditional updates serialize the few writes that matter.</li>
+<li><strong>Storage:</strong> bookings are small and durable; search data is derived and cacheable.</li>
+</ul>
+<p><strong>Worked example.</strong> The ~1000:1 read:write skew is the design driver. 100M searches/day ≈ 1.2k/s (with large peaks), but only ~100k bookings/day ≈ ~1/s of actual writes. So you pour effort into the read path — cache fare/availability results for a few seconds, serve from read replicas, precompute popular routes — because that's where the volume is, and slightly stale search results are acceptable (the hold step re-validates). The write path is tiny but must be exactly right: a popular flight has, say, 180 seats, and at peak dozens of users may try to book the last few at once. You don't lock the whole flight; you do a <strong>conditional decrement</strong> ("reserve seat only if available count &gt; 0") or a per-seat conditional claim, which serializes just the contended seats. The hold gives the user a TTL window (e.g. 10 minutes) to pay; if the seat count is decremented at hold time, an expired/abandoned hold must <strong>release</strong> the seat back — otherwise inventory silently leaks. The numbers justify the architecture: optimize reads broadly, guard the rare writes strictly.</p>
+
+<h2>Core APIs</h2>
+<ul>
+<li><code>GET /search?from=&to=&date=</code> → <code>{itineraries[]}</code> (cacheable).</li>
+<li><code>POST /holds</code> — <code>{flight_id, seat_class, user_id}</code> → <code>{hold_id, expires_at}</code>.</li>
+<li><code>POST /bookings</code> — <code>{hold_id, passenger, payment, idempotency_key}</code> → <code>{pnr, status}</code>.</li>
+<li><code>GET /bookings/{pnr}</code>, <code>POST /bookings/{pnr}/cancel</code>.</li>
+</ul>
+
+<h2>High-level architecture</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User"] --> SRCH["Search service"]
+  SRCH --> CACHE["Search cache"]
+  SRCH --> RR["Read replicas"]
+  U --> BOOK["Booking service (saga)"]
+  BOOK --> INV["Inventory service: seat holds"]
+  BOOK --> PAY["Payment"]
+  BOOK --> PNR["Booking / PNR store"]
+  BOOK --> NOTIF["Notification"]
+</pre>
+<figcaption><strong>Figure 1.</strong> A cached, replica-backed search path is separate from the booking saga that coordinates inventory holds and payment.</figcaption>
+</figure>
+
+<h2>Search path</h2>
+<p>Search is read-heavy and tolerant of slight staleness. Serve it from a <strong>cache</strong> (route+date keyed, short TTL) backed by <strong>read replicas</strong>; precompute popular routes. Availability shown in search is a hint — the authoritative check happens at hold time.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  Q["GET /search route+date"] --> C{"In cache?"}
+  C -->|hit| R1["Return cached itineraries"]
+  C -->|miss| RR["Query read replicas"]
+  RR --> BUILD["Build itineraries (incl multi-leg)"]
+  BUILD --> FILL["Fill cache (short TTL)"]
+  FILL --> R2["Return"]
+</pre>
+<figcaption><strong>Figure 2.</strong> Search hits a short-TTL cache first, falls back to read replicas, and caches the built itineraries — availability is a hint, confirmed later.</figcaption>
+</figure>
+
+<h2>Seat hold with TTL</h2>
+<p>To avoid two users paying for the same seat, the user first <strong>holds</strong> it: a conditional update marks the seat reserved with an <strong>expiry</strong>. If they pay in time, the hold becomes a booking; if not, the hold auto-expires and the seat returns to inventory. The hold is the consistency boundary.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant INV as Inventory
+  U->>INV: hold seat 14C
+  INV->>INV: conditional reserve if seat is free, set expiry
+  INV-->>U: hold_id, expires in 5 min
+  Note over U,INV: user proceeds to payment
+  alt pays in time
+    U->>INV: confirm (via booking saga)
+    INV-->>U: seat booked
+  else hold expires
+    INV->>INV: release seat back to inventory
+  end
+</pre>
+<figcaption><strong>Figure 3.</strong> A conditional reserve with a TTL is the consistency boundary: pay in time to convert the hold, otherwise it auto-releases.</figcaption>
+</figure>
+
+<h2>Booking saga</h2>
+<p>Confirming a booking touches two systems that can each fail: <strong>inventory</strong> (convert hold to sold) and <strong>payment</strong>. Because a hold already exists, the clean flow is <strong>authorize</strong> the payment (reserve funds), <strong>commit the seat</strong>, then <strong>capture</strong> — so the common path never charges then refunds. A <strong>saga</strong> sequences them with an <strong>idempotency key</strong> so retries are safe; a void/refund is only the fallback compensation if commit fails after authorization.</p>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+flowchart TB
+  START["POST /bookings (idempotency_key)"] --> AUTH["Authorize payment (hold funds)"]
+  AUTH -->|ok| COMMIT["Commit seat: hold to sold"]
+  AUTH -->|fail| FAILP["Return payment error"]
+  COMMIT -->|ok| CAPTURE["Capture payment"]
+  CAPTURE --> PNR["Issue PNR + notify"]
+  COMMIT -->|fail| VOID["Compensate: void / release authorization"]
+  VOID --> FAILB["Booking failed, no capture"]
+</pre>
+<figcaption><strong>Figure 4.</strong> The booking saga: authorize, commit the seat, then capture; if the seat cannot be committed, void the authorization (compensation) rather than charge-then-refund. The idempotency key dedups retries.</figcaption>
+</figure>
+
+<h2>Booking lifecycle</h2>
+
+<figure class="sd-figure sd-figure--diagram">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Held
+  Held --> Booked: payment + seat committed
+  Held --> Released: hold expired
+  Booked --> Cancelled: user cancels
+  Cancelled --> Refunded: refund processed
+  Released --> [*]
+  Refunded --> [*]
+  Booked --> [*]
+</pre>
+<figcaption><strong>Figure 5.</strong> Booking states from hold through booked, with expiry/cancel/refund paths.</figcaption>
+</figure>
+
+<h2>Storage &amp; technology choices</h2>
+<ul>
+<li><strong>API gateway</strong>: auth, rate limiting, routing for search vs booking.</li>
+<li><strong>Search:</strong> a <strong>Redis</strong> cache (route+date keyed, short TTL) in front of <strong>read replicas</strong> of the fare/schedule DB; popular routes precomputed.</li>
+<li><strong>Inventory:</strong> a transactional DB (<strong>PostgreSQL</strong>) holding seats with a <strong>conditional hold + TTL</strong>; a background sweeper releases expired holds.</li>
+<li><strong>Booking:</strong> a saga orchestrator (workflow engine) coordinating inventory + payment with an <strong>idempotency key</strong>; the PNR record in a relational store.</li>
+<li><strong>Events:</strong> <strong>Kafka</strong> for booking/cancellation events → notifications, analytics, downstream GDS sync.</li>
+<li><strong>Payments:</strong> a PSP integration; emails/itineraries to a notification service.</li>
+</ul>
+<p><strong>Why these:</strong> search is read-heavy and tolerates staleness → cache + replicas; the seat hold is the consistency boundary and must be strongly consistent → a transactional DB with conditional writes; the cross-system booking is a saga → a workflow engine + idempotency keys. The read path and the write path deliberately use different consistency models.</p>
+
+<h2>Consistency &amp; guarantees</h2>
+<ul>
+<li><strong>A seat is sold at most once:</strong> the conditional hold/booking on the inventory DB is the single source of truth — search availability is only a hint, and a booking is rejected if the conditional reserve fails.</li>
+<li><strong>Hold = bounded, auto-releasing reservation:</strong> a hold has a TTL; if the user doesn't pay in time, a sweeper releases the seat, so abandoned checkouts can't permanently leak inventory.</li>
+<li><strong>Idempotent booking via saga:</strong> the booking is keyed by an idempotency key so a client retry returns the same result, not a second booking; the authorize → commit → capture saga has compensations (void/refund) for partial failure.</li>
+<li><strong>Eventually-consistent search:</strong> cached fares/availability may be seconds stale — explicitly acceptable because the hold step re-validates against the authoritative inventory.</li>
+<li><strong>Durable confirmation:</strong> once a PNR is issued, it is durable and authoritative; downstream systems (GDS, notifications) sync from booking events, eventually consistent.</li>
+</ul>
+
+<h2>When (not) to use this design</h2>
+<ul>
+<li><strong>Fits:</strong> any reserve-limited-inventory-then-pay flow — flights, hotels, event tickets, car rental — where overselling is unacceptable and search dwarfs booking.</li>
+<li><strong>Simplify when:</strong> inventory is effectively unlimited (digital goods) — you don't need holds or conditional reserves, just an idempotent purchase.</li>
+<li><strong>Different design when:</strong> demand massively exceeds a tiny supply at an instant (a flash ticket drop) — you may add a virtual waiting room / queue in front so the booking core isn't stampeded, on top of this hold model.</li>
+</ul>
+
+<h2>Pitfalls and talking points</h2>
+<ul>
+<li><strong>Double-book:</strong> never trust search availability — the conditional hold is the single source of truth.</li>
+<li><strong>Orphaned holds:</strong> always set a TTL and have a sweeper release expired holds.</li>
+<li><strong>Idempotency:</strong> a retried POST /bookings with the same key must return the original result, not charge twice.</li>
+<li><strong>Multi-leg / multi-airline:</strong> a saga spanning several inventories — partial holds need compensation.</li>
+<li><strong>Cache staleness:</strong> fine for search; never for the hold/booking step.</li>
+</ul>
+
+<h2>Key takeaways</h2>
+<ul>
+<li>Separate the <strong>read-heavy search</strong> (cache + replicas) from the <strong>strict booking</strong> path.</li>
+<li>The <strong>seat hold with TTL</strong> is the consistency boundary that prevents double-booking.</li>
+<li>Booking is a <strong>saga</strong> with compensations and an <strong>idempotency key</strong>.</li>
+<li>Availability in search is a hint; the conditional hold is authoritative.</li>
+</ul>
+
+<hr/>
+<p class="muted"><em>References: the saga pattern (Garcia-Molina &amp; Salem, 1987); Stripe idempotency-key docs; public airline reservation / GDS and inventory-hold material. Diagrams and write-up are original EngineerPro content.</em></p>
