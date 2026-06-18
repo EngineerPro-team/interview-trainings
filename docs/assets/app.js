@@ -256,6 +256,11 @@
     if (/^\/system-design\/?$/.test(path)) {
       return { route: "system-design", slug: null, legacySdUrl: true };
     }
+    // Deep-link to a specific company inside the Interview Formats block, e.g.
+    // /resources/interview-formats/axon → open the panel + jump to Axon.
+    if ((m = path.match(/^\/resources\/(interview-formats|interview-format|formats)\/([\w-]+)\/?$/))) {
+      return { route: "resources", slug: null, scrollTo: "resInterviewFormats", formatCompany: m[2].toLowerCase() };
+    }
     if ((m = path.match(/^\/resources\/([\w-]+)\/?$/)) && RESOURCES_ANCHORS[m[1]]) {
       return { route: "resources", slug: null, scrollTo: RESOURCES_ANCHORS[m[1]] };
     }
@@ -291,7 +296,7 @@
     return BASE_PATH ? BASE_PATH + (p === "/" ? "/" : p) : p;
   }
 
-  function showRoute({ route, slug, scrollTo, legacySdUrl }) {
+  function showRoute({ route, slug, scrollTo, legacySdUrl, formatCompany }) {
     if (legacySdUrl) {
       history.replaceState(null, "", pathFor(route, slug));
     }
@@ -339,6 +344,39 @@
       });
     } else {
       window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    }
+
+    // Deep link /resources/interview-formats/<company>: select that company in
+    // the filter (which expands it), then scroll to its card.
+    if (formatCompany) {
+      const focusCompany = (tries = 0) => {
+        const list = document.getElementById("interviewFormatsList");
+        const sel = document.getElementById("interviewFormatsCompany");
+        // The list/select may not be hydrated yet on a cold deep-link load.
+        if ((!list || !sel || !sel.options.length) && tries < 20) {
+          if (typeof initInterviewFormats === "function") initInterviewFormats();
+          return requestAnimationFrame(() => focusCompany(tries + 1));
+        }
+        if (!list || !sel) return;
+        const opt = Array.from(sel.options).find(
+          (o) => o.value && o.value.toLowerCase() === formatCompany,
+        );
+        if (opt && sel.value !== opt.value) {
+          sel.value = opt.value;
+          if (list.__formatsRender) list.__formatsRender();
+        }
+        requestAnimationFrame(() => {
+          const card = list.querySelector(
+            `details.interview-formats__company[data-company-id="${formatCompany}"]`,
+          );
+          if (card) {
+            card.open = true;
+            if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+            card.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      };
+      requestAnimationFrame(() => focusCompany());
     }
 
     // SPA route changes go through pushState, so GA's auto page_view (which
@@ -1958,8 +1996,28 @@
     search?.addEventListener("input", render);
     companySel?.addEventListener("change", render);
 
+    const formatsBase = () => ((typeof BASE_PATH !== "undefined" && BASE_PATH) || "");
+    // Reflect the opened company in the address bar so it is shareable, e.g.
+    // opening Amazon → /resources/interview-formats/amazon (no history spam).
+    const reflectCompanyUrl = () => {
+      // Only when the Resources route is the active view (avoid rewriting the
+      // URL when a re-render fires toggles while another route is shown).
+      const sec = list.closest(".route");
+      if (sec && sec.hidden) return;
+      // Don't fight the URL while the user is searching/filtering.
+      if ((search?.value || "").trim()) return;
+      const open = list.querySelector(":scope > details.interview-formats__company[open]");
+      const target = open?.dataset.companyId
+        ? `${formatsBase()}/resources/interview-formats/${open.dataset.companyId}/`
+        : `${formatsBase()}/resources/interview-formats/`;
+      if (location.pathname !== target) {
+        try { history.replaceState(null, "", target); } catch (_) {}
+      }
+    };
+
     list.addEventListener("toggle", (ev) => {
       if (ev.target.matches(".faq-item")) syncResourceExpandLabels();
+      if (ev.target.matches(".interview-formats__company")) reflectCompanyUrl();
     }, true);
 
     document.getElementById("interviewFormatsExpandAll")?.addEventListener("click", () => {
