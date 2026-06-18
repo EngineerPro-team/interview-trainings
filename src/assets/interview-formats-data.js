@@ -655,4 +655,87 @@ window.INTERVIEW_FORMATS = [
       },
     ],
   },
+  {
+    id: "sap",
+    company: "SAP",
+    tag: "SWE · Enterprise / ERP",
+    note: "SAP đề cao hiểu biết kỹ thuật sâu + khả năng chuyển yêu cầu nghiệp vụ (ERP) phức tạp thành phần mềm scalable; nhấn structured thinking & communication rõ ràng.",
+    recommendations: [
+      { slug: "khoa-hoc-dsa", note: "Coding Screen (Medium) + Onsite Coding (Hard), debugging, clean code" },
+      { slug: "khoa-hoc-system-design-interview-big-tech", note: "System Design: distributed, scale ERP, API idempotency" },
+      { slug: "behaviour-interview-course", note: "Behavioral / Leadership: ownership, influence, conflict" },
+      { slug: "computer-science-fundamental-interview", note: "Nền tảng CS vững cho các vòng technical" },
+      { slug: "mock", note: "Mock full loop SAP (5 vòng)" },
+    ],
+    profiles: [
+      {
+        title: "Software Engineer",
+        sections: [
+          {
+            title: "1. Recruiter Screen",
+            bullets: [
+              "Motivation, mức độ phù hợp role, logistics.",
+              "Hiểu vị thế SAP trong thị trường SaaS/ERP — vì sao chọn SAP (thiếu context kinh doanh là lý do fail phổ biến).",
+            ],
+          },
+          {
+            title: "2. Coding Screen",
+            blocks: [
+              {
+                icon: "🔵",
+                title: "Algorithm & Coding",
+                bullets: [
+                  "Bài LeetCode-medium dưới áp lực thời gian.",
+                  "Array, String, Hash, Tree; đôi khi data structure theo ngữ cảnh SaaS (vd đếm unique user theo cửa sổ thời gian).",
+                ],
+              },
+            ],
+          },
+          {
+            title: "3. System Design",
+            blocks: [
+              {
+                icon: "🟢",
+                title: "Distributed systems & trade-offs",
+                bullets: [
+                  "Thiết kế dưới ràng buộc scale; phân rã service, DB schema, caching, trade-offs.",
+                  "Ngữ cảnh ERP: API upload file cấu hình lớn (reliability, idempotency, user feedback); scale dashboard analytics real-time hàng triệu event/phút.",
+                ],
+              },
+            ],
+          },
+          {
+            title: "4. Onsite Coding",
+            blocks: [
+              {
+                icon: "🟠",
+                title: "Coding sâu + Debugging",
+                bullets: [
+                  "LeetCode-hard, xử lý edge case, độ rõ của code.",
+                  "Debug đoạn code backend lỗi (vd 500 error) — đọc hiểu & sửa.",
+                  "Đặt tên biến rõ + comment hợp lý — code khó đọc là lý do fail phổ biến.",
+                ],
+              },
+            ],
+          },
+          {
+            title: "5. Behavioral / Leadership",
+            bullets: [
+              "Ownership: tự cầm trịch một vấn đề từ phát hiện đến giải quyết, kể cả khi ngoài phạm vi trách nhiệm.",
+              "Influence: thuyết phục senior stakeholder / cross-functional khi ban đầu họ không đồng ý — nêu rõ chiến lược ảnh hưởng (đừng quy công cho riêng 'ý tưởng').",
+              "Conflict resolution: xử lý xung đột trong dự án và kết quả đạt được.",
+            ],
+          },
+        ],
+      },
+    ],
+    tips: {
+      title: "Điểm chung SAP",
+      bullets: [
+        "Hiểu vị thế SAP trong thị trường SaaS/ERP — tránh fail vì thiếu context kinh doanh.",
+        "Clean code: đặt tên biến rõ + comment hợp lý.",
+        "Behavioral nêu ví dụ cụ thể về influence & ownership, đừng nói chung chung.",
+      ],
+    },
+  },
 ];
