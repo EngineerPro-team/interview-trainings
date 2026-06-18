@@ -349,32 +349,22 @@
     // Deep link /resources/interview-formats/<company>: select that company in
     // the filter (which expands it), then scroll to its card.
     if (formatCompany) {
+      // Keep the "All companies" filter — just expand + scroll to the target
+      // company within the full list (don't narrow the dropdown to one).
       const focusCompany = (tries = 0) => {
         const list = document.getElementById("interviewFormatsList");
-        const sel = document.getElementById("interviewFormatsCompany");
-        // The list/select may not be hydrated yet on a cold deep-link load.
-        if ((!list || !sel || !sel.options.length) && tries < 20) {
+        const card = list?.querySelector(
+          `details.interview-formats__company[data-company-id="${formatCompany}"]`,
+        );
+        // List may not be hydrated yet on a cold deep-link load — retry.
+        if (!card && tries < 20) {
           if (typeof initInterviewFormats === "function") initInterviewFormats();
           return requestAnimationFrame(() => focusCompany(tries + 1));
         }
-        if (!list || !sel) return;
-        const opt = Array.from(sel.options).find(
-          (o) => o.value && o.value.toLowerCase() === formatCompany,
-        );
-        if (opt && sel.value !== opt.value) {
-          sel.value = opt.value;
-          if (list.__formatsRender) list.__formatsRender();
-        }
-        requestAnimationFrame(() => {
-          const card = list.querySelector(
-            `details.interview-formats__company[data-company-id="${formatCompany}"]`,
-          );
-          if (card) {
-            card.open = true;
-            if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
-            card.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        });
+        if (!card) return;
+        card.open = true;
+        if (typeof syncResourceExpandLabels === "function") syncResourceExpandLabels();
+        requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "start" }));
       };
       requestAnimationFrame(() => focusCompany());
     }
