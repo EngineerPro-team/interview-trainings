@@ -155,8 +155,20 @@ def main() -> int:
 
     # Resources deep-link sub-pages (/resources/hr-screen/, /resources/cs-fundamental/, …)
     resources_mod = last_mod("src/assets/resources-data.js", "scripts/site_config.py")
+    # The interview-formats block is driven by its own data file, so track that too.
+    formats_mod = last_mod(
+        "src/assets/interview-formats-data.js",
+        "src/assets/resources-data.js",
+        "scripts/site_config.py",
+    )
     for slug in RESOURCES_ALIASES:
-        urls.append((f"{SITE_BASE}/resources/{slug}/", resources_mod, 0.75, "monthly"))
+        mod = formats_mod if slug == "interview-formats" else resources_mod
+        urls.append((f"{SITE_BASE}/resources/{slug}/", mod, 0.75, "monthly"))
+
+    # Per-company Interview Format landing pages (prerendered, indexable).
+    from build_pages import load_interview_format_companies  # noqa: WPS433 — shared parser
+    for cid, _cname in load_interview_format_companies():
+        urls.append((f"{SITE_BASE}/resources/interview-formats/{cid}/", formats_mod, 0.6, "monthly"))
 
     # Build XML
     sm = [

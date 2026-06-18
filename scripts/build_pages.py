@@ -112,6 +112,21 @@ def _build_version() -> str:
 BUILD_VERSION = _build_version()
 
 
+def load_interview_format_companies() -> list[tuple[str, str]]:
+    """[(id, company_name), …] parsed from the interview-formats data file.
+
+    Used to prerender per-company landing pages (/resources/interview-formats/
+    <id>/) so each company is an indexable 200 page, not just an SPA deep link.
+    """
+    path = os.path.join(SRC, "assets", "interview-formats-data.js")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+    except OSError:
+        return []
+    return re.findall(r'\bid:\s*"([^"]+)",\s*company:\s*"([^"]+)"', raw)
+
+
 # ---------- helpers ----------------------------------------------------------
 
 def load_data_array(filename: str, var_name: str) -> list[dict]:
@@ -1079,6 +1094,28 @@ def main() -> int:
             page, count=1,
         )
         write(os.path.join(DOCS, "resources", slug, "index.html"), page)
+        pages += 1
+
+    # Per-company Interview Format landing pages: /resources/interview-formats/
+    # <company>/ — indexable 200 pages with company-specific SEO. The SPA reads
+    # the path on hydration (parseHash -> formatCompany) and expands/scrolls to
+    # that company. Also removes the 404→home bounce for shared deep links.
+    for cid, cname in load_interview_format_companies():
+        page = resources_html
+        url = f"{SITE_BASE}/resources/interview-formats/{cid}/"
+        title = f"{cname} — Interview Format & Rounds · Interview Resources · {SITE_NAME}"
+        desc = (
+            f"Format phỏng vấn {cname} (tham khảo): số vòng, chủ đề từng vòng, "
+            f"tips & khoá EngineerPro phù hợp. Đọc song ngữ VI & EN."
+        )
+        page = re.sub(r'<title>[^<]*</title>', f'<title>{attr(title)}</title>', page, count=1)
+        page = re.sub(r'<link rel="canonical" href="[^"]*"', f'<link rel="canonical" href="{url}"', page, count=1)
+        page = re.sub(r'<meta property="og:url" content="[^"]*"', f'<meta property="og:url" content="{url}"', page, count=1)
+        page = re.sub(r'<meta property="og:title" content="[^"]*"', f'<meta property="og:title" content="{attr(cname + " — Interview Format")}"', page, count=1)
+        page = re.sub(r'<meta name="twitter:title" content="[^"]*"', f'<meta name="twitter:title" content="{attr(cname + " — Interview Format")}"', page, count=1)
+        page = re.sub(r'<meta name="description" content="[^"]*"', f'<meta name="description" content="{attr(desc)}"', page, count=1)
+        page = re.sub(r'<meta property="og:description" content="[^"]*"', f'<meta property="og:description" content="{attr(desc)}"', page, count=1)
+        write(os.path.join(DOCS, "resources", "interview-formats", cid, "index.html"), page)
         pages += 1
 
     # 5. Legacy URL redirects. The old Shopify site used Vietnamese-slug paths
