@@ -1928,6 +1928,10 @@
       return body;
     }
 
+    // Return the language-appropriate view of a company. English content lives
+    // in an optional `co.en` overlay; missing fields fall back to Vietnamese.
+    const viewOf = (co, lang) => (lang === "en" && co.en ? { ...co, ...co.en } : co);
+
     const render = () => {
       const langNow = document.documentElement.lang || "vi";
       list.innerHTML = "";
@@ -1936,11 +1940,13 @@
       let visible = 0;
 
       data.forEach((co) => {
+        // Search across both languages (co already includes the en overlay).
         const hay = JSON.stringify(co).toLowerCase();
         const show = (!companyId || co.id === companyId) && (!q || hay.includes(q));
         if (!show) return;
         visible++;
 
+        const view = viewOf(co, langNow);
         const details = document.createElement("details");
         details.className = "faq-item interview-formats__company";
         details.dataset.companyId = co.id;
@@ -1952,7 +1958,7 @@
         num.textContent = String(visible);
         const qtext = document.createElement("span");
         qtext.className = "faq-item__qtext";
-        qtext.textContent = co.company + (co.tag ? ` · ${co.tag}` : "");
+        qtext.textContent = (view.company || co.company) + (view.tag ? ` · ${view.tag}` : "");
         const action = document.createElement("span");
         action.className = "faq-item__action";
         action.setAttribute("data-i18n", "resources.expandOne");
@@ -1961,7 +1967,7 @@
         chevron.setAttribute("aria-hidden", "true");
         chevron.textContent = "›";
         summary.append(num, qtext, action, chevron);
-        details.append(summary, buildCompanyBody(co, langNow));
+        details.append(summary, buildCompanyBody(view, langNow));
         list.appendChild(details);
         if (q || companyId) details.open = true;
       });
