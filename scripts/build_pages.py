@@ -93,6 +93,25 @@ def content_last_mod(*path_rels: str) -> str:
     return datetime.date.today().isoformat()
 
 
+def _build_version() -> str:
+    """A short token that changes per deploy, used to cache-bust JS/CSS assets
+    so returning visitors never run stale app.js / data files after a deploy."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=ROOT, capture_output=True, text=True, timeout=10,
+        )
+        h = out.stdout.strip()
+        if re.match(r"^[0-9a-f]{6,}$", h):
+            return h
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
+
+BUILD_VERSION = _build_version()
+
+
 # ---------- helpers ----------------------------------------------------------
 
 def load_data_array(filename: str, var_name: str) -> list[dict]:
@@ -387,6 +406,12 @@ def fix_asset_paths(template: str) -> str:
     out = out.replace(
         f'<script src="{BASE_PATH}/assets/i18n.js">',
         base_path_inject + f'<script src="{BASE_PATH}/assets/i18n.js">',
+    )
+    # 5. Cache-bust local JS/CSS so a deploy never serves stale app.js / data.
+    out = re.sub(
+        r'(src|href)="([^"]*/assets/[^"?]+\.(?:js|css))"',
+        rf'\1="\2?v={BUILD_VERSION}"',
+        out,
     )
     return out
 
