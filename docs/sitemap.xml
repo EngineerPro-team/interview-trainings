@@ -1139,7 +1139,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/resources/interview-formats/</loc>
-    <lastmod>2026-06-08</lastmod>
+    <lastmod>2026-06-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/" />
@@ -1168,5 +1168,125 @@
     <priority>0.75</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/cv-kit/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/cv-kit/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/amazon/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/amazon/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/amazon/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/google/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/google/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/google/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/grab/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/grab/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/grab/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/meta/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/meta/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/meta/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/microsoft/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/microsoft/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/microsoft/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/axon/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/axon/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/axon/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/shopee/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/shopee/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/shopee/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/nab/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/nab/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/nab/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/tiktok/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/tiktok/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/tiktok/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/nvidia/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/nvidia/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/nvidia/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/anz-hcl/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/anz-hcl/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/anz-hcl/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/employment-hero/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/employment-hero/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/employment-hero/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/worldquant/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/worldquant/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/worldquant/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/anduin/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/anduin/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/anduin/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/resources/interview-formats/sap/</loc>
+    <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/resources/interview-formats/sap/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/resources/interview-formats/sap/" />
   </url>
 </urlset>
