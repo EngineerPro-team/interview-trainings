@@ -798,6 +798,12 @@
       ? courses.filter((c) => deriveTags(c).includes(activeTag))
       : courses;
 
+    // Most-enrolled courses first; courses without an enrolment figure
+    // (e.g. machine coding, mini-series) fall to the bottom. Stable sort
+    // keeps the original order within the same popularity tier.
+    const enrollOf = (c) => COURSE_ENROLLED[c.slug] || 0;
+    const ordered = filtered.slice().sort((a, b) => enrollOf(b) - enrollOf(a));
+
     const count = document.getElementById("coursesCount");
     if (count) count.textContent = courses.length;
 
@@ -807,7 +813,7 @@
     const en = currentLang === "en";
     const enMap = (typeof window !== "undefined" && window.COURSES_EN) || {};
 
-    filtered.forEach((c) => {
+    ordered.forEach((c) => {
       const badge = deriveBadge(c);
       const tags = deriveTags(c);
       const tx = enMap[c.slug] || {};
