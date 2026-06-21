@@ -908,6 +908,7 @@
       ${cover}
       ${langNote}
       <div class="article__body">${buttonifyContactLinks(rewriteAssetUrls(sanitizeHtml(body)))}</div>
+      ${buildCourseReviews(c.slug)}
       <div class="article__cta">
         <a class="btn btn--primary" href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">
           ${escapeText(t("course.cta"))}
@@ -915,6 +916,30 @@
         <a class="back-link" href="#courses" data-href="#courses">${escapeText(t("course.allCourses"))}</a>
       </div>
     `;
+  }
+
+  // Curated positive student reviews shown under each course (data in
+  // window.COURSE_REVIEWS, extracted from post-course surveys).
+  function buildCourseReviews(slug) {
+    const all = (typeof window !== "undefined" && window.COURSE_REVIEWS) || {};
+    const list = all[slug] || [];
+    if (!list.length) return "";
+    const en = currentLang === "en";
+    const heading = en ? "What students say" : "Học viên nói gì về khoá học";
+    const sub = en
+      ? `${list.length} reviews from post-course student surveys`
+      : `${list.length} cảm nhận từ khảo sát học viên sau khoá học`;
+    const items = list.map((r) => `
+        <figure class="course-review">
+          <blockquote class="course-review__text">${escapeText(r.text)}</blockquote>
+          <figcaption class="course-review__author">— ${escapeText(r.name)}</figcaption>
+        </figure>`).join("");
+    return `
+      <section class="course-reviews">
+        <h2 class="course-reviews__title">${escapeText(heading)}</h2>
+        <p class="course-reviews__sub muted">${escapeText(sub)}</p>
+        <div class="course-reviews__grid">${items}</div>
+      </section>`;
   }
 
   function normaliseHeading(s) {
