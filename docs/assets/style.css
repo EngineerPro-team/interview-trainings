@@ -5180,3 +5180,19 @@ a.faq-cta:hover { transform: translateY(-1px); }
   font-weight: 600;
   color: var(--brand-blue);
 }
+
+/* ===================== Course enrolment trust badge ===================== */
+.course-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(24, 98, 255, 0.12), rgba(255, 122, 24, 0.12));
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+.course-stat__icon { font-size: 1.1rem; line-height: 1; }
+.course-stat strong { color: var(--orange); font-size: 1.08rem; font-weight: 800; }
