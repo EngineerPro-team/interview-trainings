@@ -951,11 +951,22 @@
     const sub = en
       ? `${list.length} reviews from post-course student surveys`
       : `${list.length} cảm nhận từ khảo sát học viên sau khoá học`;
-    const items = list.map((r) => `
+    const helpLabel = en ? "Mentor" : "Giảng viên";
+    const items = list.map((r) => {
+      const chip = r.three
+        ? `<span class="course-review__chip">${escapeText(r.three)}</span>`
+        : "";
+      const help = r.help
+        ? `<p class="course-review__help"><span class="course-review__help-label">${escapeText(helpLabel)}:</span> ${escapeText(r.help)}</p>`
+        : "";
+      return `
         <figure class="course-review">
+          ${chip}
           <blockquote class="course-review__text">${escapeText(r.text)}</blockquote>
+          ${help}
           <figcaption class="course-review__author">— ${escapeText(r.name)}</figcaption>
-        </figure>`).join("");
+        </figure>`;
+    }).join("");
     return `
       <section class="course-reviews">
         <h2 class="course-reviews__title">${escapeText(heading)}</h2>
