@@ -944,6 +944,8 @@
     "computer-science-fundamental-interview": 150,
     "crash-course-build-world-class-pet-project": 200,
     "behaviour-interview-course": 120,
+    "mini-series-sharing-tips-for-tech-career": 40,
+    "cracking-machine-coding-low-level-design-round": 20,
   };
 
   // Curated positive student reviews shown under each course (data in
