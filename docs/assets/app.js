@@ -848,11 +848,20 @@
         )
       );
 
+      const enrolled = COURSE_ENROLLED[c.slug];
+      const enrollPill = enrolled
+        ? el("span", { class: "enroll-pill enroll-pill--card", title: en ? "Students enrolled" : "Học viên đã đăng ký" }, [
+            el("span", { class: "enroll-pill__spark", "aria-hidden": "true" }, "✨"),
+            el("strong", {}, `${enrolled.toLocaleString("en-US")}+`),
+            el("span", { class: "enroll-pill__label" }, en ? " students" : " học viên"),
+          ])
+        : null;
+
       const card = el("article", { class: "card card--course" }, [
         el(
           "a",
           { class: "card--course__media", href: `${BASE_PATH}/courses/${c.slug}/`, "data-href": `#course/${c.slug}` },
-          cover
+          enrollPill ? [cover, enrollPill] : cover
         ),
         el("div", { class: "card--course__body" }, [
           el("span", { class: "badge" }, badge),
