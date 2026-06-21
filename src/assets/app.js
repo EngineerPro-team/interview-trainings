@@ -899,8 +899,16 @@
       ? `<img class="article__cover" src="${escapeAttr(asset(c.cover))}" alt="${escapeAttr(title)}" />`
       : "";
 
+    const enrolled = COURSE_ENROLLED[c.slug];
+    const statHtml = enrolled
+      ? `<div class="course-stat"><span class="course-stat__icon" aria-hidden="true">👥</span>
+          <span><strong>${enrolled.toLocaleString("en-US")}+</strong> ${escapeText(en ? "students enrolled" : "học viên đã đăng ký")}</span>
+        </div>`
+      : "";
+
     wrap.innerHTML = `
       <header class="article__head">
+        ${statHtml}
         <span class="badge">${escapeText(deriveBadge(c))}</span>
         <h1>${escapeText(title)}</h1>
         <p class="article__lede">${escapeText(blurb)}</p>
@@ -917,6 +925,20 @@
       </div>
     `;
   }
+
+  // Approximate cumulative enrolments per course (across cohorts), shown as a
+  // trust badge at the top of each course page. DSA aggregates levels 1–3.
+  const COURSE_ENROLLED = {
+    "khoa-hoc-dsa": 750,
+    "khoa-hoc-system-design-interview-big-tech": 400,
+    "system-design-interview-level-2": 150,
+    "khoa-hoc-backend-golang": 500,
+    "backend-golang-level-2": 70,
+    "khoa-hoc-backend-java": 200,
+    "computer-science-fundamental-interview": 150,
+    "crash-course-build-world-class-pet-project": 200,
+    "behaviour-interview-course": 120,
+  };
 
   // Curated positive student reviews shown under each course (data in
   // window.COURSE_REVIEWS, extracted from post-course surveys).
