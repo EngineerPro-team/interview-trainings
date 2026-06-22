@@ -5285,8 +5285,13 @@ a.faq-cta:hover { transform: translateY(-1px); }
 /* ======================= COURSE SCHEDULE (Lịch khai giảng) ======================= */
 .nav__hot {
   position: relative;
-  color: var(--orange) !important;
   font-weight: 700;
+}
+.nav__hot:not(.is-active) {
+  color: var(--orange);
+}
+.nav__hot.is-active::after {
+  display: none; /* dot would clash with the solid active pill */
 }
 .nav__hot::after {
   content: "•";
