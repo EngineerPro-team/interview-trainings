@@ -703,6 +703,7 @@ p {
 .nav__links {
   display: flex;
   gap: 0.25rem;
+  margin: 0 auto; /* center the links between brand (left) and toggles (right) */
 }
 .nav__links a {
   color: var(--navy);
@@ -727,7 +728,7 @@ p {
   place-items: center;
   width: 36px;
   height: 36px;
-  margin-left: auto; /* pin theme + lang group to the far right of the nav */
+  margin-left: 0.5rem;
   padding: 0;
   background: rgba(11, 29, 58, 0.06);
   border: 1px solid var(--line);
