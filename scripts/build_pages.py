@@ -537,7 +537,7 @@ def show_route_style(template: str, route: str) -> str:
 ROUTE_OG_IMAGES = {
     "mock": "/assets/img/mock-interview-cover.jpg",
     SYSTEM_DESIGN_URL_SLUG: "/assets/img/system-design-cover.png",
-    "lich-khai-giang": "/assets/img/schedule-hero.png",
+    "lich-khai-giang": "/assets/img/schedule-og.png",
 }
 
 SD_AUTHORS = [
