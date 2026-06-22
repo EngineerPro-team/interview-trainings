@@ -659,6 +659,7 @@ p {
   justify-content: space-between;
   height: 68px;
   gap: 1rem;
+  max-width: 100%; /* full-width bar: brand hugs left edge, toggles hug right edge */
 }
 
 .brand {
