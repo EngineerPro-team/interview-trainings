@@ -3599,6 +3599,12 @@ p {
 /* Extras + Benefits */
 .roadmap-extras {
   padding-top: 0;
+  /* Align the box's left edge with the roadmap stage cards above, which are
+     indented past the 60px number-rail column + 1.5rem grid gap. */
+  margin-left: calc(60px + 1.5rem);
+}
+@media (max-width: 640px) {
+  .roadmap-extras { margin-left: calc(44px + 1rem); }
 }
 .roadmap-extras__inner {
   background: linear-gradient(135deg, #fff 0%, #f4f1ea 100%);
