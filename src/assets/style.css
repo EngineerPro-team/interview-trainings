@@ -3555,10 +3555,13 @@ p {
   border-color: var(--orange-2);
 }
 /* In the extras bulleted list the CTA should sit on its own line under the
-   bullet text, with a hint of indent so it visually clings to its item. */
+   bullet text, left-aligned and hugging its label (not stuck inline at the
+   end of a wrapped sentence). `display:flex` forces it onto a new line;
+   `width:fit-content` keeps the pill tight. */
 .roadmap-extras li .module__cta {
-  display: inline-flex;
-  margin-top: 0.3rem;
+  display: flex;
+  width: fit-content;
+  margin-top: 0.45rem;
 }
 .roadmap-extras__name {
   color: var(--navy);
@@ -3615,7 +3618,11 @@ p {
   color: var(--text);
 }
 .roadmap-extras__inner li {
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.9rem;
+  line-height: 1.55;
+}
+.roadmap-extras__inner li:last-child {
+  margin-bottom: 0;
 }
 
 .roadmap-benefits {
@@ -5201,6 +5208,18 @@ a.faq-cta:hover { transform: translateY(-1px); }
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--brand-blue);
+}
+.course-review__cohort {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 122, 24, 0.14);
+  color: var(--orange);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
 }
 
 /* ===================== Course enrolment trust badge ===================== */
