@@ -976,12 +976,15 @@
       const help = r.help
         ? `<p class="course-review__help"><span class="course-review__help-label">${escapeText(helpLabel)}:</span> ${escapeText(r.help)}</p>`
         : "";
+      const cohort = r.cohort
+        ? ` <span class="course-review__cohort">${escapeText(r.cohort)}</span>`
+        : "";
       return `
         <figure class="course-review">
           ${chip}
           <blockquote class="course-review__text">${escapeText(r.text)}</blockquote>
           ${help}
-          <figcaption class="course-review__author">— ${escapeText(r.name)}</figcaption>
+          <figcaption class="course-review__author">— ${escapeText(r.name)}${cohort}</figcaption>
         </figure>`;
     }).join("");
     return `

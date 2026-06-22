@@ -3,7 +3,7 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://engineerprogurus.com/</loc>
-    <lastmod>2026-06-21</lastmod>
+    <lastmod>2026-06-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/" />
@@ -19,7 +19,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/book/</loc>
-    <lastmod>2026-06-21</lastmod>
+    <lastmod>2026-06-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/book/" />
@@ -35,7 +35,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/mock/</loc>
-    <lastmod>2026-06-21</lastmod>
+    <lastmod>2026-06-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/mock/" />
@@ -91,7 +91,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/terms/</loc>
-    <lastmod>2026-06-21</lastmod>
+    <lastmod>2026-06-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/terms/" />
