@@ -726,7 +726,7 @@ p {
   place-items: center;
   width: 36px;
   height: 36px;
-  margin-left: 0.5rem;
+  margin-left: auto; /* pin theme + lang group to the far right of the nav */
   padding: 0;
   background: rgba(11, 29, 58, 0.06);
   border: 1px solid var(--line);
