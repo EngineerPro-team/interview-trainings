@@ -2,6 +2,42 @@
 // Source: engineerprovn.substack.com/podcast/archive (Substack API)
 window.PODCASTS = [
   {
+    "title": "Coffee with Lam: Bình luận dạo các đề thi Big Tech - Đề thi Meta - Episode 08",
+    "slug": "coffee-with-lam-binh-luan-dao-cac-028",
+    "url": "https://engineerprovn.substack.com/p/coffee-with-lam-binh-luan-dao-cac-028",
+    "series": "Coffee with Lam",
+    "date": "Jun 20, 2026",
+    "duration": "39:47",
+    "blurb": "Nằm trong series Coffee with Lam"
+  },
+  {
+    "title": "Coffee with Lam: Bình luận dạo các đề thi Big Tech tổng hợp - Microsoft (episode 7)",
+    "slug": "coffee-with-lam-binh-luan-dao-cac-b48",
+    "url": "https://engineerprovn.substack.com/p/coffee-with-lam-binh-luan-dao-cac-b48",
+    "series": "Coffee with Lam",
+    "date": "Jun 14, 2026",
+    "duration": "31:44",
+    "blurb": "Nằm trong series Coffee with Lam"
+  },
+  {
+    "title": "Coffee with Lam: Bình luận dạo các đề thi Big Tech - Đề thi Meta - Episode 06",
+    "slug": "coffee-with-lam-binh-luan-dao-cac-bcb",
+    "url": "https://engineerprovn.substack.com/p/coffee-with-lam-binh-luan-dao-cac-bcb",
+    "series": "Coffee with Lam",
+    "date": "Jun 6, 2026",
+    "duration": "33:49",
+    "blurb": "Nằm trong series Coffee with Lam"
+  },
+  {
+    "title": "Coffee with Lam: Bình luận dạo các đề thi Big Tech tổng hợp - Agoda (episode 5)",
+    "slug": "coffee-with-lam-binh-luan-dao-cac-33c",
+    "url": "https://engineerprovn.substack.com/p/coffee-with-lam-binh-luan-dao-cac-33c",
+    "series": "Coffee with Lam",
+    "date": "May 31, 2026",
+    "duration": "55:29",
+    "blurb": "Nằm trong series Coffee with Lam"
+  },
+  {
     "title": "Coffee with Lam: Bình luận dạo các đề thi Big Tech - Đề thi Tiktok - Episode 04",
     "slug": "coffee-with-lam-binh-luan-dao-cac-496",
     "url": "https://engineerprovn.substack.com/p/coffee-with-lam-binh-luan-dao-cac-496",
@@ -29,13 +65,40 @@ window.PODCASTS = [
     "blurb": "Nằm trong series Coffee with Lam"
   },
   {
-    "title": "Coffee with Lam: Bình luận dạo các đề thi Big Tech tổng hợp (episode 1)",
-    "slug": "coffee-with-lam-binh-luan-dao-cac",
-    "url": "https://engineerprovn.substack.com/p/coffee-with-lam-binh-luan-dao-cac",
-    "series": "Coffee with Lam",
-    "date": "May 3, 2026",
-    "duration": "39:50",
-    "blurb": "Nằm trong series Coffee with Lam"
+    "title": "OverEngineering",
+    "slug": "overengineering",
+    "url": "https://engineerprovn.substack.com/p/overengineering",
+    "series": "EngineerPro Podcast",
+    "date": "Jun 5, 2025",
+    "duration": "54:10",
+    "blurb": "Podcast nằm trong series Coffee With Lam and Mr.Hieu"
+  },
+  {
+    "title": "The art of monitoring",
+    "slug": "the-art-of-monitoring",
+    "url": "https://engineerprovn.substack.com/p/the-art-of-monitoring",
+    "series": "EngineerPro Podcast",
+    "date": "May 29, 2025",
+    "duration": "57:43",
+    "blurb": "Podcast nằm trong series Coffee With Lam and Mr.Hieu"
+  },
+  {
+    "title": "E2E Encryption",
+    "slug": "e2e-encryption",
+    "url": "https://engineerprovn.substack.com/p/e2e-encryption",
+    "series": "EngineerPro Podcast",
+    "date": "May 26, 2025",
+    "duration": "51:44",
+    "blurb": "Listen now (52 mins) | Podcast nằm trong series Coffee With Lam and Mr.Hieu"
+  },
+  {
+    "title": "ÔN THI BIG TECH – GIỐNG GÌ VỚI ÔN THI ĐẠI HỌC?",
+    "slug": "on-thi-big-tech-giong-gi-voi-on-thi",
+    "url": "https://engineerprovn.substack.com/p/on-thi-big-tech-giong-gi-voi-on-thi",
+    "series": "EngineerPro Podcast",
+    "date": "May 24, 2025",
+    "duration": "1:41:50",
+    "blurb": "Nằm trong series podcast Coffee with Lam. Chúng ta sẽ cùng bàn luận về ôn thi big tech"
   },
   {
     "title": "Coffee with Lam and Hieu: HomeLab",

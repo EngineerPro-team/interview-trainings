@@ -107,7 +107,7 @@ window.I18N = {
     // ============== PODCAST ==============
     "podcast.head": "Podcast",
     "podcast.intro.html":
-      '<span id="podcastCount">12</span> tập gần nhất — bấm vào để nghe trực tiếp trên <a href="https://engineerprovn.substack.com/podcast/archive?sort=new" target="_blank" rel="noopener">Substack</a>.',
+      '<span id="podcastCount">19</span> tập gần nhất — bấm vào để nghe trực tiếp trên <a href="https://engineerprovn.substack.com/podcast/archive?sort=new" target="_blank" rel="noopener">Substack</a>.',
     "podcast.card.cta": "Nghe trên Substack →",
 
     // ============== ROADMAP ==============
@@ -555,7 +555,7 @@ window.I18N = {
 
     "podcast.head": "Podcast",
     "podcast.intro.html":
-      '<span id="podcastCount">12</span> latest episodes — click to listen on <a href="https://engineerprovn.substack.com/podcast/archive?sort=new" target="_blank" rel="noopener">Substack</a>.',
+      '<span id="podcastCount">19</span> latest episodes — click to listen on <a href="https://engineerprovn.substack.com/podcast/archive?sort=new" target="_blank" rel="noopener">Substack</a>.',
     "podcast.card.cta": "Listen on Substack →",
 
     "roadmap.eyebrow": "📍 Interview roadmap · Big Tech",
