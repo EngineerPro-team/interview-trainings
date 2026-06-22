@@ -4861,6 +4861,9 @@ a.faq-cta:hover { transform: translateY(-1px); }
 .social-rail__btn--spotify {
   background: #1db954;
 }
+.social-rail__btn--applepodcasts {
+  background: linear-gradient(135deg, #f452ff 0%, #832bc1 100%);
+}
 .social-rail__btn--youtube {
   background: #ff0000;
 }
