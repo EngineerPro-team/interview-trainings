@@ -209,7 +209,7 @@
   //  #home, #courses, #book, #resources, #mentors, #stories, #podcast, #partners, #faq, #contact
   //  (#home-roadmap and #home-format are anchor scrolls into the home page)
   const TOP_ROUTES = [
-    "home", "courses", "book", "system-design", "mock", "resources",
+    "home", "courses", "lich-khai-giang", "book", "system-design", "mock", "resources",
     "mentors", "stories", "podcast", "partners", "faq", "terms", "contact",
   ];
 
@@ -264,7 +264,7 @@
     if ((m = path.match(/^\/resources\/([\w-]+)\/?$/)) && RESOURCES_ANCHORS[m[1]]) {
       return { route: "resources", slug: null, scrollTo: RESOURCES_ANCHORS[m[1]] };
     }
-    if ((m = path.match(new RegExp(`^/(courses|book|${SD_URL_SLUG}|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/?$`)))) {
+    if ((m = path.match(new RegExp(`^/(courses|lich-khai-giang|book|${SD_URL_SLUG}|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/?$`)))) {
       const route = m[1] === SD_URL_SLUG ? "system-design" : m[1];
       return { route, slug: null };
     }
@@ -440,6 +440,7 @@
       const ROUTE_DESC = {
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
+        "lich-khai-giang": en ? "EngineerPro course launch schedule — DSA, System Design, CS Fundamentals, Backend Go, Redis crash course. Online classes, GMT+7." : "Lịch khai giảng các lớp mới tại EngineerPro — DSA, System Design, CS Fundamentals, Backend Go, Crash Course Redis. Lớp online, giờ GMT+7.",
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
         "system-design": en ? "21 original System Design Interview case studies — read chapter by chapter (VI & EN). Original content by EngineerPro." : "21 case study System Design Interview gốc — đọc từng chương (VI & EN). Nội dung gốc bởi EngineerPro.",
         resources: en ? "Free interview resources from EngineerPro — HR phone screen checklist, programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech và playlist review CV.",
@@ -506,6 +507,7 @@
     return (
       {
         courses:   t("nav.courses"),
+        "lich-khai-giang": t("nav.schedule"),
         book:      t("nav.book"),
         "system-design": t("nav.systemDesign"),
         resources: t("nav.resources"),

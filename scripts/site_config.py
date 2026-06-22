@@ -44,6 +44,7 @@ SYSTEM_DESIGN_URL_SLUG: str = "system-design-material"
 # Order also drives navigation in the prerendered <noscript> fallback.
 TOP_ROUTES = [
     ("courses",   "Khoá học",          "Courses"),
+    ("lich-khai-giang", "Lịch khai giảng", "Course Schedule"),
     ("book",          "Coding Book",       "Coding Book"),
     (SYSTEM_DESIGN_URL_SLUG, "System design material", "System design material"),
     ("mock",          "Mock Interview 1-1", "Mock Interview 1-1"),

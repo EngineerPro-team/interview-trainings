@@ -537,6 +537,7 @@ def show_route_style(template: str, route: str) -> str:
 ROUTE_OG_IMAGES = {
     "mock": "/assets/img/mock-interview-cover.jpg",
     SYSTEM_DESIGN_URL_SLUG: "/assets/img/system-design-cover.png",
+    "lich-khai-giang": "/assets/img/schedule-hero.png",
 }
 
 SD_AUTHORS = [
@@ -911,6 +912,7 @@ def build_sd_chapter(template: str, ch: dict) -> str:
 
 ROUTE_DESCRIPTIONS_VI = {
     "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
+    "lich-khai-giang": "Lịch khai giảng các lớp mới tại EngineerPro — DSA Level 1 & 2, System Design, CS Fundamentals, Backend Golang, Crash Course Redis. Lớp online, mentor Big Tech, giờ học GMT+7.",
     "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
     SYSTEM_DESIGN_URL_SLUG: (
         "21 case study System Design Interview gốc — đọc từng chương (VI & EN). "
