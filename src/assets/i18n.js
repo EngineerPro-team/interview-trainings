@@ -94,11 +94,11 @@ window.I18N = {
     "stats.caption.courses":   "khoá học chuyên sâu",
 
     // ============== COMPANIES MARQUEE ==============
-    "home.coverage.tag":  "DÀNH CHO MỌI ROLE",
-    "home.coverage.head": "Một nơi luyện đủ mọi vòng phỏng vấn — cho mọi vị trí kỹ sư",
-    "home.coverage.body.html": "EngineerPro huấn luyện toàn bộ các vòng phỏng vấn cốt lõi — <strong>DSA</strong>, <strong>System Design</strong>, <strong>Behavioral</strong> và <strong>CS Fundamentals</strong> — áp dụng cho <strong>mọi role</strong>: từ Backend, Frontend, Data đến cả Agentic / AI Engineer tại Big Tech. Dù bạn đang nhắm vị trí nào, EngineerPro đều có thể đồng hành.",
+    "home.coverage.tag":  "PHÙ HỢP NHIỀU ROLE",
+    "home.coverage.head": "Dành cho các role có các vòng phỏng vấn dưới đây",
+    "home.coverage.body.html": "EngineerPro huấn luyện các vòng phỏng vấn cốt lõi — <strong>DSA</strong>, <strong>System Design</strong>, <strong>Behavioral</strong> và <strong>CS Fundamentals</strong>. Nếu vị trí bạn ứng tuyển có các vòng này — như <strong>Backend, Frontend, Data</strong> hay <strong>Agentic / AI Engineer</strong> tại Big Tech — EngineerPro đều có thể đồng hành.",
     "home.coverage.rounds":   "Vòng phỏng vấn",
-    "home.coverage.forRoles": "Cho mọi role",
+    "home.coverage.forRoles": "Các role phù hợp",
     "companies.label": "Học viên EngineerPro đã nhận offer tại",
 
     // ============== PILLARS ==============
@@ -604,11 +604,11 @@ window.I18N = {
     "stats.caption.giangvien": "mentors",
     "stats.caption.courses":   "in-depth courses",
 
-    "home.coverage.tag":  "FOR EVERY ROLE",
-    "home.coverage.head": "One place to master every interview round — for any engineering role",
-    "home.coverage.body.html": "EngineerPro trains every core interview round — <strong>DSA</strong>, <strong>System Design</strong>, <strong>Behavioral</strong> and <strong>CS Fundamentals</strong> — for <strong>any role</strong>: from Backend, Frontend and Data to Agentic / AI Engineer at Big Tech. Whatever role you're aiming for, EngineerPro can go the distance with you.",
+    "home.coverage.tag":  "FITS MANY ROLES",
+    "home.coverage.head": "For roles whose interviews include the rounds below",
+    "home.coverage.body.html": "EngineerPro trains the core interview rounds — <strong>DSA</strong>, <strong>System Design</strong>, <strong>Behavioral</strong> and <strong>CS Fundamentals</strong>. If the role you're applying for includes these rounds — such as <strong>Backend, Frontend, Data</strong> or <strong>Agentic / AI Engineer</strong> at Big Tech — EngineerPro can go the distance with you.",
     "home.coverage.rounds":   "Interview rounds",
-    "home.coverage.forRoles": "For any role",
+    "home.coverage.forRoles": "Suitable roles",
     "companies.label": "EngineerPro students have received offers at",
 
     "pillars.head":  "3 core values of EngineerPro",
