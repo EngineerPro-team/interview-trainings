@@ -94,6 +94,11 @@ window.I18N = {
     "stats.caption.courses":   "khoá học chuyên sâu",
 
     // ============== COMPANIES MARQUEE ==============
+    "home.coverage.tag":  "DÀNH CHO MỌI ROLE",
+    "home.coverage.head": "Một nơi luyện đủ mọi vòng phỏng vấn — cho mọi vị trí kỹ sư",
+    "home.coverage.body.html": "EngineerPro huấn luyện toàn bộ các vòng phỏng vấn cốt lõi — <strong>DSA</strong>, <strong>System Design</strong>, <strong>Behavioral</strong> và <strong>CS Fundamentals</strong> — áp dụng cho <strong>mọi role</strong>: từ Backend, Frontend, Data đến cả Agentic / AI Engineer tại Big Tech. Dù bạn đang nhắm vị trí nào, EngineerPro đều có thể đồng hành.",
+    "home.coverage.rounds":   "Vòng phỏng vấn",
+    "home.coverage.forRoles": "Cho mọi role",
     "companies.label": "Học viên EngineerPro đã nhận offer tại",
 
     // ============== PILLARS ==============
@@ -599,6 +604,11 @@ window.I18N = {
     "stats.caption.giangvien": "mentors",
     "stats.caption.courses":   "in-depth courses",
 
+    "home.coverage.tag":  "FOR EVERY ROLE",
+    "home.coverage.head": "One place to master every interview round — for any engineering role",
+    "home.coverage.body.html": "EngineerPro trains every core interview round — <strong>DSA</strong>, <strong>System Design</strong>, <strong>Behavioral</strong> and <strong>CS Fundamentals</strong> — for <strong>any role</strong>: from Backend, Frontend and Data to Agentic / AI Engineer at Big Tech. Whatever role you're aiming for, EngineerPro can go the distance with you.",
+    "home.coverage.rounds":   "Interview rounds",
+    "home.coverage.forRoles": "For any role",
     "companies.label": "EngineerPro students have received offers at",
 
     "pillars.head":  "3 core values of EngineerPro",
