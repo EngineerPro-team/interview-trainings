@@ -1302,6 +1302,21 @@ p {
   border-color: var(--brand-blue, #1862ff);
   transform: translateY(-1px);
 }
+.partner-strip__logo {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0.3rem 0.5rem;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(10, 20, 36, 0.08);
+}
+.partner-strip__logo img {
+  display: block;
+  height: 30px;
+  width: auto;
+}
 .partner-strip__tag {
   flex: 0 0 auto;
   font-size: 0.7rem;
