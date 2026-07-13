@@ -223,6 +223,11 @@
     "roadmap": "home-roadmap",
     "format":  "home-format",
   };
+  // Reverse map: anchor id -> clean URL alias, so clicking an in-page home
+  // anchor (e.g. #home-roadmap) reflects a shareable path (/roadmap/).
+  const HOME_ANCHOR_PATHS = Object.fromEntries(
+    Object.entries(HOME_ANCHORS).map(([alias, anchorId]) => [anchorId, alias]),
+  );
   // Deep-link sub-sections of the Resources tab: clicking
   // /resources/golang-tour lands on /resources/ and scrolls straight to
   // that resource block.
@@ -550,7 +555,13 @@
     if (anchor && anchor.startsWith("#home-")) {
       e.preventDefault();
       const anchorId = anchor.slice(1);
-      history.pushState(null, "", pathFor("home", null));
+      // Reflect a clean, shareable URL for anchors that have one (/roadmap/,
+      // /format/); otherwise stay on the home path.
+      const alias = HOME_ANCHOR_PATHS[anchorId];
+      const url = alias
+        ? (BASE_PATH ? `${BASE_PATH}/${alias}/` : `/${alias}/`)
+        : pathFor("home", null);
+      history.pushState(null, "", url);
       showRoute({ route: "home", slug: null });
       requestAnimationFrame(() => {
         const target = document.getElementById(anchorId);
