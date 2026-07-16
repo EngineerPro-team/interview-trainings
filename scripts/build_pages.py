@@ -911,7 +911,7 @@ def build_sd_chapter(template: str, ch: dict) -> str:
 # ---------- per-route descriptions for top routes ---------------------------
 
 ROUTE_DESCRIPTIONS_VI = {
-    "courses":   "11 khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.",
+    "courses":   "12 khoá đào tạo chuyên sâu — DSA, System Design, ML / Agentic AI, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "lich-khai-giang": "Lịch khai giảng các lớp mới tại EngineerPro — DSA Level 1 & 2, System Design, CS Fundamentals, Backend Golang, Crash Course Redis. Lớp online, mentor Big Tech, giờ học GMT+7.",
     "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
     SYSTEM_DESIGN_URL_SLUG: (
