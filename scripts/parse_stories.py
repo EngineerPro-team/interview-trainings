@@ -528,12 +528,21 @@ ARTICLE_TITLE_FALLBACKS_EN = [
 
 
 def generate_title(rec: dict, rng: random.Random, lang: str = "vi") -> str:
+    t = _generate_title_raw(rec, rng, lang)
+    return (t[0].upper() + t[1:]) if t else t
+
+
+def _generate_title_raw(rec: dict, rng: random.Random, lang: str = "vi") -> str:
     en = lang == "en"
     if rec.get("isArticle"):
         pool = ARTICLE_TITLE_FALLBACKS_EN if en else ARTICLE_TITLE_FALLBACKS
         return rng.choice(pool).format(heading=rec.get("rawHeading", rec.get("rawTitle", "")))
 
-    name = _polite(rec["name"]) if rec["name"] else ("a student" if en else "bạn học viên")
+    if rec.get("anonymous"):
+        # Never surface a real name for anonymous stories.
+        name = "an EngineerPro student" if en else "một học viên EngineerPro"
+    else:
+        name = _polite(rec["name"]) if rec["name"] else ("a student" if en else "bạn học viên")
     cos = rec.get("companies") or []
     tier = rec.get("tier", 4)
     if not cos:
@@ -624,10 +633,14 @@ def generate_body(rec: dict, rng: random.Random, lang: str = "vi") -> tuple[str,
     4. CTA to read original on Substack (if matched)
     """
     en = lang == "en"
-    name = _polite(rec["name"])
-    intro_name = (_name_for_intro_en if en else _name_for_intro)(
-        name, rec.get("anonymous", False)
-    )
+    if rec.get("anonymous"):
+        # Never surface a real name for anonymous stories.
+        intro_name = "an anonymous EngineerPro student" if en else "một học viên EngineerPro (ẩn danh)"
+    else:
+        name = _polite(rec["name"])
+        intro_name = (_name_for_intro_en if en else _name_for_intro)(
+            name, rec.get("anonymous", False)
+        )
     cos = rec.get("companies") or []
     if en:
         co_list = (
@@ -644,6 +657,7 @@ def generate_body(rec: dict, rng: random.Random, lang: str = "vi") -> tuple[str,
 
     lead_pool = LEAD_VARIANTS_EN if en else LEAD_VARIANTS
     lead = rng.choice(lead_pool).format(intro_name=intro_name, co_list=co_list)
+    lead = (lead[0].upper() + lead[1:]) if lead else lead  # capitalize sentence start
 
     parts = [f"<p class=\"story__lead\">{lead}</p>"]
 

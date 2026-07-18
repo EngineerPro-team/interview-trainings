@@ -2475,7 +2475,9 @@
       } catch (_) { return false; }
     }
     const extUrl = s.matchedSubstackUrl || s.externalUrl;
-    const extLink = isSpecificSubstackUrl(extUrl)
+    // For anonymous stories, never link to the original Substack post — it
+    // reveals the student's real name. Show only our name-free write-up.
+    const extLink = (!s.anonymous && isSpecificSubstackUrl(extUrl))
       ? `<a class="btn btn--ghost" href="${extUrl}" target="_blank" rel="noopener">${escapeText(t("stories.cta.substack"))}</a>`
       : "";
 
