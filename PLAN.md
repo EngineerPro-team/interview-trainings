@@ -102,7 +102,7 @@ Placeholder section with “Thông tin liên hệ sẽ được cập nhật”.
 - **Layout**: 1200px max-width container, CSS Grid for card sections, sticky nav with backdrop blur.
 - **Components**:
   - Hero with gradient + CTA buttons.
-  - Stat strip (dynamic from data: 19 mentors, 12 courses, 12 podcasts, 94 stories).
+  - Stat strip (dynamic from data: 19 mentors, 12 courses, 12 podcasts, 113 stories).
   - Card grid (3 columns ≥ 1024px, 2 columns ≥ 640px, 1 column mobile).
   - Mentor avatar cards with initial-based color blocks (no external images needed).
   - Footer with social placeholders.

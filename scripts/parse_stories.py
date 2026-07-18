@@ -31,6 +31,9 @@ SHEET_MD = next((p for p in (_CLI, _ENV, _REPO) if p and p.exists()), _REPO)
 OUT = ROOT / "src" / "assets" / "stories-data.js"
 MAX_OUTPUT = 100
 
+# Slugs to drop even if they appear in the sheet (removed on request).
+EXCLUDE_SLUGS = {"anh-tiep-axon"}
+
 # Tier ranking — lower number = higher priority (shown first)
 TIER_MAP = {
     # Tier 1: top FAANG-adjacent
@@ -776,6 +779,9 @@ def main() -> int:
         r["bodyEn"] = body_en
         r["externalUrl"] = r.pop("url", "")  # keep original substack link
 
+    # Drop excluded slugs (removed on request).
+    chosen = [r for r in chosen if r.get("slug") not in EXCLUDE_SLUGS]
+
     print(f"  kept top {len(chosen)} stories (tier-sorted)")
     print()
     print("  tier distribution:")
@@ -824,6 +830,18 @@ def main() -> int:
             if "name_real" in prev:
                 r["name_real"] = prev["name_real"]
         print(f"  restored {restored} manualEdits field values from previous stories-data.js")
+
+        # Carry forward stories pulled from Substack (crawl_substack_stories.py),
+        # which are not in the sheet and would otherwise be dropped on re-run.
+        chosen_slugs = {r.get("slug") for r in chosen}
+        carried = [
+            p for p in prev_by_slug.values()
+            if p.get("crawled") and p.get("slug") not in chosen_slugs
+            and p.get("slug") not in EXCLUDE_SLUGS
+        ]
+        chosen.extend(carried)
+        if carried:
+            print(f"  carried forward {len(carried)} crawled Substack stories")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(chosen, ensure_ascii=False, indent=2)

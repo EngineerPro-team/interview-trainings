@@ -921,7 +921,7 @@ ROUTE_DESCRIPTIONS_VI = {
     "mock":          "Mock Interview 1-1 với interviewer từ team EngineerPro — System Design, DSA, Behavioral theo style Big Tech (Google, Meta, TikTok, Amazon, Microsoft, Nvidia, WorldQuant, Axon…). Mock VI hoặc EN.",
     "resources": "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech, playlist review CV.",
     "mentors":   "17 mentor đang làm việc tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…",
-    "stories":   "94+ học viên EngineerPro đã nhận offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",
+    "stories":   "113+ học viên EngineerPro đã nhận offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ…",
     "podcast":   "Podcast EngineerPro trên Substack & Spotify — tips sự nghiệp & phỏng vấn từ mentor Big Tech.",
     "partners":  "Đối tác EngineerPro — các tổ chức cùng sứ mệnh đưa kỹ sư Việt vươn ra Big Tech.",
     "faq":       "Câu hỏi thường gặp về khoá học, mentor, lịch học và thủ tục đăng ký tại EngineerPro.",

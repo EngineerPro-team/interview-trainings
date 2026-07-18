@@ -155,7 +155,7 @@ window.I18N = {
     // ============== STORIES ==============
     "stories.head":  "Success Stories",
     "stories.intro.html":
-      '<span id="storiesCount">94</span> câu chuyện học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ… Sắp xếp theo Big Tech trước.',
+      '<span id="storiesCount">113</span> câu chuyện học viên EngineerPro chinh phục offer tại Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ… Sắp xếp theo Big Tech trước.',
     "stories.foot.html":
       'Đây mới chỉ là một phần — xem thêm trên <a href="https://engineerprovn.substack.com/" target="_blank" rel="noopener">Substack</a> hoặc <a href="https://viblo.asia/u/EngineerPro" target="_blank" rel="noopener">Viblo</a>.',
     "stories.back":  "← Tất cả câu chuyện",
@@ -668,7 +668,7 @@ window.I18N = {
 
     "stories.head":  "Success Stories",
     "stories.intro.html":
-      '<span id="storiesCount">94</span> stories of EngineerPro students landing offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ… Sorted with Big Tech first.',
+      '<span id="storiesCount">113</span> stories of EngineerPro students landing offers at Google, Meta, Amazon, TikTok, Microsoft, Grab, Shopee, NAB, ANZ… Sorted with Big Tech first.',
     "stories.foot.html":
       'These are only some highlights — find more on <a href="https://engineerprovn.substack.com/" target="_blank" rel="noopener">Substack</a> or <a href="https://viblo.asia/u/EngineerPro" target="_blank" rel="noopener">Viblo</a>.',
     "stories.back":  "← Back to all stories",

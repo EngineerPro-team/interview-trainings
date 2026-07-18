@@ -3,7 +3,7 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://engineerprogurus.com/</loc>
-    <lastmod>2026-07-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/" />
@@ -19,7 +19,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/lich-khai-giang/</loc>
-    <lastmod>2026-07-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/lich-khai-giang/" />
@@ -27,7 +27,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/book/</loc>
-    <lastmod>2026-07-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/book/" />
@@ -43,7 +43,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/mock/</loc>
-    <lastmod>2026-07-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/mock/" />
@@ -99,7 +99,7 @@
   </url>
   <url>
     <loc>https://engineerprogurus.com/terms/</loc>
-    <lastmod>2026-07-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/terms/" />
@@ -208,6 +208,166 @@
     <priority>0.7</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/courses/crash-course-build-world-class-pet-project/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/courses/crash-course-build-world-class-pet-project/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/nen-tang-vung-co-hoi-mo-tai-shopback/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/nen-tang-vung-co-hoi-mo-tai-shopback/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/nen-tang-vung-co-hoi-mo-tai-shopback/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/bai-hoc-tu-trai-nghiem-thuc-te-khi/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/bai-hoc-tu-trai-nghiem-thuc-te-khi/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/bai-hoc-tu-trai-nghiem-thuc-te-khi/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/hoc-vien-engineer-pro-va-buoc-tien/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/hoc-vien-engineer-pro-va-buoc-tien/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/hoc-vien-engineer-pro-va-buoc-tien/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/kien-tri-e-thanh-cong-tai-thoughtworks/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/kien-tri-e-thanh-cong-tai-thoughtworks/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/kien-tri-e-thanh-cong-tai-thoughtworks/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/hanh-trinh-chinh-phuc-tymex-cua-hoc/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/hanh-trinh-chinh-phuc-tymex-cua-hoc/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/hanh-trinh-chinh-phuc-tymex-cua-hoc/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/cach-mot-hoc-vien-engineer-pro-chinh-ca7/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/cach-mot-hoc-vien-engineer-pro-chinh-ca7/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/cach-mot-hoc-vien-engineer-pro-chinh-ca7/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/quy-trinh-phong-van-caladan-co-lam/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/quy-trinh-phong-van-caladan-co-lam/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/quy-trinh-phong-van-caladan-co-lam/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/tu-cu-truot-caladan-en-offer-mid/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/tu-cu-truot-caladan-en-offer-mid/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/tu-cu-truot-caladan-en-offer-mid/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/lien-tiep-chinh-phuc-offer-silicon/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/lien-tiep-chinh-phuc-offer-silicon/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/lien-tiep-chinh-phuc-offer-silicon/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/tu-trai-nghiem-tai-grab-toi-offer/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/tu-trai-nghiem-tai-grab-toi-offer/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/tu-trai-nghiem-tai-grab-toi-offer/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/amazon-call-hanh-trinh-ung-vien-viet/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/amazon-call-hanh-trinh-ung-vien-viet/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/amazon-call-hanh-trinh-ung-vien-viet/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/chuyen-nganh-thanh-cong-va-buoc-vao/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/chuyen-nganh-thanh-cong-va-buoc-vao/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/chuyen-nganh-thanh-cong-va-buoc-vao/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/hanh-trinh-en-voi-motional-va-goc/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/hanh-trinh-en-voi-motional-va-goc/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/hanh-trinh-en-voi-motional-va-goc/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/hoc-vien-engineer-pro-chinh-phuc/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/hoc-vien-engineer-pro-chinh-phuc/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/hoc-vien-engineer-pro-chinh-phuc/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/truot-microsoft-nhung-thu-hoach-ca/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/truot-microsoft-nhung-thu-hoach-ca/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/truot-microsoft-nhung-thu-hoach-ca/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/cach-mot-hoc-vien-engineer-pro-chinh/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/cach-mot-hoc-vien-engineer-pro-chinh/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/cach-mot-hoc-vien-engineer-pro-chinh/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/hoc-vien-engineer-pro-tu-tin-chinh/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/hoc-vien-engineer-pro-tu-tin-chinh/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/hoc-vien-engineer-pro-tu-tin-chinh/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/lam-sao-e-vuot-qua-vong-phong-van/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/lam-sao-e-vuot-qua-vong-phong-van/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/lam-sao-e-vuot-qua-vong-phong-van/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/tong-hop-format-phong-van-cac-cong-7d4/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/tong-hop-format-phong-van-cac-cong-7d4/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/tong-hop-format-phong-van-cac-cong-7d4/" />
+  </url>
+  <url>
+    <loc>https://engineerprogurus.com/stories/tong-hop-format-phong-van-cac-cong/</loc>
+    <lastmod>2026-05-31</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/tong-hop-format-phong-van-cac-cong/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/tong-hop-format-phong-van-cac-cong/" />
   </url>
   <url>
     <loc>https://engineerprogurus.com/stories/anh-dang-microsoft/</loc>
@@ -552,14 +712,6 @@
     <priority>0.6</priority>
     <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/anh-cong-gfg/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/anh-cong-gfg/" />
-  </url>
-  <url>
-    <loc>https://engineerprogurus.com/stories/anh-tiep-axon/</loc>
-    <lastmod>2026-05-31</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://engineerprogurus.com/stories/anh-tiep-axon/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://engineerprogurus.com/stories/anh-tiep-axon/" />
   </url>
   <url>
     <loc>https://engineerprogurus.com/stories/anh-triet-grab/</loc>
