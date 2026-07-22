@@ -2,6 +2,11 @@
 // The full Vietnamese article body stays as-is — a small banner on the detail
 // page nudges English readers to use the browser auto-translate.
 window.COURSES_EN = {
+  "ml-agentic-ai-interview-preparation": {
+    title: "ML / Agentic AI Interview Preparation",
+    blurb:
+      "Interview prep for ML / GenAI / Agentic AI Engineer roles at Big Tech (Nvidia, Qualcomm, OKX…). 10 lectures built around a repeatable 9-step ML System Design formula: recsys, search/ads, NLP/CV, RAG & agents.",
+  },
   "cracking-machine-coding-low-level-design-round": {
     title: "Cracking Machine Coding — Low Level Design Round",
     blurb:

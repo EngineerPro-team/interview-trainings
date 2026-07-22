@@ -1002,7 +1002,7 @@
       <div class="course-sched">
         <div class="course-sched__head">
           <h2>${escapeText(head)}</h2>
-          <a class="course-sched__all" href="/lich-khai-giang/" data-route="lich-khai-giang">${escapeText(seeAll)}</a>
+          <a class="course-sched__all" href="${escapeAttr(pathFor("lich-khai-giang", null))}" data-route="lich-khai-giang">${escapeText(seeAll)}</a>
         </div>
         ${rows}
       </div>`;
