@@ -942,6 +942,7 @@
         <p class="article__lede">${escapeText(blurb)}</p>
       </header>
       ${cover}
+      ${buildCourseSchedule(c.slug)}
       ${langNote}
       <div class="article__body">${buttonifyContactLinks(rewriteAssetUrls(sanitizeHtml(body)))}</div>
       ${buildCourseReviews(c.slug)}
@@ -969,6 +970,43 @@
     "mini-series-sharing-tips-for-tech-career": 40,
     "cracking-machine-coding-low-level-design-round": 20,
   };
+
+  // Up to 2 most-recent cohorts for a course, pulled from window.SCHEDULE
+  // (the same data behind the /lich-khai-giang/ page).
+  function buildCourseSchedule(slug) {
+    const all = Array.isArray(window.SCHEDULE) ? window.SCHEDULE : [];
+    const en = currentLang === "en";
+    const list = all
+      .filter((x) => x.course === slug)
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+      .slice(0, 2);
+    if (!list.length) return "";
+    const head = en ? "Recent cohorts" : "Lịch khai giảng gần đây";
+    const reserve = en ? "Reserve via FB" : "Giữ chỗ qua FB";
+    const seeAll = en ? "Full schedule →" : "Xem lịch đầy đủ →";
+    const rows = list.map((s) => {
+      const [, m, d] = (s.date || "").split("-");
+      const day = en ? (s.dayEn || s.dayVi) : s.dayVi;
+      const dur = en ? (s.durEn || s.durVi) : s.durVi;
+      return `
+        <div class="course-cohort">
+          <span class="course-cohort__date"><strong>${escapeText(d || "")}</strong><small>/${escapeText(m || "")}</small></span>
+          <div class="course-cohort__info">
+            <span class="course-cohort__label">${escapeText(s.label || "")}</span>
+            <span class="course-cohort__meta">🗓️ ${escapeText(day || "")} · 🕗 ${escapeText(s.time || "")} <span class="sched-tz">GMT+7</span> · ⏳ ${escapeText(dur || "")}</span>
+          </div>
+          <a class="btn btn--ghost btn--sm course-cohort__cta" href="https://m.me/EngineerPro.Official" target="_blank" rel="noopener">${escapeText(reserve)}</a>
+        </div>`;
+    }).join("");
+    return `
+      <div class="course-sched">
+        <div class="course-sched__head">
+          <h2>${escapeText(head)}</h2>
+          <a class="course-sched__all" href="/lich-khai-giang/" data-route="lich-khai-giang">${escapeText(seeAll)}</a>
+        </div>
+        ${rows}
+      </div>`;
+  }
 
   // Curated positive student reviews shown under each course (data in
   // window.COURSE_REVIEWS, extracted from post-course surveys).
