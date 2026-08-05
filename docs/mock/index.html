@@ -167,7 +167,7 @@
     />
     <link rel="icon" type="image/png" href="/assets/img/logo.png" />
     <link rel="apple-touch-icon" href="/assets/img/logo.png" />
-    <link rel="stylesheet" href="/assets/style.css?v=01937771" />
+    <link rel="stylesheet" href="/assets/style.css?v=93421dd2" />
   
     <style id="prerenderShowRoute">section.route[data-route="mock"][hidden]{display:block !important;}section.route[data-route="mock"]{display:block !important;}section.route:not([data-route="mock"]){display:none !important;}</style>
   </head>
@@ -190,8 +190,14 @@
           <a href="#home-roadmap" data-href="#home-roadmap" data-i18n="nav.roadmap">Lộ trình</a>
           <a href="/courses/" data-route="courses" data-i18n="nav.courses">Khoá học</a>
           <a href="/lich-khai-giang/" data-route="lich-khai-giang" class="nav__hot" data-i18n="nav.schedule">Lịch khai giảng</a>
-          <a href="/book/" data-route="book" data-i18n="nav.book">Coding Book</a>
-          <a href="/system-design-material/" data-route="system-design" data-i18n="nav.systemDesign">System design material</a>
+          <div class="nav__dropdown">
+            <button class="nav__dropbtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="nav.books">Sách &amp; Tài liệu</button>
+            <div class="nav__dropmenu">
+              <a href="/book/" data-route="book" data-i18n="nav.book">Coding Book</a>
+              <a href="/system-design-material/" data-route="system-design" data-i18n="nav.systemDesign">System design material</a>
+              <a href="/ebooks/" data-route="ebooks" data-i18n="nav.ebooks">E-books (Gumroad)</a>
+            </div>
+          </div>
           <a href="/mock/" data-route="mock" data-i18n="nav.mock">Mock 1-1</a>
           <a href="/resources/" data-route="resources" data-i18n="nav.resources">Resources</a>
           <a href="/mentors/" data-route="mentors" data-i18n="nav.mentors">Giảng viên</a>
@@ -739,6 +745,17 @@
             </div>
           </div>
         </section>
+      </section>
+
+      <!-- ============== E-BOOKS ============== -->
+      <section class="route" data-route="ebooks" hidden>
+        <div class="container section">
+          <div class="section__head">
+            <h2 data-i18n="ebooks.head">E-books</h2>
+            <p data-i18n="ebooks.intro">Sách điện tử do team EngineerPro biên soạn — mua trực tiếp trên Gumroad, tải PDF về đọc ngay.</p>
+          </div>
+          <div class="grid grid--ebooks" id="ebooksGrid"></div>
+        </div>
       </section>
 
       <!-- ============== SYSTEM DESIGN NOTES ============== -->
@@ -2361,20 +2378,21 @@
     </div>
 
     <script>window.EP_BASE_PATH = "";</script>
-    <script src="/assets/i18n.js?v=01937771"></script>
-    <script src="/assets/data.js?v=01937771"></script>
-    <script src="/assets/courses-data.js?v=01937771"></script>
-    <script src="/assets/courses-i18n.js?v=01937771"></script>
-    <script src="/assets/reviews-data.js?v=01937771"></script>
-    <script src="/assets/schedule-data.js?v=01937771"></script>
-    <script src="/assets/podcasts-data.js?v=01937771"></script>
-    <script src="/assets/faqs-data.js?v=01937771"></script>
-    <script src="/assets/resources-data.js?v=01937771"></script>
-    <script src="/assets/resources-i18n.js?v=01937771"></script>
-    <script src="/assets/cs-fundamental-questions-data.js?v=01937771"></script>
-    <script src="/assets/interview-formats-data.js?v=01937771"></script>
-    <script src="/assets/stories-data.js?v=01937771"></script>
-    <script src="/assets/system-design-data.js?v=01937771"></script>
-    <script src="/assets/app.js?v=01937771"></script>
+    <script src="/assets/i18n.js?v=93421dd2"></script>
+    <script src="/assets/data.js?v=93421dd2"></script>
+    <script src="/assets/courses-data.js?v=93421dd2"></script>
+    <script src="/assets/courses-i18n.js?v=93421dd2"></script>
+    <script src="/assets/reviews-data.js?v=93421dd2"></script>
+    <script src="/assets/schedule-data.js?v=93421dd2"></script>
+    <script src="/assets/ebooks-data.js?v=93421dd2"></script>
+    <script src="/assets/podcasts-data.js?v=93421dd2"></script>
+    <script src="/assets/faqs-data.js?v=93421dd2"></script>
+    <script src="/assets/resources-data.js?v=93421dd2"></script>
+    <script src="/assets/resources-i18n.js?v=93421dd2"></script>
+    <script src="/assets/cs-fundamental-questions-data.js?v=93421dd2"></script>
+    <script src="/assets/interview-formats-data.js?v=93421dd2"></script>
+    <script src="/assets/stories-data.js?v=93421dd2"></script>
+    <script src="/assets/system-design-data.js?v=93421dd2"></script>
+    <script src="/assets/app.js?v=93421dd2"></script>
   </body>
 </html>

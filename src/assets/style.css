@@ -5780,3 +5780,117 @@ a.faq-cta:hover { transform: translateY(-1px); }
   .course-cohort { flex-wrap: wrap; }
   .course-cohort__cta { width: 100%; text-align: center; }
 }
+
+/* ======================= NAV "Books" DROPDOWN ======================= */
+.nav__dropdown { position: relative; display: inline-flex; align-items: center; }
+.nav__dropbtn {
+  color: var(--navy);
+  font-weight: 500;
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background 0.2s, color 0.2s;
+}
+.nav__dropbtn::after { content: "▾"; font-size: 0.7em; opacity: 0.7; }
+.nav__dropbtn:hover { background: rgba(11, 29, 58, 0.06); }
+.nav__dropdown:has(a.is-active) > .nav__dropbtn { background: var(--navy); color: #fff; }
+.nav__dropmenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  display: none;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 0.4rem;
+  z-index: 60;
+}
+.nav__dropdown:hover .nav__dropmenu,
+.nav__dropdown.is-open .nav__dropmenu { display: flex; }
+.nav__dropmenu a {
+  color: var(--navy);
+  font-size: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.nav__dropmenu a:hover { background: rgba(11, 29, 58, 0.06); text-decoration: none; }
+.nav__dropmenu a.is-active { background: var(--navy); color: #fff; }
+:root[data-theme="dark"] .nav__dropbtn { color: var(--navy); }
+:root[data-theme="dark"] .nav__dropbtn:hover,
+:root[data-theme="dark"] .nav__dropmenu a:hover { background: rgba(255, 255, 255, 0.08); }
+:root[data-theme="dark"] .nav__dropdown:has(a.is-active) > .nav__dropbtn,
+:root[data-theme="dark"] .nav__dropmenu a.is-active { background: var(--orange); color: #1a1f2e; }
+@media (max-width: 860px) {
+  .nav__dropdown { display: block; width: 100%; }
+  .nav__dropbtn { width: 100%; justify-content: space-between; }
+  .nav__dropmenu {
+    position: static;
+    box-shadow: none;
+    border: 0;
+    padding: 0 0 0.4rem 0.75rem;
+    min-width: 0;
+    background: transparent;
+  }
+  .nav__dropdown:hover .nav__dropmenu { display: none; }
+  .nav__dropdown.is-open .nav__dropmenu { display: flex; }
+}
+
+/* ======================= E-BOOKS ======================= */
+.grid--ebooks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.4rem;
+}
+.ebook-card {
+  display: flex;
+  gap: 1.1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+.ebook-card__cover { flex: none; width: 128px; }
+.ebook-card__cover img {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+  box-shadow: var(--shadow-sm);
+}
+.ebook-card__body { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.ebook-card__badge {
+  align-self: flex-start;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--orange);
+  background: rgba(255, 122, 24, 0.12);
+  border: 1px solid rgba(255, 122, 24, 0.3);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+.ebook-card__title { margin: 0.15rem 0 0; font-size: 1.05rem; color: var(--navy); line-height: 1.25; }
+.ebook-card__authors { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.ebook-card__blurb { margin: 0.15rem 0; font-size: 0.87rem; color: var(--text); line-height: 1.5; }
+.ebook-card__meta { margin: 0.1rem 0 0.6rem; font-size: 0.8rem; color: var(--muted); display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
+.ebook-card__price { font-weight: 800; color: var(--brand-blue); font-size: 0.95rem; }
+.ebook-card .btn { align-self: flex-start; margin-top: auto; }
+@media (max-width: 560px) {
+  .ebook-card { flex-direction: column; align-items: center; text-align: center; }
+  .ebook-card__cover { width: 55%; max-width: 200px; }
+  .ebook-card__badge, .ebook-card .btn { align-self: center; }
+  .ebook-card__meta { justify-content: center; }
+}

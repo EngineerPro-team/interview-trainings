@@ -46,6 +46,7 @@ TOP_ROUTES = [
     ("courses",   "Khoá học",          "Courses"),
     ("lich-khai-giang", "Lịch khai giảng", "Course Schedule"),
     ("book",          "Coding Book",       "Coding Book"),
+    ("ebooks",        "E-books",           "E-books"),
     (SYSTEM_DESIGN_URL_SLUG, "System design material", "System design material"),
     ("mock",          "Mock Interview 1-1", "Mock Interview 1-1"),
     ("resources", "Interview Resources", "Interview Resources"),

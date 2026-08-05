@@ -209,7 +209,7 @@
   //  #home, #courses, #book, #resources, #mentors, #stories, #podcast, #partners, #faq, #contact
   //  (#home-roadmap and #home-format are anchor scrolls into the home page)
   const TOP_ROUTES = [
-    "home", "courses", "lich-khai-giang", "book", "system-design", "mock", "resources",
+    "home", "courses", "lich-khai-giang", "book", "ebooks", "system-design", "mock", "resources",
     "mentors", "stories", "podcast", "partners", "faq", "terms", "contact",
   ];
 
@@ -269,7 +269,7 @@
     if ((m = path.match(/^\/resources\/([\w-]+)\/?$/)) && RESOURCES_ANCHORS[m[1]]) {
       return { route: "resources", slug: null, scrollTo: RESOURCES_ANCHORS[m[1]] };
     }
-    if ((m = path.match(new RegExp(`^/(courses|lich-khai-giang|book|${SD_URL_SLUG}|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/?$`)))) {
+    if ((m = path.match(new RegExp(`^/(courses|lich-khai-giang|book|ebooks|${SD_URL_SLUG}|mock|resources|mentors|stories|podcast|partners|faq|terms|contact)/?$`)))) {
       const route = m[1] === SD_URL_SLUG ? "system-design" : m[1];
       return { route, slug: null };
     }
@@ -447,6 +447,7 @@
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
         "lich-khai-giang": en ? "EngineerPro course launch schedule — DSA, System Design, CS Fundamentals, Backend Go, Redis crash course. Online classes, GMT+7." : "Lịch khai giảng các lớp mới tại EngineerPro — DSA, System Design, CS Fundamentals, Backend Go, Crash Course Redis. Lớp online, giờ GMT+7.",
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
+        ebooks:    en ? "EngineerPro e-books on Gumroad — starting with 'Cafe Talk: The Interview & Career Playbook' by mentors from NVIDIA & AWS." : "E-books của EngineerPro trên Gumroad — mở đầu với 'Cafe Talk: The Interview & Career Playbook' từ mentor NVIDIA & AWS.",
         "system-design": en ? "21 original System Design Interview case studies — read chapter by chapter (VI & EN). Original content by EngineerPro." : "21 case study System Design Interview gốc — đọc từng chương (VI & EN). Nội dung gốc bởi EngineerPro.",
         resources: en ? "Free interview resources from EngineerPro — HR phone screen checklist, programming foundation videos, Big Tech CV templates and review playlist." : "Tài nguyên phỏng vấn miễn phí từ EngineerPro — checklist HR phone screen, video lập trình nền tảng, template CV Big Tech và playlist review CV.",
         mentors:   en ? `${nMentors} mentors currently at Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…` : `${nMentors} mentor đang làm tại Google, Amazon, Meta, TikTok, Spotify, Shopee, Acronis, AWS…`,
@@ -514,6 +515,7 @@
         courses:   t("nav.courses"),
         "lich-khai-giang": t("nav.schedule"),
         book:      t("nav.book"),
+        ebooks:    t("nav.ebooks"),
         "system-design": t("nav.systemDesign"),
         resources: t("nav.resources"),
         mentors:   t("nav.mentors"),
@@ -612,13 +614,40 @@
   // ===================== MOBILE NAV =====================
   const navLinks = document.getElementById("navLinks");
   const navToggle = document.getElementById("navToggle");
+  function closeNavDropdowns() {
+    document.querySelectorAll(".nav__dropdown.is-open").forEach((dd) => {
+      dd.classList.remove("is-open");
+      dd.querySelector(".nav__dropbtn")?.setAttribute("aria-expanded", "false");
+    });
+  }
   function closeMobileNav() {
     navLinks?.classList.remove("is-open");
     navToggle?.classList.remove("is-open");
+    closeNavDropdowns();
   }
   navToggle?.addEventListener("click", () => {
     navLinks.classList.toggle("is-open");
     navToggle.classList.toggle("is-open");
+  });
+
+  // "Sách & Tài liệu" nav dropdown: click toggles (mobile + a11y; desktop also
+  // opens on hover via CSS).
+  document.querySelectorAll(".nav__dropbtn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dd = btn.closest(".nav__dropdown");
+      const open = dd.classList.toggle("is-open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  });
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll(".nav__dropdown.is-open").forEach((dd) => {
+      if (!dd.contains(e.target)) {
+        dd.classList.remove("is-open");
+        dd.querySelector(".nav__dropbtn")?.setAttribute("aria-expanded", "false");
+      }
+    });
   });
 
   // ===================== HELPERS =====================
@@ -1149,6 +1178,34 @@
 
       wrap.appendChild(el("article", { class: "card card--mentor" }, children));
     });
+  }
+
+  // ===================== E-BOOKS =====================
+  function renderEbooks() {
+    const grid = document.getElementById("ebooksGrid");
+    if (!grid) return;
+    const list = Array.isArray(window.EBOOKS) ? window.EBOOKS : [];
+    const en = currentLang === "en";
+    grid.innerHTML = list.map((b) => {
+      const blurb = en ? (b.blurbEn || b.blurb) : b.blurb;
+      const fmt = en ? (b.formatEn || b.format) : b.format;
+      const badge = en ? (b.badgeEn || b.badge) : b.badge;
+      const cta = en ? "View on Gumroad →" : "Xem trên Gumroad →";
+      return `
+        <article class="ebook-card">
+          <a class="ebook-card__cover" href="${escapeAttr(b.url)}" target="_blank" rel="noopener" aria-label="${escapeAttr(b.title)}">
+            <img src="${escapeAttr(asset(b.cover))}" alt="${escapeAttr(b.title)}" loading="lazy" />
+          </a>
+          <div class="ebook-card__body">
+            ${badge ? `<span class="ebook-card__badge">${escapeText(badge)}</span>` : ""}
+            <h3 class="ebook-card__title">${escapeText(b.title)}</h3>
+            ${b.authors ? `<p class="ebook-card__authors">${escapeText(b.authors)}</p>` : ""}
+            <p class="ebook-card__blurb">${escapeText(blurb || "")}</p>
+            <p class="ebook-card__meta">${fmt ? `<span>${escapeText(fmt)}</span>` : ""}${b.price ? `<span class="ebook-card__price">${escapeText(b.price)}</span>` : ""}</p>
+            <a class="btn btn--primary" href="${escapeAttr(b.url)}" target="_blank" rel="noopener">${escapeText(cta)}</a>
+          </div>
+        </article>`;
+    }).join("");
   }
 
   // ===================== PODCASTS =====================
@@ -3146,6 +3203,7 @@
     if (typeof renderCourses === "function") renderCourses();
     if (typeof renderMentors === "function") renderMentors();
     if (typeof renderPodcasts === "function") renderPodcasts();
+    if (typeof renderEbooks === "function") renderEbooks();
     if (typeof renderBook === "function") renderBook();
     if (typeof renderSystemDesign === "function") renderSystemDesign();
     if (typeof renderFAQ === "function") renderFAQ();
@@ -3229,6 +3287,7 @@
   renderCourses();
   renderMentors();
   renderPodcasts();
+  renderEbooks();
   renderBook();
   renderSystemDesign();
   renderFAQ();
