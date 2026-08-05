@@ -445,7 +445,7 @@
       const ROUTE_DESC = {
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
         courses:   en ? `${nCourses} in-depth courses — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.` : `${nCourses} khoá đào tạo chuyên sâu — DSA, System Design, Backend (Go/Java), Behavioural Interview, Machine Coding.`,
-        "lich-khai-giang": en ? "EngineerPro course launch schedule — DSA, System Design, CS Fundamentals, Backend Go, Redis crash course. Online classes, GMT+7." : "Lịch khai giảng các lớp mới tại EngineerPro — DSA, System Design, CS Fundamentals, Backend Go, Crash Course Redis. Lớp online, giờ GMT+7.",
+        "lich-khai-giang": en ? "EngineerPro course launch schedule — DSA Level 1/2/3, System Design Level 1/2, Backend Golang, ML / Agentic AI, Behavioral Interview. Online classes, GMT+7." : "Lịch khai giảng các lớp mới tại EngineerPro — DSA Level 1/2/3, System Design Level 1/2, Backend Golang, ML / Agentic AI, Behavioral Interview. Lớp online, giờ GMT+7.",
         book:      en ? "Coding DSA Interview at Big Tech — 288 problems, 44 patterns, full solutions. Free for the community." : "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
         ebooks:    en ? "EngineerPro e-books on Gumroad — starting with 'Cafe Talk: The Interview & Career Playbook' by mentors from NVIDIA & AWS." : "E-books của EngineerPro trên Gumroad — mở đầu với 'Cafe Talk: The Interview & Career Playbook' từ mentor NVIDIA & AWS.",
         "system-design": en ? "21 original System Design Interview case studies — read chapter by chapter (VI & EN). Original content by EngineerPro." : "21 case study System Design Interview gốc — đọc từng chương (VI & EN). Nội dung gốc bởi EngineerPro.",
@@ -628,6 +628,7 @@
   navToggle?.addEventListener("click", () => {
     navLinks.classList.toggle("is-open");
     navToggle.classList.toggle("is-open");
+    closeNavDropdowns();
   });
 
   // "Sách & Tài liệu" nav dropdown: click toggles (mobile + a11y; desktop also
