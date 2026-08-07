@@ -539,7 +539,7 @@ ROUTE_OG_IMAGES = {
     "mock": "/assets/img/mock-interview-cover.jpg",
     SYSTEM_DESIGN_URL_SLUG: "/assets/img/system-design-cover.png",
     "lich-khai-giang": "/assets/img/schedule-og.png",
-    "ebooks": "/assets/img/ebooks/cafe-talk-cover.jpg",
+    "ebooks": "/assets/img/ebooks/forty-seconds-cover.jpg",
 }
 
 SD_AUTHORS = [
@@ -916,7 +916,7 @@ ROUTE_DESCRIPTIONS_VI = {
     "courses":   "12 khoá đào tạo chuyên sâu — DSA, System Design, ML / Agentic AI, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "lich-khai-giang": "Lịch khai giảng các lớp mới tại EngineerPro — DSA Level 1/2/3, System Design Level 1/2, Backend Golang, ML / Agentic AI, Behavioral Interview. Lớp online, mentor Big Tech, giờ học GMT+7.",
     "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-    "ebooks":        "E-books của EngineerPro trên Gumroad — mở đầu với 'Cafe Talk: The Interview & Career Playbook' từ mentor NVIDIA & AWS (PDF, tiếng Việt).",
+    "ebooks":        "E-books của EngineerPro trên Gumroad — 'Forty Seconds: Ten Real CVs That Passed Big Tech' và 'Cafe Talk: The Interview & Career Playbook', từ mentor NVIDIA & AWS (PDF, tiếng Việt).",
     SYSTEM_DESIGN_URL_SLUG: (
         "21 case study System Design Interview gốc — đọc từng chương (VI & EN). "
         "Nội dung gốc bởi EngineerPro."
