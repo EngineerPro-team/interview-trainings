@@ -154,6 +154,13 @@ window.SITE_DATA = {
       ],
       linkedin: "https://www.linkedin.com/in/nhudinhtuan/",
     },
+    {
+      name: "Đạt Phạm",
+      photo: "assets/img/mentors/dat-pham.jpg",
+      current:  { role: "Software Engineer",        company: "NVIDIA" },
+      previous: null,
+      linkedin: "https://www.linkedin.com/in/datphamvn/",
+    },
   ],
 
   contact: {

@@ -440,7 +440,7 @@
         : `${label} · ${SUFFIX}`;
       // Counts derived from live data so descriptions can never drift.
       const nCourses  = (typeof courses  !== "undefined") ? courses.length  : 10;
-      const nMentors  = (data && data.mentors) ? data.mentors.length : 20;
+      const nMentors  = (data && data.mentors) ? data.mentors.length : 21;
       const nStories  = (typeof stories  !== "undefined") ? stories.length  : 94;
       const ROUTE_DESC = {
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
