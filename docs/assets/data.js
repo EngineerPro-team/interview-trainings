@@ -11,156 +11,160 @@ window.SITE_DATA = {
   // Spotify podcast episode descriptions, and user-supplied hints.
   // Profile photos for 3 cases downloaded locally from LinkedIn — rest fall
   // back to gradient + initials avatar.
+  //
+  // Entries below are strict JSON (quoted keys, no trailing comma): the build
+  // reads this array to prerender the mentor list. Keep that shape or
+  // `make github` will fail.
   mentors: [
     {
-      name: "Harry Lê Quang Hoà",
-      photo: "assets/img/mentors/harry-le-quang-hoa.jpg",
-      current:  { role: "Senior Software Engineer", company: "Amazon Web Services" },
-      previous: { role: "Tech Lead",                 company: "TikTok" },
-      linkedin: "https://www.linkedin.com/in/harry-le-quang-hoa-32210066/",
+      "name": "Harry Lê Quang Hoà",
+      "photo": "assets/img/mentors/harry-le-quang-hoa.jpg",
+      "current":  { "role": "Senior Software Engineer", "company": "Amazon Web Services" },
+      "previous": { "role": "Tech Lead",                 "company": "TikTok" },
+      "linkedin": "https://www.linkedin.com/in/harry-le-quang-hoa-32210066/"
     },
     {
-      name: "Lâm Phạm",
-      photo: "assets/img/mentors/lam-pham.jpg",
-      current:  { role: "Founder & Lead Mentor",     company: "EngineerPro" },
-      previous: { role: "Senior Software Engineer",  company: "TikTok · Grab · Motional · Sea Group" },
-      linkedin: "https://www.linkedin.com/in/lam0895/",
+      "name": "Lâm Phạm",
+      "photo": "assets/img/mentors/lam-pham.jpg",
+      "current":  { "role": "Founder & Lead Mentor",     "company": "EngineerPro" },
+      "previous": { "role": "Senior Software Engineer",  "company": "TikTok · Grab · Motional · Sea Group" },
+      "linkedin": "https://www.linkedin.com/in/lam0895/"
     },
     {
-      name: "Tùng Trần",
-      photo: "assets/img/mentors/tung-tran.jpg",
-      current:  { role: "Senior Software Engineer",  company: "Pendle" },
-      previous: { role: "Senior Software Engineer",  company: "Shopee" },
-      linkedin: "https://www.linkedin.com/in/tungtran309/",
+      "name": "Tùng Trần",
+      "photo": "assets/img/mentors/tung-tran.jpg",
+      "current":  { "role": "Senior Software Engineer",  "company": "Pendle" },
+      "previous": { "role": "Senior Software Engineer",  "company": "Shopee" },
+      "linkedin": "https://www.linkedin.com/in/tungtran309/"
     },
     {
-      name: "Quang Hoàng",
-      photo: "assets/img/mentors/quang-hoang.jpg",
-      current:  { role: "Senior Software Engineer",  company: "Google" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/hoangdquang/",
+      "name": "Quang Hoàng",
+      "photo": "assets/img/mentors/quang-hoang.jpg",
+      "current":  { "role": "Senior Software Engineer",  "company": "Google" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/hoangdquang/"
     },
     {
-      name: "Quốc Anh (Anh Gian)",
-      photo: "assets/img/mentors/anh-gian.jpg",
-      current:  { role: "Senior Software Engineer",  company: "Shopee (Singapore)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/anh-gian/",
+      "name": "Quốc Anh (Anh Gian)",
+      "photo": "assets/img/mentors/anh-gian.jpg",
+      "current":  { "role": "Senior Software Engineer",  "company": "Shopee (Singapore)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/anh-gian/"
     },
     {
-      name: "Thiên Anh",
-      photo: "assets/img/mentors/thien-anh.jpg",
-      current:  { role: "Software Engineer",         company: "Microsoft (US)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/vu-thi-thien-anh/",
+      "name": "Thiên Anh",
+      "photo": "assets/img/mentors/thien-anh.jpg",
+      "current":  { "role": "Software Engineer",         "company": "Microsoft (US)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/vu-thi-thien-anh/"
     },
     {
-      name: "Chương",
-      photo: "assets/img/mentors/chuong-le.jpg",
-      current:  { role: "Senior Software Engineer",  company: "Google (USA)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/le-chuong-50b91766/",
+      "name": "Chương",
+      "photo": "assets/img/mentors/chuong-le.jpg",
+      "current":  { "role": "Senior Software Engineer",  "company": "Google (USA)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/le-chuong-50b91766/"
     },
     {
-      name: "Việt",
-      photo: "assets/img/mentors/viet-nguyen.jpg",
-      current:  { role: "Senior Software Engineer",  company: "Big Tech" },
-      previous: { role: "Staff Engineer",            company: "Shopee" },
-      linkedin: "https://www.linkedin.com/in/nguyen-anh-viet/",
+      "name": "Việt",
+      "photo": "assets/img/mentors/viet-nguyen.jpg",
+      "current":  { "role": "Senior Software Engineer",  "company": "Big Tech" },
+      "previous": { "role": "Staff Engineer",            "company": "Shopee" },
+      "linkedin": "https://www.linkedin.com/in/nguyen-anh-viet/"
     },
     {
-      name: "Kyle Nguyễn",
-      photo: "assets/img/mentors/kyle-nguyen.jpg",
-      current:  { role: "Senior Engineer",           company: "Citadel" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/kylenguyen141/",
+      "name": "Kyle Nguyễn",
+      "photo": "assets/img/mentors/kyle-nguyen.jpg",
+      "current":  { "role": "Senior Engineer",           "company": "Citadel" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/kylenguyen141/"
     },
     {
-      name: "Hiệp (Khánh Hiệp Trần)",
-      photo: "assets/img/mentors/khanh-hiep-tran.jpg",
-      current:  { role: "Software Engineer",         company: "Spotify (Berlin)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/khanh-hiep-tran-9b529a92/",
+      "name": "Hiệp (Khánh Hiệp Trần)",
+      "photo": "assets/img/mentors/khanh-hiep-tran.jpg",
+      "current":  { "role": "Software Engineer",         "company": "Spotify (Berlin)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/khanh-hiep-tran-9b529a92/"
     },
     {
-      name: "Huy",
-      photo: "assets/img/mentors/huy-tran.jpg",
-      current:  { role: "Software Engineer",         company: "Meta (Singapore)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/huytq56/",
+      "name": "Huy",
+      "photo": "assets/img/mentors/huy-tran.jpg",
+      "current":  { "role": "Software Engineer",         "company": "Meta (Singapore)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/huytq56/"
     },
     {
-      name: "Nhị (Nhi V.)",
-      photo: "assets/img/mentors/nhi-vu.jpg",
-      current:  { role: "Software Engineer",         company: "Meta (Singapore)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/vuducnhi/",
+      "name": "Nhị (Nhi V.)",
+      "photo": "assets/img/mentors/nhi-vu.jpg",
+      "current":  { "role": "Software Engineer",         "company": "Meta (Singapore)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/vuducnhi/"
     },
     {
-      name: "Hiếu (Trần Minh Hiếu)",
-      photo: "assets/img/mentors/hieu-tran.jpg",
-      current:  { role: "Senior Software Engineer", company: "Acronis (Singapore)" },
-      previous: { role: "Software Engineer",        company: "Shopee" },
-      linkedin: "https://www.linkedin.com/in/tranhieu23/",
+      "name": "Hiếu (Trần Minh Hiếu)",
+      "photo": "assets/img/mentors/hieu-tran.jpg",
+      "current":  { "role": "Senior Software Engineer", "company": "Acronis (Singapore)" },
+      "previous": { "role": "Software Engineer",        "company": "Shopee" },
+      "linkedin": "https://www.linkedin.com/in/tranhieu23/"
     },
     {
-      name: "Chấn Thành (Thomas Quach)",
-      photo: "assets/img/mentors/thomas-quach.jpg",
-      current:  { role: "Software Engineer",        company: "Amazon (UK)" },
-      previous: { role: "Staff Engineer",           company: "OKX" },
-      linkedin: "https://www.linkedin.com/in/thomas-quach-669818117/",
+      "name": "Chấn Thành (Thomas Quach)",
+      "photo": "assets/img/mentors/thomas-quach.jpg",
+      "current":  { "role": "Software Engineer",        "company": "Amazon (UK)" },
+      "previous": { "role": "Staff Engineer",           "company": "OKX" },
+      "linkedin": "https://www.linkedin.com/in/thomas-quach-669818117/"
     },
     {
-      name: "Tùng Lâm",
-      current:  { role: "Senior Software Engineer", company: "Shopee" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/ntlam94/",
+      "name": "Tùng Lâm",
+      "current":  { "role": "Senior Software Engineer", "company": "Shopee" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/ntlam94/"
     },
     {
-      name: "Lợi Nguyễn",
-      photo: "assets/img/mentors/loi-nguyen.jpg",
-      current:  { role: "Software Engineer",        company: "GovTech (Singapore)" },
-      previous: { role: "Staff Engineer",           company: "Zendesk" },
-      linkedin: "https://www.linkedin.com/in/loi-nguyen-thang/",
+      "name": "Lợi Nguyễn",
+      "photo": "assets/img/mentors/loi-nguyen.jpg",
+      "current":  { "role": "Software Engineer",        "company": "GovTech (Singapore)" },
+      "previous": { "role": "Staff Engineer",           "company": "Zendesk" },
+      "linkedin": "https://www.linkedin.com/in/loi-nguyen-thang/"
     },
     {
-      name: "Mạnh",
-      photo: "assets/img/mentors/manh.jpg",
-      current:  { role: "Senior Software Engineer", company: "Big Tech" },
-      previous: { role: "Software Engineer",        company: "Amazon · Sea Group" },
-      linkedin: "https://www.linkedin.com/in/manhdx/",
+      "name": "Mạnh",
+      "photo": "assets/img/mentors/manh.jpg",
+      "current":  { "role": "Senior Software Engineer", "company": "Big Tech" },
+      "previous": { "role": "Software Engineer",        "company": "Amazon · Sea Group" },
+      "linkedin": "https://www.linkedin.com/in/manhdx/"
     },
     {
-      name: "Đức",
-      photo: "assets/img/mentors/duc-than.jpg",
-      current:  { role: "Software Engineer",        company: "Uber (USA)" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/duc-than-a15045122/",
+      "name": "Đức",
+      "photo": "assets/img/mentors/duc-than.jpg",
+      "current":  { "role": "Software Engineer",        "company": "Uber (USA)" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/duc-than-a15045122/"
     },
     {
-      name: "Đông Trương",
-      photo: "assets/img/mentors/dong-truong.jpg",
-      current:  { role: "Software Engineer",        company: "TikTok" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/dong-truong-56297a145/",
+      "name": "Đông Trương",
+      "photo": "assets/img/mentors/dong-truong.jpg",
+      "current":  { "role": "Software Engineer",        "company": "TikTok" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/dong-truong-56297a145/"
     },
     {
-      name: "Tuấn (Nhữ Đình Tuấn)",
-      photo: "assets/img/mentors/nhu-dinh-tuan.jpg",
-      current:  { role: "Engineering Manager",      company: "GRVT" },
-      previous: [
-        { role: "Senior Software Engineer", company: "Meta" },
-        { role: "Expert Software Engineer", company: "Shopee" },
+      "name": "Tuấn (Nhữ Đình Tuấn)",
+      "photo": "assets/img/mentors/nhu-dinh-tuan.jpg",
+      "current":  { "role": "Engineering Manager",      "company": "GRVT" },
+      "previous": [
+        { "role": "Senior Software Engineer", "company": "Meta" },
+        { "role": "Expert Software Engineer", "company": "Shopee" }
       ],
-      linkedin: "https://www.linkedin.com/in/nhudinhtuan/",
+      "linkedin": "https://www.linkedin.com/in/nhudinhtuan/"
     },
     {
-      name: "Đạt Phạm",
-      photo: "assets/img/mentors/dat-pham.jpg",
-      current:  { role: "Software Engineer",        company: "NVIDIA" },
-      previous: null,
-      linkedin: "https://www.linkedin.com/in/datphamvn/",
-    },
+      "name": "Đạt Phạm",
+      "photo": "assets/img/mentors/dat-pham.jpg",
+      "current":  { "role": "Software Engineer",        "company": "NVIDIA" },
+      "previous": null,
+      "linkedin": "https://www.linkedin.com/in/datphamvn/"
+    }
   ],
 
   contact: {

@@ -5894,3 +5894,40 @@ a.faq-cta:hover { transform: translateY(-1px); }
   .ebook-card__badge, .ebook-card .btn { align-self: center; }
   .ebook-card__meta { justify-content: center; }
 }
+
+/* ---------- Prerendered listing fallback ----------
+   Static markup the build injects into the listing grids so crawlers and
+   no-JS visitors get the items on the first pass. app.js clears the
+   container and replaces this with the real cards on hydration. */
+.pre-list {
+  grid-column: 1 / -1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.pre-list__item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: var(--paper);
+}
+.pre-list__item > a,
+.pre-list__item > strong {
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+.pre-list__item > a:hover { text-decoration: underline; }
+.pre-list__meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.pre-list__blurb {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}

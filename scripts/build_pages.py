@@ -136,6 +136,13 @@ def load_data_array(filename: str, var_name: str) -> list[dict]:
     return json.loads(m.group(1)) if m else []
 
 
+def load_mentors() -> list[dict]:
+    """Mentor rows out of data.js (a JS object whose `mentors` array is JSON)."""
+    with open(os.path.join(SRC, "assets", "data.js"), "r", encoding="utf-8") as f:
+        m = re.search(r"mentors:\s*(\[.*?\]),\s*\n\s*contact", f.read(), re.S)
+    return json.loads(m.group(1)) if m else []
+
+
 def load_data_object(filename: str, var_name: str) -> dict:
     with open(os.path.join(SRC, "assets", filename), "r", encoding="utf-8") as f:
         raw = f.read()
@@ -642,6 +649,99 @@ ROUTE_EXTRA_SCHEMA = {
 }
 
 
+# ---------- no-JS listing snippets -------------------------------------------
+# The listing grids are filled in by app.js, so the prerendered HTML would
+# otherwise ship an empty container: a crawler only sees the items after it
+# executes JS (Google's second pass), and no-JS visitors see nothing at all.
+# Each builder below emits the same items the first paint shows, in plain
+# markup. app.js clears the container before rendering, so the real cards
+# replace this the moment the page hydrates.
+
+STORIES_PER_PAGE = 8  # keep in sync with app.js so the snippet matches paint 1
+
+
+def _pre_list(rows: list[tuple[str, str, str, str]]) -> str:
+    """rows = (href, title, meta, blurb); href "" renders as plain text."""
+    out = ['<ul class="pre-list">']
+    for href, title_, meta, blurb in rows:
+        head = f'<a href="{attr(href)}">{text(title_)}</a>' if href else f"<strong>{text(title_)}</strong>"
+        out.append('<li class="pre-list__item">')
+        out.append(head)
+        if meta:
+            out.append(f'<span class="pre-list__meta">{text(meta)}</span>')
+        if blurb:
+            out.append(f'<p class="pre-list__blurb">{text(truncate(blurb, 180))}</p>')
+        out.append("</li>")
+    out.append("</ul>")
+    return "".join(out)
+
+
+def snippet_courses() -> str:
+    return _pre_list([
+        (f"{BASE_PATH}/courses/{c['slug']}/", c.get("title", ""), "", c.get("blurb", ""))
+        for c in load_data_array("courses-data.js", "COURSES")
+    ])
+
+
+def snippet_mentors() -> str:
+    rows = []
+    for m in load_mentors():
+        cur = m.get("current") or {}
+        meta = f"{cur.get('role', '')} @ {cur.get('company', '')}".strip(" @")
+        prev = m.get("previous") or []
+        past = prev if isinstance(prev, list) else [prev]
+        blurb = " · ".join(f"ex-{p['role']} @ {p['company']}" for p in past)
+        rows.append((m.get("linkedin", ""), m.get("name", ""), meta, blurb))
+    return _pre_list(rows)
+
+
+def snippet_stories() -> str:
+    stories = load_data_array("stories-data.js", "STORIES")[:STORIES_PER_PAGE]
+    return _pre_list([
+        (f"{BASE_PATH}/stories/{s['slug']}/", s.get("title", ""),
+         " · ".join(s.get("companies") or []), s.get("lead", ""))
+        for s in stories
+    ])
+
+
+def snippet_podcast() -> str:
+    return _pre_list([
+        (p.get("url", ""), p.get("title", ""),
+         " · ".join(x for x in (p.get("series"), p.get("date"), p.get("duration")) if x),
+         p.get("blurb", ""))
+        for p in load_data_array("podcasts-data.js", "PODCASTS")
+    ])
+
+
+def snippet_ebooks() -> str:
+    return _pre_list([
+        (b.get("url", ""), b.get("title", ""),
+         " · ".join(x for x in (b.get("format"), b.get("price")) if x), b.get("blurb", ""))
+        for b in load_data_array("ebooks-data.js", "EBOOKS")
+    ])
+
+
+# slug -> (container id, snippet builder)
+ROUTE_SNIPPETS = {
+    "courses": ("coursesGrid", snippet_courses),
+    "mentors": ("mentorsGrid", snippet_mentors),
+    "stories": ("storiesGrid", snippet_stories),
+    "podcast": ("podcastGrid", snippet_podcast),
+    "ebooks":  ("ebooksGrid",  snippet_ebooks),
+}
+
+
+def inject_snippet(out: str, slug: str) -> str:
+    """Fill the (empty) listing container of `slug` with static markup."""
+    if slug not in ROUTE_SNIPPETS:
+        return out
+    container_id, builder = ROUTE_SNIPPETS[slug]
+    pattern = re.compile(rf'(<div[^>]*id="{container_id}"[^>]*>)(</div>)')
+    if not pattern.search(out):
+        raise ValueError(f"prerender: container #{container_id} not found for /{slug}/")
+    return pattern.sub(lambda m: m.group(1) + builder() + m.group(2), out, count=1)
+
+
 def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
                     description: str, snippet_html: str = "") -> str:
     title = f"{title_vi} · {SITE_NAME} — Luyện phỏng vấn Big Tech"
@@ -674,6 +774,7 @@ def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
         extra += ROUTE_EXTRA_SCHEMA[slug](canonical)
     out = patch_jsonld(out, extra)
     out = show_route_style(out, slug)
+    out = inject_snippet(out, slug)
     out = inject_boot_script(out)
     return out
 

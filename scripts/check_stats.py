@@ -29,9 +29,11 @@ def load_array(filename: str, var_name: str) -> list:
 
 
 def count_mentors() -> int:
+    """The `mentors` array in data.js is strict JSON — parsing it here doubles
+    as a format check, since the prerender step reads the same block."""
     with open(os.path.join(SRC, "assets", "data.js"), "r", encoding="utf-8") as f:
-        m = re.search(r"mentors:\s*\[(.*?)\],\s*\n\s*contact", f.read(), re.S)
-    return len(re.findall(r"name:\s*\"", m.group(1))) if m else 0
+        m = re.search(r"mentors:\s*(\[.*?\]),\s*\n\s*contact", f.read(), re.S)
+    return len(json.loads(m.group(1))) if m else 0
 
 
 def find_all(pattern: str, *paths: str) -> list[tuple[str, int, str]]:
