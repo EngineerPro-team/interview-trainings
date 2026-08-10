@@ -42,6 +42,10 @@
   --radius: 14px;
   --radius-sm: 10px;
   --maxw: 1200px;
+  /* Semantic aliases. Both resolve against the theme-aware values above, so
+     they follow the dark theme without needing their own override. */
+  --accent: var(--orange);
+  --surface: var(--paper);
 }
 
 /* ======================= DARK THEME ======================= */
