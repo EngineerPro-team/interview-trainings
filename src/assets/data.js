@@ -144,6 +144,16 @@ window.SITE_DATA = {
       previous: null,
       linkedin: "https://www.linkedin.com/in/dong-truong-56297a145/",
     },
+    {
+      name: "Tuấn (Nhữ Đình Tuấn)",
+      photo: "assets/img/mentors/nhu-dinh-tuan.jpg",
+      current:  { role: "Engineering Manager",      company: "GRVT" },
+      previous: [
+        { role: "Senior Software Engineer", company: "Meta" },
+        { role: "Expert Software Engineer", company: "Shopee" },
+      ],
+      linkedin: "https://www.linkedin.com/in/nhudinhtuan/",
+    },
   ],
 
   contact: {

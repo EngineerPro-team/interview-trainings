@@ -440,7 +440,7 @@
         : `${label} · ${SUFFIX}`;
       // Counts derived from live data so descriptions can never drift.
       const nCourses  = (typeof courses  !== "undefined") ? courses.length  : 10;
-      const nMentors  = (data && data.mentors) ? data.mentors.length : 19;
+      const nMentors  = (data && data.mentors) ? data.mentors.length : 20;
       const nStories  = (typeof stories  !== "undefined") ? stories.length  : 94;
       const ROUTE_DESC = {
         home:      en ? "100% mentors from Google, Amazon, TikTok, Shopee, Spotify, Uber. A clear roadmap to land Big Tech offers." : "100% mentors đến từ Google, Amazon, TikTok, Shopee, Spotify, Uber. Lộ trình rõ ràng để chinh phục offer Big Tech.",
@@ -1144,14 +1144,16 @@
       // 4-row grid (avatar / name / body 1fr / cta) keeps the LinkedIn CTA
       // pinned to the same y across all cards in a row.
       const bodyChildren = [current];
-      if (m.previous) {
+      // `previous` is either a single {role, company} or a list of them.
+      const previousList = m.previous ? [].concat(m.previous) : [];
+      previousList.forEach((p) => {
         bodyChildren.push(
           el("div", { class: "mentor__line mentor__line--ex" }, [
             el("span", { class: "mentor__ex" }, "ex-"),
-            el("span", {}, `${m.previous.role} @ ${m.previous.company}`),
+            el("span", {}, `${p.role} @ ${p.company}`),
           ])
         );
-      }
+      });
       const body = el("div", { class: "mentor__body" }, bodyChildren);
 
       const children = [

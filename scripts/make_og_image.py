@@ -8,11 +8,16 @@ Generate a 1200x630 Open Graph share image at src/assets/img/og-share.png
 
 Run:  python3.11 scripts/make_og_image.py
 """
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Chip counts come from the data files — `make stats` cannot audit numbers
+# baked into a PNG, so deriving them is the only way to keep this in sync.
+from check_stats import count_mentors, load_array  # noqa: E402
 OUT = ROOT / "src" / "assets" / "img" / "og-share.png"
 LOGO = ROOT / "src" / "assets" / "img" / "logo.png"
 
@@ -129,8 +134,8 @@ def main() -> int:
     chips = [
         ("2K+", "Học viên"),
         ("500+", "Offers"),
-        ("19", "Mentor Big Tech"),
-        ("10", "Khoá học"),
+        (str(count_mentors()), "Mentor Big Tech"),
+        (str(len(load_array("courses-data.js", "COURSES"))), "Khoá học"),
         ("3+ năm", "Từ 04·2023"),
     ]
     chip_y = H - 130
