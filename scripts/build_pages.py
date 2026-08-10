@@ -583,6 +583,65 @@ def sd_chapter_intro_snippet(slug: str, limit: int = 320) -> str:
     return cut + "…"
 
 
+def ebooks_schema(canonical: str) -> list[dict]:
+    """Book + Offer nodes for the /ebooks/ route.
+
+    The e-book grid is rendered client-side, so this JSON-LD is the only
+    machine-readable copy of the catalogue a crawler sees on the first pass.
+    """
+    books = load_data_array("ebooks-data.js", "EBOOKS")
+    items = []
+    for idx, b in enumerate(books, start=1):
+        price = re.fullmatch(r"\$(\d+(?:\.\d{1,2})?)", b.get("price", "").strip())
+        if not price:
+            raise ValueError(
+                f"ebooks-data.js: cannot read a USD amount from price "
+                f"{b.get('price')!r} for {b.get('slug')!r}"
+            )
+        book = {
+            "@type": "Book",
+            "@id": f"{canonical}#{b['slug']}",
+            "name": b["title"],
+            "url": b["url"],
+            "image": absolutise(b["cover"]),
+            "description": b["blurb"],
+            "bookFormat": "https://schema.org/EBook",
+            "inLanguage": "vi",
+            # "Lâm Phạm (NVIDIA) & Harry Lê Quang Hoà (AWS)" -> two Person nodes.
+            "author": [
+                {"@type": "Person", "name": re.sub(r"\s*\([^)]*\)", "", a).strip()}
+                for a in b["authors"].split("&")
+            ],
+            "publisher": {"@id": f"{SITE_BASE}/#organization"},
+            "offers": {
+                "@type": "Offer",
+                "url": b["url"],
+                "price": price.group(1),
+                "priceCurrency": "USD",
+                "availability": "https://schema.org/InStock",
+            },
+        }
+        pages = re.search(r"(\d+)\s*trang", b.get("format", ""))
+        if pages:
+            book["numberOfPages"] = int(pages.group(1))
+        items.append({"@type": "ListItem", "position": idx, "item": book})
+
+    return [{
+        "@type": "ItemList",
+        "@id": canonical + "#catalogue",
+        "name": f"{SITE_NAME} — E-books",
+        "numberOfItems": len(items),
+        "itemListOrder": "https://schema.org/ItemListOrderAscending",
+        "itemListElement": items,
+    }]
+
+
+# Routes that contribute item-level schema on top of the generic WebPage graph.
+ROUTE_EXTRA_SCHEMA = {
+    "ebooks": ebooks_schema,
+}
+
+
 def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
                     description: str, snippet_html: str = "") -> str:
     title = f"{title_vi} · {SITE_NAME} — Luyện phỏng vấn Big Tech"
@@ -611,6 +670,8 @@ def build_top_route(template: str, slug: str, title_vi: str, title_en: str,
             ],
         },
     ]
+    if slug in ROUTE_EXTRA_SCHEMA:
+        extra += ROUTE_EXTRA_SCHEMA[slug](canonical)
     out = patch_jsonld(out, extra)
     out = show_route_style(out, slug)
     out = inject_boot_script(out)
