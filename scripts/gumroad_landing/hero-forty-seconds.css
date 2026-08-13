@@ -1,0 +1,30 @@
+  /* --- the 40-second scan visual (pure CSS) --- */
+  .scan { position: relative; }
+  .scan__stack { position: relative; padding: 0 0 1.5rem; }
+  .scan__sheet {
+    position: relative; overflow: hidden;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); padding: 1.4rem 1.5rem;
+    transform: rotate(-1.4deg);
+  }
+  .scan__sheet::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 34%;
+    top: -34%; pointer-events: none;
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--orange) 26%, transparent) 78%, color-mix(in srgb, var(--orange) 62%, transparent));
+    animation: sweep 5.5s cubic-bezier(.4, 0, .5, 1) infinite;
+  }
+  @keyframes sweep { 0% { top: -34%; } 70% { top: 100%; } 100% { top: 100%; } }
+  .cvline { height: 8px; border-radius: 4px; background: var(--paper-3); margin: .5rem 0; }
+  .cvline--head { height: 13px; width: 46%; background: var(--ink); opacity: .85; margin-bottom: .2rem; }
+  .cvline--sub { width: 30%; height: 7px; background: var(--orange); opacity: .75; }
+  .cvline--w80 { width: 80%; } .cvline--w65 { width: 65%; } .cvline--w90 { width: 90%; } .cvline--w40 { width: 40%; }
+  .cvsec { font-family: var(--mono); font-size: .6rem; letter-spacing: .14em; text-transform: uppercase; color: var(--orange-ink); margin: 1rem 0 .35rem; font-weight: 700; }
+  .scan__timer {
+    position: absolute; right: -6px; bottom: 6px; z-index: 2;
+    /* --ink/--paper invert together, so this pill stays legible in both themes */
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: .78rem; font-weight: 700;
+    padding: .5rem .85rem; border-radius: 999px; box-shadow: var(--shadow-md);
+    border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) { .scan__sheet::after { animation: none; top: 40%; opacity: .5; } }

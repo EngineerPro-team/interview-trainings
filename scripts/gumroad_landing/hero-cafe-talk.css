@@ -1,0 +1,47 @@
+  /* --- the interview scorecard visual (pure CSS) --- */
+  .card { position: relative; }
+  .card__stack { position: relative; padding: 0 0 1.5rem; }
+  .card__sheet {
+    position: relative; overflow: hidden;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); padding: 1.3rem 1.4rem 1.5rem;
+    transform: rotate(-1.2deg);
+  }
+  .card__title {
+    font-family: var(--mono); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--orange-ink); font-weight: 700; margin-bottom: .1rem;
+  }
+  .card__lvl { font-family: var(--serif); font-size: 1.05rem; font-weight: 700; }
+  .row { margin-top: .95rem; }
+  .row__top { display: flex; align-items: baseline; gap: .5rem; font-size: .78rem; }
+  .row__name { font-weight: 650; }
+  .row__val { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--ink-soft); }
+  .row__bar {
+    position: relative; height: 7px; border-radius: 4px;
+    background: var(--paper-3); margin-top: .3rem; overflow: hidden;
+  }
+  .row__fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--green); }
+  .row--miss .row__fill { background: var(--miss); }
+  .row--miss .row__val { color: var(--miss); font-weight: 700; }
+  /* the level threshold for this criterion; clipped to the bar by overflow */
+  .row__mark {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: var(--ink); opacity: .75;
+  }
+  .card__rule {
+    margin-top: 1.2rem; padding-top: .9rem; border-top: 1px dashed var(--line);
+    font-size: .78rem; color: var(--ink-soft);
+  }
+  .card__rule b { color: var(--ink); }
+  .card__verdict {
+    position: absolute; right: -6px; bottom: 6px; z-index: 2;
+    /* --ink/--paper invert together, so this pill stays legible in both themes */
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: .74rem; font-weight: 700;
+    padding: .5rem .85rem; border-radius: 999px; box-shadow: var(--shadow-md);
+    border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  }
+  /* the miss row pulses so the eye lands on the one line that sinks the loop */
+  .row--miss .row__fill { animation: nudge 3.4s ease-in-out infinite; }
+  @keyframes nudge { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .row--miss .row__fill { animation: none; } }

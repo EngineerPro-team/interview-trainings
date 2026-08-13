@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cafe Talk: The Interview and Career Playbook | EngineerPro</title>
+<style>
+  /* ============================ TOKENS ============================ */
+  :root {
+    --ink: #10192b;
+    --ink-soft: #46536b;
+    --paper: #ffffff;
+    --paper-2: #f7f4ee;
+    --paper-3: #efeae0;
+    --line: #e2dbcd;
+    --orange: #ff6a00;
+    --orange-ink: #b23c00;
+    /* for small text sitting on an orange-tinted surface, which needs to go
+       darker than --orange-ink to clear 4.5:1 */
+    --tint-ink: #8a2e00;
+    --green: #0f8a5f;
+    --tint-green: #0a6b48;
+    --miss: #b21437;
+    --shadow-sm: 0 1px 2px rgba(16, 25, 43, .06), 0 3px 8px rgba(16, 25, 43, .05);
+    --shadow-md: 0 10px 30px rgba(16, 25, 43, .10);
+    --shadow-lg: 0 30px 70px rgba(16, 25, 43, .18);
+    --radius: 16px;
+    --maxw: 1120px;
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eef2f8;
+      --ink-soft: #a3b0c4;
+      --paper: #0d1626;
+      --paper-2: #131f33;
+      --paper-3: #1a2942;
+      --line: #29395a;
+      --orange: #ff8a3d;
+      --orange-ink: #ffb37a;
+      --tint-ink: #ffc08c;
+      --green: #35c48f;
+      --tint-green: #35c48f;
+      --miss: #ff8fa3;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, .5), 0 3px 8px rgba(0, 0, 0, .35);
+      --shadow-md: 0 10px 30px rgba(0, 0, 0, .45);
+      --shadow-lg: 0 30px 70px rgba(0, 0, 0, .6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef2f8;
+    --ink-soft: #a3b0c4;
+    --paper: #0d1626;
+    --paper-2: #131f33;
+    --paper-3: #1a2942;
+    --line: #29395a;
+    --orange: #ff8a3d;
+    --orange-ink: #ffb37a;
+    --tint-ink: #ffc08c;
+    --green: #35c48f;
+    --tint-green: #35c48f;
+    --miss: #ff8fa3;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .5), 0 3px 8px rgba(0, 0, 0, .35);
+    --shadow-md: 0 10px 30px rgba(0, 0, 0, .45);
+    --shadow-lg: 0 30px 70px rgba(0, 0, 0, .6);
+  }
+
+  /* ============================ BASE ============================ */
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper-2);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+  h1, h2, h3 { font-family: var(--serif); line-height: 1.15; letter-spacing: -.01em; margin: 0; }
+  p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+
+  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+  .skip {
+    position: absolute; left: -9999px; top: 0; z-index: 100;
+    background: var(--ink); color: var(--paper); padding: .7rem 1.1rem;
+    border-radius: 0 0 10px 0; font-weight: 700; text-decoration: none;
+  }
+  .skip:focus { left: 0; }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 3px; border-radius: 4px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--orange-ink);
+  }
+  .lede { color: var(--ink-soft); font-size: 1.08rem; }
+
+  /* ============================ HEADER ============================ */
+  .top {
+    position: sticky; top: 0; z-index: 40;
+    background: color-mix(in srgb, var(--paper-2) 88%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .top__in { display: flex; align-items: center; gap: 1rem; height: 60px; }
+  .brand { display: flex; align-items: center; gap: .55rem; font-weight: 800; letter-spacing: -.01em; text-decoration: none; }
+  .brand__mark {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: linear-gradient(135deg, #ff6a00, #ff2d55);
+    display: grid; place-items: center; color: #101a2c; font-size: .7rem; font-weight: 900;
+    font-family: var(--mono);
+  }
+  .top__spacer { margin-left: auto; }
+  .iconbtn {
+    display: inline-grid; place-items: center; width: 38px; height: 38px;
+    border-radius: 10px; border: 1px solid var(--line); background: var(--paper);
+    color: var(--ink); cursor: pointer; font-size: 1rem; line-height: 1;
+  }
+  .iconbtn:hover { border-color: var(--orange); color: var(--orange); }
+  .top .btn--sm { display: none; }
+  @media (min-width: 720px) { .top .btn--sm { display: inline-flex; } }
+  /* the store link fits before the buy button does, since it has no price in it */
+  @media (min-width: 560px) { .top .btn--sm.top__store { display: inline-flex; } }
+
+  /* ============================ BUTTONS ============================ */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+    padding: .95rem 1.6rem; border-radius: 999px; border: 1px solid transparent;
+    font: inherit; font-weight: 750; text-decoration: none; cursor: pointer;
+    transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+  }
+  /* Dark ink on the bright gradient rather than white: white tops out at 2.9:1
+     against #ff6a00, this clears 4.7:1 across the whole gradient. */
+  .btn--primary {
+    background: linear-gradient(135deg, #ff6a00, #ff2d55);
+    color: #101a2c; font-weight: 800;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--orange) 40%, transparent);
+  }
+  .btn--primary:hover { transform: translateY(-2px); box-shadow: 0 14px 34px color-mix(in srgb, var(--orange) 50%, transparent); }
+  .btn--ghost { background: var(--paper); color: var(--ink); border-color: var(--line); }
+  .btn--ghost:hover { border-color: var(--orange); color: var(--orange); }
+  .btn--sm { padding: .55rem 1.05rem; font-size: .9rem; }
+  .btn--block { width: 100%; }
+  @media (prefers-reduced-motion: reduce) { .btn:hover { transform: none; } }
+
+  /* ============================ HERO ============================ */
+  .hero { position: relative; overflow: hidden; padding: 3.5rem 0 3rem; }
+  .hero::before {
+    content: ""; position: absolute; inset: -30% -10% auto -10%; height: 70%;
+    background: radial-gradient(60% 60% at 30% 40%, color-mix(in srgb, var(--orange) 22%, transparent), transparent 70%);
+    pointer-events: none;
+  }
+  .hero__grid { position: relative; display: grid; gap: 2.5rem; align-items: center; }
+  @media (min-width: 940px) { .hero__grid { grid-template-columns: 1.05fr .95fr; gap: 3rem; } }
+  .hero h1 { font-size: clamp(2.1rem, 6vw, 3.5rem); margin: .7rem 0 0; }
+  .hero h1 em { font-style: normal; color: var(--orange-ink); }
+  .hero__sub { margin-top: 1.1rem; max-width: 34rem; }
+  .hero__cta { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.8rem; align-items: center; }
+  .pricetag { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
+  .pricetag__now { font-family: var(--serif); font-size: 1.9rem; font-weight: 700; }
+  .pricetag__was {
+    font-family: var(--serif); font-size: 1.2rem; color: var(--ink-soft);
+    text-decoration: line-through; text-decoration-thickness: 1.5px;
+  }
+  .pricetag__off, .book__off {
+    font-size: .76rem; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+    padding: .22rem .6rem; border-radius: 999px;
+    background: color-mix(in srgb, var(--green) 16%, var(--paper));
+    color: var(--tint-green);
+  }
+  .pricenote { margin-top: .55rem; font-size: .85rem; color: var(--ink-soft); max-width: 32rem; }
+  .pricenote code {
+    font-family: var(--mono); font-size: .8rem; font-weight: 700; color: var(--tint-ink);
+    background: color-mix(in srgb, var(--orange) 13%, var(--paper));
+    padding: .1rem .4rem; border-radius: 5px;
+  }
+  .reviews {
+    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    margin-top: 1.1rem; color: var(--ink-soft); font-size: .9rem;
+  }
+  /* a display rule beats the hidden attribute, so restore it explicitly */
+  [hidden] { display: none !important; }
+  .stars { color: var(--orange-ink); letter-spacing: .1em; }
+  .trustrow { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.6rem; }
+  .chip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .35rem .8rem; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--paper); font-size: .82rem; font-weight: 600; color: var(--ink-soft);
+  }
+
+
+  /* ============================ SECTIONS ============================ */
+  section { padding: 3.5rem 0; }
+  .sec__head { max-width: 46rem; margin-bottom: 2rem; }
+  .sec__head h2 { font-size: clamp(1.6rem, 4vw, 2.3rem); margin: .5rem 0 .7rem; }
+  .band { background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+  /* --- journey --- */
+  .journey { display: grid; gap: 1rem; counter-reset: step; }
+  @media (min-width: 800px) { .journey { grid-template-columns: repeat(4, 1fr); } }
+  .step {
+    position: relative; background: var(--paper-2); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.2rem 1.1rem 1.1rem;
+  }
+  .band .step { background: var(--paper-2); }
+  .step__n {
+    font-family: var(--mono); font-size: .7rem; font-weight: 800; letter-spacing: .1em;
+    color: var(--orange-ink);
+  }
+  .step h3 { font-size: 1.05rem; margin: .35rem 0 .4rem; font-family: var(--sans); font-weight: 750; }
+  .step p { font-size: .92rem; color: var(--ink-soft); }
+  .step__tag {
+    display: inline-block; margin-top: .7rem; font-size: .72rem; font-weight: 700;
+    padding: .2rem .55rem; border-radius: 6px;
+    background: color-mix(in srgb, var(--orange) 14%, var(--paper));
+    color: var(--tint-ink);
+  }
+  .step__tag--alt { background: color-mix(in srgb, var(--green) 16%, var(--paper)); color: var(--tint-green); }
+
+  /* --- book cards --- */
+  .books { display: grid; gap: 1.6rem; }
+  @media (min-width: 900px) { .books { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .book {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 20px;
+    padding: 1.5rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; height: 100%;
+  }
+  .book--lead { border-color: color-mix(in srgb, var(--orange) 45%, var(--line)); box-shadow: var(--shadow-md); }
+  .book__badge {
+    align-self: flex-start; font-size: .72rem; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; padding: .25rem .6rem; border-radius: 6px;
+    background: color-mix(in srgb, var(--orange) 16%, var(--paper)); color: var(--tint-ink);
+    margin-bottom: .9rem;
+  }
+  .book__badge--alt { background: var(--paper-3); color: var(--ink-soft); }
+  .book__top { display: flex; gap: 1.1rem; align-items: flex-start; }
+  .book__cover {
+    width: 132px; flex: none; border-radius: 8px; overflow: hidden;
+    box-shadow: var(--shadow-md); background: var(--paper-3);
+    aspect-ratio: 1005 / 1421;
+  }
+  .book__cover img { width: 100%; height: 100%; object-fit: cover; }
+  .book h3 { font-size: 1.3rem; }
+  .book__meta { font-family: var(--mono); font-size: .74rem; color: var(--ink-soft); margin-top: .5rem; letter-spacing: .02em; }
+  .book__blurb { margin-top: 1rem; font-size: .95rem; color: var(--ink-soft); }
+  .book__list { margin-top: 1rem; display: grid; gap: .45rem; }
+  .book__list li { position: relative; padding-left: 1.5rem; font-size: .92rem; }
+  .book__list li::before {
+    content: "✓"; position: absolute; left: 0; top: 0; color: var(--green); font-weight: 800; font-size: .85rem;
+  }
+  .book__foot { margin-top: auto; padding-top: 1.3rem; }
+  .book__price { display: flex; align-items: baseline; gap: .45rem; flex-wrap: wrap; }
+  .book__price b { font-family: var(--serif); font-size: 1.5rem; }
+  .book__was {
+    font-family: var(--serif); font-size: 1.05rem; color: var(--ink-soft);
+    text-decoration: line-through; text-decoration-thickness: 1.5px;
+  }
+  .book__note { font-size: .82rem; color: var(--ink-soft); margin: .35rem 0 .85rem; }
+
+  /* --- details / accordion --- */
+  details.acc {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--paper);
+    margin-bottom: .7rem; overflow: hidden;
+  }
+  .band details.acc { background: var(--paper-2); }
+  details.acc > summary {
+    cursor: pointer; padding: .95rem 1.1rem; font-weight: 700; font-size: .96rem;
+    display: flex; align-items: center; gap: .7rem; list-style: none;
+  }
+  details.acc > summary::-webkit-details-marker { display: none; }
+  details.acc > summary::after {
+    content: "+"; margin-left: auto; font-family: var(--mono); font-weight: 700;
+    color: var(--orange); font-size: 1.1rem; flex: none;
+  }
+  details.acc[open] > summary::after { content: "–"; }
+  details.acc > summary:hover { color: var(--orange); }
+  .acc__body { padding: 0 1.1rem 1.1rem; color: var(--ink-soft); font-size: .93rem; }
+  .acc__body ul { display: grid; gap: .35rem; margin-top: .5rem; }
+  .acc__body li { padding-left: 1.1rem; position: relative; }
+  .acc__body li::before { content: "—"; position: absolute; left: 0; color: var(--orange); }
+  .acc__n { font-family: var(--mono); font-size: .72rem; color: var(--orange-ink); font-weight: 700; flex: none; }
+
+  /* --- storefront call-out --- */
+  .store {
+    margin-top: 1.2rem; padding: 1.15rem 1.35rem;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius);
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .9rem;
+  }
+  .store__t { font-weight: 700; }
+  .store__p { font-size: .87rem; color: var(--ink-soft); margin-top: .2rem; }
+  .store .btn { flex: none; }
+  @media (max-width: 560px) { .store .btn { width: 100%; } }
+
+  /* --- company proof strip --- */
+  .proof { padding: 1.4rem 0 .2rem; }
+  .proof__label {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-soft); text-align: center;
+  }
+  /* capped width so a long list breaks into balanced rows instead of
+     stranding one orphan name on the second line */
+  .proof__list {
+    list-style: none; display: flex; flex-wrap: wrap; justify-content: center;
+    gap: .35rem 1.15rem; margin: .85rem auto 0; max-width: 46rem;
+  }
+  .proof__list li { font-family: var(--serif); font-size: 1.05rem; font-weight: 650; color: var(--ink); }
+
+  /* --- authors --- */
+  /* The photo is a transparent PNG/WebP of both portraits, so it reads correctly
+     on either theme. Its two circles line up with the two cards below it. */
+  .authors__photo { margin: 0 auto 1.4rem; max-width: 40rem; }
+  .authors__photo img { display: block; width: 100%; height: auto; }
+  .authors { display: grid; gap: 1.2rem; }
+  @media (min-width: 760px) { .authors { grid-template-columns: 1fr 1fr; } }
+  .author { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.3rem; }
+  .band .author { background: var(--paper-2); }
+  .author__top { display: flex; align-items: center; gap: .9rem; }
+  .author h3 { font-size: 1.1rem; font-family: var(--sans); font-weight: 750; }
+  .author__role { font-size: .85rem; color: var(--ink-soft); }
+  .author p { margin-top: .8rem; font-size: .92rem; color: var(--ink-soft); }
+  .author a { color: var(--orange-ink); font-weight: 650; text-decoration: none; font-size: .88rem; }
+  .author a:hover { text-decoration: underline; }
+
+  /* --- final cta --- */
+  /* Deliberately a dark panel in BOTH themes, with fixed light text on it —
+     no theme-dependent vars inside, so it can never go dark-on-dark. */
+  .final {
+    background: #0b1d3a; color: #e8eefa; border-radius: 24px;
+    padding: clamp(2rem, 5vw, 3.2rem); text-align: center; position: relative; overflow: hidden;
+    border: 1px solid #1b3260;
+  }
+  .final::before {
+    content: ""; position: absolute; inset: auto -20% -60% -20%; height: 120%;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(255, 106, 0, .30), transparent 70%);
+  }
+  .final > * { position: relative; }
+  .final h2 { font-size: clamp(1.6rem, 4.5vw, 2.4rem); color: #ffffff; }
+  .final .eyebrow { color: #ff9a4d; }
+  .final p { margin-top: .9rem; color: #bfcde6; max-width: 34rem; margin-left: auto; margin-right: auto; }
+  .final .btn { margin-top: 1.6rem; }
+  .final__deal { margin-top: .9rem; font-size: .85rem; color: #bfcde6; }
+  .final__deal s { text-decoration-thickness: 1.5px; }
+  .final__deal b { color: #ffd9b8; font-weight: 700; }
+
+  /* --- footer --- */
+  footer { padding: 2.5rem 0 6rem; color: var(--ink-soft); font-size: .87rem; }
+  .foot__in { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; align-items: center; }
+  footer a { color: var(--ink-soft); }
+  footer a:hover { color: var(--orange); }
+
+  /* --- sticky mobile buy bar --- */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: color-mix(in srgb, var(--paper) 94%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line); padding: .7rem 20px;
+    display: flex; align-items: center; gap: .9rem;
+    transform: translateY(110%); transition: transform .28s ease;
+  }
+  .dock.is-on { transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .dock { transition: none; } }
+  .dock__txt { min-width: 0; }
+  .dock__t { font-weight: 750; font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dock__p { font-size: .8rem; color: var(--ink-soft); }
+  .dock .btn { margin-left: auto; flex: none; }
+  @media (min-width: 900px) { .dock { display: none; } }
+
+  /* --- modal --- */
+  .modal {
+    position: fixed; inset: 0; z-index: 60; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(8, 14, 26, .6); backdrop-filter: blur(4px);
+  }
+  .modal.is-open { display: flex; }
+  .modal__box {
+    background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 18px; max-width: 34rem; width: 100%; max-height: 85vh; overflow: auto;
+    padding: 1.6rem; box-shadow: var(--shadow-lg);
+  }
+  .modal__head { display: flex; align-items: flex-start; gap: 1rem; }
+  .modal__box h3 { font-size: 1.25rem; }
+  .modal__x {
+    margin-left: auto; flex: none; border: 1px solid var(--line); background: var(--paper-2);
+    color: var(--ink); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1rem;
+  }
+  .modal__x:hover { border-color: var(--orange); color: var(--orange); }
+  .bullet {
+    margin-top: 1.2rem; padding: 1rem 1.1rem; border-radius: 12px;
+    background: var(--paper-2); border: 1px solid var(--line); font-size: .93rem;
+  }
+  .bullet__lbl { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--orange-ink); font-weight: 700; }
+  .bullet__txt { margin-top: .4rem; }
+  .bullet__txt mark { background: color-mix(in srgb, var(--orange) 24%, transparent); color: inherit; border-radius: 3px; padding: 0 .15em; }
+  .bullet__key { display: grid; gap: .3rem; margin-top: .8rem; font-size: .85rem; color: var(--ink-soft); }
+  .bullet__key span b { color: var(--ink); }
+
+  /* ============================ HERO COVER ============================ */
+  /* A custom landing page replaces the whole product page, Gumroad's own big
+     cover shot included, so the hero has to carry the cover itself. */
+  .cover-hero { position: relative; display: flex; justify-content: center; padding: .5rem 0 2rem; }
+  .cover-hero__frame {
+    position: relative; width: min(300px, 74%);
+    transform: rotate(-2deg);
+    transition: transform .45s cubic-bezier(.2, .7, .3, 1);
+  }
+  .cover-hero__frame:hover { transform: rotate(0deg) translateY(-6px); }
+  @media (prefers-reduced-motion: reduce) {
+    .cover-hero__frame { transition: none; }
+    .cover-hero__frame:hover { transform: rotate(-2deg); }
+  }
+  .cover-hero__img {
+    width: 100%; height: auto; display: block;
+    border-radius: 3px 11px 11px 3px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--line);
+  }
+  /* spine shading down the binding edge */
+  .cover-hero__frame::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 16px; z-index: 2;
+    border-radius: 3px 0 0 3px; pointer-events: none;
+    background: linear-gradient(to right, rgba(0, 0, 0, .30), rgba(0, 0, 0, .06) 55%, rgba(0, 0, 0, 0));
+  }
+  .cover-hero__pill {
+    position: absolute; right: -14px; bottom: -18px; z-index: 3; max-width: 88%;
+    /* --ink/--paper invert together, so this stays legible in both themes */
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: .72rem; font-weight: 700; line-height: 1.35;
+    padding: .5rem .8rem; border-radius: 999px; box-shadow: var(--shadow-md);
+    border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  }
+  @media (max-width: 939px) { .cover-hero { padding-top: 1.5rem; } }
+  /* on phones the pill would sit on top of the cover art, so drop it underneath */
+  @media (max-width: 560px) {
+    .cover-hero { padding-bottom: 3.6rem; }
+    .cover-hero__pill {
+      right: auto; left: 50%; bottom: -3.1rem; transform: translateX(-50%);
+      max-width: none; white-space: nowrap; font-size: .66rem;
+    }
+  }
+
+  /* ============================ INSIDE LAYOUT ============================ */
+  /* chapter list on the left, the book's concept illustration parked alongside it */
+  .inside-grid { display: grid; gap: 2.2rem; align-items: start; }
+  @media (min-width: 980px) { .inside-grid { grid-template-columns: 1.1fr .9fr; gap: 3rem; } }
+  @media (min-width: 980px) { .inside-art { position: sticky; top: 84px; } }
+  .inside-art__cap {
+    margin-top: 1.6rem; font-size: .85rem; color: var(--ink-soft);
+    border-left: 2px solid var(--orange); padding-left: .9rem;
+  }
+
+  /* --- scroll reveal --- */
+  .rv { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* --- the interview scorecard visual (pure CSS) --- */
+  .card { position: relative; }
+  .card__stack { position: relative; padding: 0 0 1.5rem; }
+  .card__sheet {
+    position: relative; overflow: hidden;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-lg); padding: 1.3rem 1.4rem 1.5rem;
+    transform: rotate(-1.2deg);
+  }
+  .card__title {
+    font-family: var(--mono); font-size: .62rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--orange-ink); font-weight: 700; margin-bottom: .1rem;
+  }
+  .card__lvl { font-family: var(--serif); font-size: 1.05rem; font-weight: 700; }
+  .row { margin-top: .95rem; }
+  .row__top { display: flex; align-items: baseline; gap: .5rem; font-size: .78rem; }
+  .row__name { font-weight: 650; }
+  .row__val { margin-left: auto; font-family: var(--mono); font-size: .72rem; color: var(--ink-soft); }
+  .row__bar {
+    position: relative; height: 7px; border-radius: 4px;
+    background: var(--paper-3); margin-top: .3rem; overflow: hidden;
+  }
+  .row__fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--green); }
+  .row--miss .row__fill { background: var(--miss); }
+  .row--miss .row__val { color: var(--miss); font-weight: 700; }
+  /* the level threshold for this criterion; clipped to the bar by overflow */
+  .row__mark {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: var(--ink); opacity: .75;
+  }
+  .card__rule {
+    margin-top: 1.2rem; padding-top: .9rem; border-top: 1px dashed var(--line);
+    font-size: .78rem; color: var(--ink-soft);
+  }
+  .card__rule b { color: var(--ink); }
+  .card__verdict {
+    position: absolute; right: -6px; bottom: 6px; z-index: 2;
+    /* --ink/--paper invert together, so this pill stays legible in both themes */
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: .74rem; font-weight: 700;
+    padding: .5rem .85rem; border-radius: 999px; box-shadow: var(--shadow-md);
+    border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  }
+  /* the miss row pulses so the eye lands on the one line that sinks the loop */
+  .row--miss .row__fill { animation: nudge 3.4s ease-in-out infinite; }
+  @keyframes nudge { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .row--miss .row__fill { animation: none; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#buy">Bỏ qua tới phần mua sách</a>
+
+<header class="top">
+  <div class="wrap top__in">
+    <a class="brand" href="https://engineerprovn.gumroad.com/">
+      <span class="brand__mark" aria-hidden="true">EP</span>
+      <span>EngineerPro</span>
+    </a>
+    <div class="top__spacer"></div>
+    <a class="btn btn--ghost btn--sm top__store" href="https://engineerprovn.gumroad.com/" target="_blank" rel="noopener">Tất cả sản phẩm</a>
+    <a class="btn btn--primary btn--sm" data-gumroad-action="buy">Mua ngay — <span data-gumroad-field="price">$10.99</span></a>
+    <button class="iconbtn" id="themeBtn" type="button" aria-pressed="false" title="Đổi giao diện sáng/tối">
+      <span aria-hidden="true" id="themeIco">◐</span>
+      <span class="sr">Đổi giao diện sáng/tối</span>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ======================= HERO ======================= -->
+  <section class="hero" aria-labelledby="h-hero">
+    <div class="wrap hero__grid">
+      <div>
+        <p class="eyebrow">Bộ đôi sách · EngineerPro</p>
+        <h1 id="h-hero">Cafe Talk<br /><em>The Interview and Career Playbook</em></h1>
+        <p class="hero__sub lede">
+          Từ phòng phỏng vấn Big Tech tới ba tháng đầu, thăng tiến và những mùa cắt giảm. Đúc kết từ mười buổi trò chuyện của hai kỹ sư đã ngồi cả ghế ứng viên lẫn ghế người phỏng vấn tại Amazon, NVIDIA, TikTok và Grab.
+        </p>
+
+        <div class="hero__cta">
+          <a class="btn btn--primary" data-gumroad-action="buy" id="buy">
+            Mua Cafe Talk
+          </a>
+          <a class="btn btn--ghost" href="#sach">Xem cả hai cuốn</a>
+        </div>
+
+        <div class="pricetag" style="margin-top:1.1rem">
+          <span class="sr">Giá gốc</span>
+          <s class="pricetag__was">$15.99</s>
+          <span class="sr">Giá sau giảm</span>
+          <span class="pricetag__now" data-gumroad-field="price">$10.99</span>
+          <span class="pricetag__off">Tiết kiệm $5</span>
+        </div>
+        <p class="pricenote">Đang giảm $5 — mã <code>EngineerProAug</code> tự động áp ở bước thanh toán, bạn không phải nhập gì. Tải PDF ngay sau khi mua.</p>
+
+        <!-- Gumroad interpolates the two fields below. The row stays hidden until a
+             script confirms review-count > 0, so an unrated product never shows a
+             row of filled stars that it has not earned. -->
+        <p class="reviews" id="ratingRow" hidden>
+          <span class="stars" id="ratingStars" aria-hidden="true"></span>
+          <span><span data-gumroad-field="rating">0</span>/5</span>
+          <span aria-hidden="true">·</span>
+          <span><span data-gumroad-field="review-count">0</span> lượt đánh giá</span>
+        </p>
+
+        <div class="trustrow">
+          <span class="chip">Viết từ cả hai phía của chiếc bàn</span>
+          <span class="chip">Có phần luật lao động Việt Nam</span>
+          <span class="chip">PDF · Tiếng Việt</span>
+        </div>
+      </div>
+
+      <div class="cover-hero">
+        <div class="cover-hero__frame">
+          <!-- no fetchpriority/loading hints here: Gumroad's sanitizer strips them -->
+          <img class="cover-hero__img" src="https://public-files.gumroad.com/kito51ojyindwee0h337iiu00tdo" alt="Bìa sách Cafe Talk: The Interview and Career Playbook"
+               width="1005" height="1421" />
+          <p class="cover-hero__pill">10 chương · hơn nửa sách là sau khi bạn ký</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="proof" aria-label="Các công ty liên quan">
+    <div class="wrap">
+      <p class="proof__label">Đúc kết từ ghế ứng viên và ghế người phỏng vấn tại</p>
+      <ul class="proof__list rv">
+        <li>Amazon</li>
+        <li>NVIDIA</li>
+        <li>TikTok</li>
+        <li>Grab</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ======================= AUTHORS ======================= -->
+  <section aria-labelledby="h-authors">
+    <div class="wrap">
+      <div class="sec__head rv">
+        <p class="eyebrow">Ai viết</p>
+        <h2 id="h-authors">Hai người đã đọc hàng nghìn CV để chọn ứng viên vào vòng trong</h2>
+        <p>Cả hai cùng dạy tại EngineerPro, nơi các khoá học tập trung vào đúng bốn vòng phỏng vấn cốt lõi của Big Tech: thuật toán, thiết kế hệ thống, behavioral và kiến thức nền.</p>
+      </div>
+
+      <figure class="authors__photo rv">
+        <img src="https://public-files.gumroad.com/dlax51rydtohrw6d0sb89ywny9m6" width="1246" height="496"
+             alt="Lâm Phạm và Harry Lê Quang Hoà, hai tác giả của bộ sách" />
+      </figure>
+
+      <div class="authors">
+        <article class="author rv">
+          <div class="author__top">
+            <div>
+              <h3>Lâm Phạm</h3>
+              <p class="author__role">Senior Software Engineer @ NVIDIA</p>
+            </div>
+          </div>
+          <p>
+            Nhà sáng lập và lead mentor của EngineerPro. Từng làm tại TikTok, Grab, Motional và
+            Sea Group. Đã ngồi cả ghế người phỏng vấn lẫn ghế ứng viên, và đã mentor khoảng một
+            nghìn năm trăm kỹ sư.
+          </p>
+          <p style="margin-top:.7rem">
+            <a href="https://www.linkedin.com/in/lam0895" target="_blank" rel="noopener">LinkedIn →</a>
+          </p>
+        </article>
+
+        <article class="author rv">
+          <div class="author__top">
+            <div>
+              <h3>Harry Lê Quang Hoà</h3>
+              <p class="author__role">Software Engineer @ Amazon Web Services</p>
+            </div>
+          </div>
+          <p>
+            Đồng sáng lập EngineerPro, hiện thuộc team Aurora PostgreSQL tại AWS Canada. Hơn mười
+            năm kinh nghiệm ở Singapore và Canada, từng là Tech Lead tại TikTok Singapore và làm
+            tại Visa cùng một vài startup.
+          </p>
+          <p style="margin-top:.7rem">
+            <a href="https://www.linkedin.com/in/harry-le-quang-hoa" target="_blank" rel="noopener">LinkedIn →</a>
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= JOURNEY ======================= -->
+  <section class="band" aria-labelledby="h-journey">
+    <div class="wrap">
+      <div class="sec__head rv">
+        <p class="eyebrow">Hai cuốn, hai nửa hành trình</p>
+        <h2 id="h-journey">Vào được cửa là một việc. Trụ được và đi lên là việc khác.</h2>
+        <p class="lede">
+          Phần lớn tài liệu phỏng vấn dừng lại ở lúc bạn nhận offer. Bộ đôi này đi hết chặng
+          đường: từ tờ CV bị đọc trong bốn mươi giây, tới lúc bạn ngồi trong phòng review lương.
+        </p>
+      </div>
+
+      <ol class="journey">
+        <li class="step rv">
+          <p class="step__n">01</p>
+          <h3>Vòng CV</h3>
+          <p>Không ai phỏng vấn bạn. Chỉ có một tờ giấy và bốn mươi giây. Đây là vòng đánh trượt nhiều người nhất.</p>
+          <span class="step__tag">Forty Seconds</span>
+        </li>
+        <li class="step rv">
+          <p class="step__n">02</p>
+          <h3>Các vòng phỏng vấn</h3>
+          <p>Thuật toán, system design, behavioral, kiến thức nền — và cách người phỏng vấn thực sự chấm điểm bạn.</p>
+          <span class="step__tag step__tag--alt">Cafe Talk</span>
+        </li>
+        <li class="step rv">
+          <p class="step__n">03</p>
+          <h3>90 ngày đầu</h3>
+          <p>Ký hợp đồng xong mới là lúc khó. Hơn nửa cuốn Cafe Talk nói về giai đoạn này.</p>
+          <span class="step__tag step__tag--alt">Cafe Talk</span>
+        </li>
+        <li class="step rv">
+          <p class="step__n">04</p>
+          <h3>Thăng tiến &amp; rủi ro</h3>
+          <p>Lên level, đàm phán, và phải làm gì khi công ty bước vào mùa cắt giảm — kèm luật lao động Việt Nam.</p>
+          <span class="step__tag step__tag--alt">Cafe Talk</span>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ======================= THE TWO BOOKS ======================= -->
+  <section id="sach" aria-labelledby="h-books">
+    <div class="wrap">
+      <div class="sec__head rv">
+        <p class="eyebrow">Nội dung</p>
+        <h2 id="h-books">Bạn đang xem bộ đôi</h2>
+        <p class="lede">Mua riêng từng cuốn. Cuốn nào cũng đọc độc lập được — nhưng đọc cả hai thì khớp thành một đường thẳng.</p>
+      </div>
+
+      <div class="books">
+        <!-- the product this page is hosted on -->
+        <article class="book book--lead rv">
+          <span class="book__badge">Bạn đang ở trang này</span>
+          <div class="book__top">
+            <div class="book__cover">
+              <img src="https://public-files.gumroad.com/kito51ojyindwee0h337iiu00tdo" alt="Bìa sách Cafe Talk: The Interview and Career Playbook" width="1005" height="1421" />
+            </div>
+            <div>
+              <h3><span data-gumroad-field="name">Cafe Talk: The Interview and Career Playbook</span></h3>
+              <p class="book__meta">PDF · 67 trang · 10 chương · Tiếng Việt</p>
+              <p class="book__blurb">Hai tác giả đã chấm điểm ứng viên và cũng đã bị chấm điểm. Chỗ nào hai người không đồng ý với nhau thì được giữ nguyên thay vì làm mượt đi.</p>
+            </div>
+          </div>
+
+          <ul class="book__list">
+            <li>Vì sao người giỏi vẫn trượt: ba lỗi và bốn red flag người phỏng vấn ghi lại</li>
+            <li>Nguyên tắc làm tròn xuống — một mục dưới ngưỡng kéo cả buổi xuống theo</li>
+            <li>Bốn thứ phải chốt trong tuần đầu tiên đi làm</li>
+            <li>Thử việc theo luật Việt Nam: trần 60 ngày, lương tối thiểu 85%</li>
+            <li>Cắt giảm nhân sự: trợ cấp thực nhận và hạn nộp bảo hiểm thất nghiệp</li>
+          </ul>
+
+          <p style="margin-top:1rem">
+            <button class="btn btn--ghost btn--sm" type="button" id="demoBtn">
+              Xem ba con số trong phần thử việc
+            </button>
+          </p>
+
+          <div class="book__foot">
+            <div class="book__price">
+              <span class="sr">Giá gốc</span>
+              <s class="book__was">$15.99</s>
+              <b data-gumroad-field="price">$10.99</b>
+              <span class="book__off">−$5</span>
+            </div>
+            <p class="book__note">Một lượt mua = một bản sách cho một người đọc.</p>
+            <a class="btn btn--primary btn--block" data-gumroad-action="buy">Tôi muốn cuốn này</a>
+          </div>
+        </article>
+
+        <!-- the other book: a plain link to its own Gumroad product page -->
+        <article class="book rv">
+          <span class="book__badge book__badge--alt">Cuốn còn lại của bộ đôi</span>
+          <div class="book__top">
+            <div class="book__cover">
+              <img src="https://public-files.gumroad.com/0crfr93vbfu6wwshh93d84mqku45" alt="Bìa sách Forty Seconds: Ten Real CVs That Passed Big Tech" width="1005" height="1421" />
+            </div>
+            <div>
+              <h3>Forty Seconds: Ten Real CVs That Passed Big Tech</h3>
+              <p class="book__meta">PDF · 86 trang · 11 chương · Tiếng Việt</p>
+              <p class="book__blurb">Mười CV thật của kỹ sư Việt Nam đã qua vòng loại tại Meta, Google, Amazon, NVIDIA, Databricks, Anthropic, Grab, Citadel… trích nguyên văn tiếng Anh kèm phân tích.</p>
+            </div>
+          </div>
+
+          <ul class="book__list">
+            <li>Bốn mươi giây và đường đi thật của mắt người đọc CV</li>
+            <li>Bốn mảnh của một gạch đầu dòng: động từ, quy mô, cách làm, kết quả</li>
+            <li>Mười hai lỗi khiến hồ sơ bị loại, xếp theo mức thiệt hại</li>
+            <li>Checklist trước khi bấm nộp + thư viện động từ</li>
+          </ul>
+
+          <div class="book__foot">
+            <div class="book__price">
+              <span class="sr">Giá gốc</span>
+              <s class="book__was">$19.99</s>
+              <b>$14.99</b>
+              <span class="book__off">−$5</span>
+            </div>
+            <p class="book__note">Có trang sản phẩm riêng trên Gumroad.</p>
+            <a class="btn btn--ghost btn--block" href="https://engineerprovn.gumroad.com/l/Forty-Seconds-Ten-Real-CVs-That-Passed-Big-Tech">Xem Forty Seconds</a>
+          </div>
+        </article>
+      </div>
+
+      <div class="store rv">
+        <div>
+          <p class="store__t">Toàn bộ sản phẩm của EngineerPro</p>
+          <p class="store__p">
+            Sách, và những thứ ra mắt sau này, đều nằm chung một chỗ trên Gumroad.
+          </p>
+        </div>
+        <a class="btn btn--ghost" href="https://engineerprovn.gumroad.com/" target="_blank" rel="noopener">
+          Xem cửa hàng EngineerPro →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= WHAT'S INSIDE ======================= -->
+  <section class="band" aria-labelledby="h-inside">
+    <div class="wrap">
+      <div class="sec__head rv">
+        <p class="eyebrow">Bên trong Cafe Talk</p>
+        <h2 id="h-inside">Mười chương, ba phần cộng một phần gom lại</h2>
+      </div>
+
+      <div class="inside-grid">
+        <div>
+        <details class="acc rv">
+          <summary><span class="acc__n">P1</span> Bước vào phòng phỏng vấn</summary>
+          <div class="acc__body">
+            <ul>
+              <li>Vì sao người giỏi vẫn trượt: ba lỗi và bốn red flag người phỏng vấn ghi lại mà không ai nói cho bạn biết</li>
+              <li>Vòng thuật toán: hai trường phái luyện tập, tám bước xử lý một bài, và vì sao cày số lượng là vòng lặp không có lối ra</li>
+              <li>Thiết kế hệ thống: người ta chấm cách bạn đặt câu hỏi và phân tích đánh đổi, không chấm đáp án</li>
+              <li>Kiến thức nền: cơ sở dữ liệu, hệ điều hành, mạng, lý thuyết DSA — kèm những câu bẫy hay gặp</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="acc rv">
+          <summary><span class="acc__n">P2</span> Thứ quyết định điểm số</summary>
+          <div class="acc__body">
+            <ul>
+              <li>Vòng behavioral: cách kể chuyện quyết định bạn được xếp vào level nào</li>
+              <li>Nguyên tắc làm tròn xuống: mỗi mục trong phiếu đánh giá có ngưỡng tối thiểu riêng cho từng level</li>
+              <li>Giao tiếp: rõ ràng thắng thông minh — phép thử cho mọi câu hỏi làm rõ</li>
+              <li>Vì sao im lặng là lỗi đắt nhất trong phòng phỏng vấn</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="acc rv">
+          <summary><span class="acc__n">P3</span> Sau khi đã vào được công ty mong muốn</summary>
+          <div class="acc__body">
+            <ul>
+              <li>Ba tháng đầu: bốn thứ phải chốt trong tuần đầu tiên, và vì sao được sếp tin quan trọng hơn được sếp quý</li>
+              <li>Thử việc theo luật Việt Nam: trần 60 ngày, lương tối thiểu 85%, chỉ một lần cho một vị trí</li>
+              <li>Quan hệ trong ngành: cho trước nhận sau, và một ranh giới bảo mật không được vượt qua</li>
+              <li>Thăng tiến: hai con đường, và cái trần vô hình nằm ở phạm vi công việc chứ không nằm ở chức danh của sếp</li>
+              <li>Cắt giảm nhân sự: trợ cấp mất việc thực nhận, hạn nộp bảo hiểm thất nghiệp, và vì sao người đang làm ở nước ngoài phải tra visa trước khi sửa CV</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="acc rv">
+          <summary><span class="acc__n">P4</span> Gom lại những gì đã nói</summary>
+          <div class="acc__body">
+            <ul>
+              <li>Sáu sợi chỉ nối mười chương</li>
+              <li>Một danh sách việc cần làm gom từ cả cuốn sách</li>
+            </ul>
+          </div>
+        </details>
+
+          <p class="lede" style="margin-top:1.4rem;font-size:.95rem">
+            Không hứa đường tắt. Cuốn sách nói thẳng rằng mẹo không thay thế được nền tảng — phần lớn nội dung là để bạn không mất điểm ở những chỗ đáng ra không nên mất.
+          </p>
+        </div>
+
+        <div class="inside-art rv">
+        <div class="card">
+          <div class="card__stack">
+            <div class="card__sheet">
+              <p class="card__title">Phiếu đánh giá · vòng onsite</p>
+              <p class="card__lvl">Ứng viên đề xuất level L5</p>
+              <div class="row">
+                <div class="row__top">
+                  <span class="row__name">Thuật toán</span>
+                  <span class="row__val">đạt</span>
+                </div>
+                <div class="row__bar" aria-hidden="true">
+                  <div class="row__fill" style="width:84%"></div>
+                  <div class="row__mark" style="left:68%"></div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row__top">
+                  <span class="row__name">Thiết kế hệ thống</span>
+                  <span class="row__val">đạt</span>
+                </div>
+                <div class="row__bar" aria-hidden="true">
+                  <div class="row__fill" style="width:76%"></div>
+                  <div class="row__mark" style="left:68%"></div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row__top">
+                  <span class="row__name">Kiến thức nền</span>
+                  <span class="row__val">đạt</span>
+                </div>
+                <div class="row__bar" aria-hidden="true">
+                  <div class="row__fill" style="width:72%"></div>
+                  <div class="row__mark" style="left:68%"></div>
+                </div>
+              </div>
+              <div class="row row--miss">
+                <div class="row__top">
+                  <span class="row__name">Giao tiếp</span>
+                  <span class="row__val">dưới ngưỡng</span>
+                </div>
+                <div class="row__bar" aria-hidden="true">
+                  <div class="row__fill" style="width:52%"></div>
+                  <div class="row__mark" style="left:68%"></div>
+                </div>
+              </div>
+              <p class="card__rule">
+                Nguyên tắc <b>làm tròn xuống</b>: mỗi mục có ngưỡng tối thiểu riêng cho từng level.
+                Chỉ cần một mục rơi xuống dưới ngưỡng là cả buổi bị kéo theo.
+              </p>
+            </div>
+            <p class="card__verdict">Kết quả: L4</p>
+          </div>
+        </div>
+        <p class="inside-art__cap">
+          Bốn vòng đều đạt vẫn có thể rớt level. Chương về phiếu đánh giá giải thích vì sao,
+          và mục nào thường là mục kéo cả buổi xuống.
+        </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= AUTHORS ======================= -->
+  <!-- ======================= FAQ ======================= -->
+  <section aria-labelledby="h-faq">
+    <div class="wrap">
+      <div class="sec__head rv">
+        <p class="eyebrow">Câu hỏi thường gặp</p>
+        <h2 id="h-faq">Trước khi bạn mua</h2>
+      </div>
+      <div style="max-width:46rem">
+        <details class="acc rv">
+          <summary>Sách này dành cho ai?</summary>
+          <div class="acc__body">Cho người đang chuẩn bị phỏng vấn Big Tech, và cho người vừa vào làm. Nếu bạn chỉ cần luyện đề thì đây không phải sách bài tập — đây là cách người phỏng vấn chấm bạn, và những gì xảy ra sau khi bạn ký.</div>
+        </details>
+        <details class="acc rv">
+          <summary>Đã đi làm vài năm rồi thì còn cần không?</summary>
+          <div class="acc__body">Phần ba viết cho đúng giai đoạn đó: thăng tiến, cái trần vô hình nằm ở phạm vi công việc, quan hệ trong ngành, và việc cần làm trong tuần đầu tiên của một mùa cắt giảm.</div>
+        </details>
+        <details class="acc rv">
+          <summary>Phần luật lao động có áp dụng cho tôi không?</summary>
+          <div class="acc__body">Phần này viết theo luật lao động Việt Nam và dẫn điều khoản cụ thể — thử việc, trợ cấp mất việc, quyền lợi khi bị cắt giảm. Nếu bạn đang làm ở nước ngoài, sách nói riêng về chuyện tra visa trước khi bắt đầu tìm việc lại.</div>
+        </details>
+        <details class="acc rv">
+          <summary>Mua rồi nhận sách thế nào?</summary>
+          <div class="acc__body">Thanh toán qua Gumroad, tải PDF ngay sau đó. Mỗi lượt mua tương ứng một bản sách cho một người đọc.</div>
+        </details>
+        <details class="acc rv">
+          <summary>Nên mua cuốn nào trước?</summary>
+          <div class="acc__body">Nếu bạn nộp đơn mà chưa được gọi phỏng vấn, vấn đề nằm ở vòng CV — chọn <a href="https://engineerprovn.gumroad.com/l/Forty-Seconds-Ten-Real-CVs-That-Passed-Big-Tech">Forty Seconds</a>. Nếu bạn đã được gọi phỏng vấn, hoặc vừa nhận offer và muốn biết đường đi phía sau, bắt đầu với cuốn này.</div>
+        </details>
+        <details class="acc rv">
+          <summary>Đọc xong rồi, viết đánh giá ở đâu?</summary>
+          <div class="acc__body">Gumroad chỉ cho người đã mua chấm điểm, nên nút đánh giá không nằm ở trang này. Mở <a href="https://app.gumroad.com/library" target="_blank" rel="noopener">thư viện Gumroad</a> của bạn, chọn cuốn sách rồi chấm sao kèm nhận xét — link tới thư viện cũng có sẵn trong email biên nhận lúc mua. Điểm và số lượt đánh giá sẽ hiện ngay trên trang này.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= FINAL CTA ======================= -->
+  <section aria-labelledby="h-final">
+    <div class="wrap">
+      <div class="final rv">
+        <p class="eyebrow">Phần ít ai viết ra</p>
+        <h2 id="h-final">Nhận offer không phải vạch đích. Đó là ngày đầu tiên của phần khó hơn.</h2>
+        <p>Hai tác giả không phải lúc nào cũng đồng ý với nhau, và những chỗ đó được giữ nguyên. Không hứa đường tắt — chỉ là bạn đi mà biết đường.</p>
+        <a class="btn btn--primary" data-gumroad-action="buy">
+          Mua Cafe Talk — <span data-gumroad-field="price">$10.99</span>
+        </a>
+        <p class="final__deal">Giá gốc <s>$15.99</s> · giảm <b>$5</b> tự động ở bước thanh toán</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot__in">
+      <span>© EngineerPro</span>
+      <a href="https://engineerprovn.gumroad.com/">Tất cả sách trên Gumroad</a>
+      <a href="https://engineerprogurus.com/ebooks/" target="_blank" rel="noopener">engineerprogurus.com</a>
+    </div>
+  </footer>
+</main>
+
+<!-- ======================= STICKY BUY DOCK (mobile) ======================= -->
+<div class="dock" id="dock">
+  <div class="dock__txt">
+    <p class="dock__t" data-gumroad-field="name">Cafe Talk</p>
+    <p class="dock__p"><s>$15.99</s> <span data-gumroad-field="price">$10.99</span> · PDF 67 trang</p>
+  </div>
+  <a class="btn btn--primary btn--sm" data-gumroad-action="buy">Mua</a>
+</div>
+
+<!-- ======================= DEMO MODAL ======================= -->
+<div class="modal" id="demo" role="dialog" aria-modal="true" aria-labelledby="demoTitle">
+  <div class="modal__box">
+    <div class="modal__head">
+      <h3 id="demoTitle">Thử việc theo luật Việt Nam</h3>
+      <button class="modal__x" type="button" id="demoX" title="Đóng">
+        <span aria-hidden="true">✕</span><span class="sr">Đóng</span>
+      </button>
+    </div>
+    <p class="lede" style="margin-top:.6rem;font-size:.93rem">
+      Phần luật lao động trong sách dẫn điều khoản cụ thể, không nói chung chung. Ba con số dưới đây là ví dụ — rất ít người đi làm biết đủ cả ba.
+    </p>
+
+    <div class="bullet">
+      <p class="bullet__lbl">Ba con số</p>
+      <div class="bullet__key">
+        <span><b>Trần 60 ngày:</b> thời gian thử việc không được vượt mức luật định cho vị trí của bạn</span>
+        <span><b>85%:</b> mức lương tối thiểu trong thời gian thử việc, tính trên lương của công việc đó</span>
+        <span><b>Một lần:</b> một người chỉ thử việc một lần cho một vị trí — không có chuyện gia hạn thêm vòng nữa</span>
+      </div>
+    </div>
+
+    <div class="bullet">
+      <p class="bullet__lbl">Trong sách còn có</p>
+      <p class="bullet__txt">
+        Trợ cấp mất việc <mark>thực nhận</mark> là bao nhiêu, <mark>hạn nộp</mark> bảo hiểm thất nghiệp,
+        quyền lợi khi bị cắt giảm, và vì sao người đang làm ở nước ngoài phải
+        <mark>tra visa trước khi sửa CV</mark>.
+      </p>
+    </div>
+
+    <p style="margin-top:1.3rem">
+      <a class="btn btn--primary btn--block" data-gumroad-action="buy">
+        Mua sách — <span data-gumroad-field="price">$10.99</span>
+      </a>
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- theme toggle (light / dark) ---------- */
+  var root = document.documentElement;
+  var btn = document.getElementById("themeBtn");
+  var ico = document.getElementById("themeIco");
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function isDark() {
+    var t = root.getAttribute("data-theme");
+    return t ? t === "dark" : systemDark();
+  }
+  function paint() {
+    var dark = isDark();
+    if (ico) ico.textContent = dark ? "\u2600" : "\u263e";
+    if (btn) {
+      btn.setAttribute("aria-pressed", dark ? "true" : "false");
+      btn.setAttribute("title", dark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối");
+    }
+  }
+  var saved = read("ep-landing-theme");
+  if (saved === "dark" || saved === "light") root.setAttribute("data-theme", saved);
+  paint();
+
+  if (btn) {
+    btn.addEventListener("click", function () {
+      var next = isDark() ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      store("ep-landing-theme", next);
+      paint();
+    });
+  }
+
+  /* ---------- scroll reveal ---------- */
+  var items = [].slice.call(document.querySelectorAll(".rv"));
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !("IntersectionObserver" in window)) {
+    items.forEach(function (el) { el.classList.add("in"); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    items.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------- sticky buy dock: show once the hero CTA scrolls away ---------- */
+  var dock = document.getElementById("dock");
+  var anchor = document.getElementById("buy");
+  if (dock && anchor && "IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) {
+      dock.classList.toggle("is-on", !entries[0].isIntersecting);
+    }, { threshold: 0 }).observe(anchor);
+  }
+
+  /* ---------- rating row: only reveal it once there is a real rating ---------- */
+  var ratingRow = document.getElementById("ratingRow");
+  if (ratingRow) {
+    var countEl = ratingRow.querySelector('[data-gumroad-field="review-count"]');
+    var rateEl = ratingRow.querySelector('[data-gumroad-field="rating"]');
+    var count = parseInt(((countEl && countEl.textContent) || "").replace(/[^0-9]/g, ""), 10) || 0;
+    if (count > 0) {
+      var score = parseFloat(((rateEl && rateEl.textContent) || "").replace(",", ".")) || 0;
+      /* floor, never round up: the exact score sits next to the stars anyway,
+         so erring low is better than claiming a star that was not earned */
+      var full = Math.max(0, Math.min(5, Math.floor(score)));
+      ratingRow.querySelector("#ratingStars").textContent =
+        "★★★★★".slice(0, full) + "☆☆☆☆☆".slice(0, 5 - full);
+      ratingRow.hidden = false;
+    }
+  }
+
+  /* ---------- demo modal (focus-trapped, Esc to close) ---------- */
+  var modal = document.getElementById("demo");
+  var open = document.getElementById("demoBtn");
+  var close = document.getElementById("demoX");
+  var lastFocus = null;
+
+  function focusables() {
+    return [].slice.call(
+      modal.querySelectorAll('a[href], a[data-gumroad-action], button, input, [tabindex]:not([tabindex="-1"])')
+    ).filter(function (el) { return el.offsetParent !== null || el === close; });
+  }
+  function openModal() {
+    lastFocus = document.activeElement;
+    modal.classList.add("is-open");
+    var f = focusables();
+    if (f.length) f[0].focus();
+  }
+  function closeModal() {
+    modal.classList.remove("is-open");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  if (open) open.addEventListener("click", openModal);
+  if (close) close.addEventListener("click", closeModal);
+  if (modal) {
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (!modal || !modal.classList.contains("is-open")) return;
+    if (e.key === "Escape") { closeModal(); return; }
+    if (e.key !== "Tab") return;
+    var f = focusables();
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  /* ---------- keep anchor-style buy elements keyboard-operable ---------- */
+  [].slice.call(document.querySelectorAll('a[data-gumroad-action="buy"]')).forEach(function (el) {
+    if (!el.hasAttribute("href")) {
+      el.setAttribute("role", "button");
+      el.setAttribute("tabindex", "0");
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); }
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>
