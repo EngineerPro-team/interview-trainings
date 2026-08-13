@@ -40,13 +40,16 @@ OG_IMAGE: str = "/assets/img/og-share.png"
 # Public URL segment for System Design material tab (SPA route id stays "system-design").
 SYSTEM_DESIGN_URL_SLUG: str = "system-design-material"
 
+# The books are sold only on Gumroad, so the header CTA and the retired
+# /ebooks/ path both point here.
+GUMROAD_STORE_URL: str = "https://engineerprovn.gumroad.com/"
+
 # Routes that should be prerendered as real paths (besides home which is "/").
 # Order also drives navigation in the prerendered <noscript> fallback.
 TOP_ROUTES = [
     ("courses",   "Khoá học",          "Courses"),
     ("lich-khai-giang", "Lịch khai giảng", "Course Schedule"),
     ("book",          "Coding Book",       "Coding Book"),
-    ("ebooks",        "E-books",           "E-books"),
     (SYSTEM_DESIGN_URL_SLUG, "System design material", "System design material"),
     ("mock",          "Mock Interview 1-1", "Mock Interview 1-1"),
     ("resources", "Interview Resources", "Interview Resources"),

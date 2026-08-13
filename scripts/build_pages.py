@@ -59,6 +59,7 @@ from site_config import (  # noqa: E402
     SITE_NAME,
     OG_IMAGE,
     SYSTEM_DESIGN_URL_SLUG,
+    GUMROAD_STORE_URL,
 )
 
 # First publish date of the original v2 System Design set (used as datePublished
@@ -546,7 +547,6 @@ ROUTE_OG_IMAGES = {
     "mock": "/assets/img/mock-interview-cover.jpg",
     SYSTEM_DESIGN_URL_SLUG: "/assets/img/system-design-cover.png",
     "lich-khai-giang": "/assets/img/schedule-og.png",
-    "ebooks": "/assets/img/ebooks/forty-seconds-cover.jpg",
 }
 
 SD_AUTHORS = [
@@ -590,63 +590,8 @@ def sd_chapter_intro_snippet(slug: str, limit: int = 320) -> str:
     return cut + "…"
 
 
-def ebooks_schema(canonical: str) -> list[dict]:
-    """Book + Offer nodes for the /ebooks/ route.
-
-    The e-book grid is rendered client-side, so this JSON-LD is the only
-    machine-readable copy of the catalogue a crawler sees on the first pass.
-    """
-    books = load_data_array("ebooks-data.js", "EBOOKS")
-    items = []
-    for idx, b in enumerate(books, start=1):
-        price = re.fullmatch(r"\$(\d+(?:\.\d{1,2})?)", b.get("price", "").strip())
-        if not price:
-            raise ValueError(
-                f"ebooks-data.js: cannot read a USD amount from price "
-                f"{b.get('price')!r} for {b.get('slug')!r}"
-            )
-        book = {
-            "@type": "Book",
-            "@id": f"{canonical}#{b['slug']}",
-            "name": b["title"],
-            "url": b["url"],
-            "image": absolutise(b["cover"]),
-            "description": b["blurb"],
-            "bookFormat": "https://schema.org/EBook",
-            "inLanguage": "vi",
-            # "Lâm Phạm (NVIDIA) & Harry Lê Quang Hoà (AWS)" -> two Person nodes.
-            "author": [
-                {"@type": "Person", "name": re.sub(r"\s*\([^)]*\)", "", a).strip()}
-                for a in b["authors"].split("&")
-            ],
-            "publisher": {"@id": f"{SITE_BASE}/#organization"},
-            "offers": {
-                "@type": "Offer",
-                "url": b["url"],
-                "price": price.group(1),
-                "priceCurrency": "USD",
-                "availability": "https://schema.org/InStock",
-            },
-        }
-        pages = re.search(r"(\d+)\s*trang", b.get("format", ""))
-        if pages:
-            book["numberOfPages"] = int(pages.group(1))
-        items.append({"@type": "ListItem", "position": idx, "item": book})
-
-    return [{
-        "@type": "ItemList",
-        "@id": canonical + "#catalogue",
-        "name": f"{SITE_NAME} — E-books",
-        "numberOfItems": len(items),
-        "itemListOrder": "https://schema.org/ItemListOrderAscending",
-        "itemListElement": items,
-    }]
-
-
 # Routes that contribute item-level schema on top of the generic WebPage graph.
-ROUTE_EXTRA_SCHEMA = {
-    "ebooks": ebooks_schema,
-}
+ROUTE_EXTRA_SCHEMA: dict = {}
 
 
 # ---------- no-JS listing snippets -------------------------------------------
@@ -713,21 +658,12 @@ def snippet_podcast() -> str:
     ])
 
 
-def snippet_ebooks() -> str:
-    return _pre_list([
-        (b.get("url", ""), b.get("title", ""),
-         " · ".join(x for x in (b.get("format"), b.get("price")) if x), b.get("blurb", ""))
-        for b in load_data_array("ebooks-data.js", "EBOOKS")
-    ])
-
-
 # slug -> (container id, snippet builder)
 ROUTE_SNIPPETS = {
     "courses": ("coursesGrid", snippet_courses),
     "mentors": ("mentorsGrid", snippet_mentors),
     "stories": ("storiesGrid", snippet_stories),
     "podcast": ("podcastGrid", snippet_podcast),
-    "ebooks":  ("ebooksGrid",  snippet_ebooks),
 }
 
 
@@ -1078,7 +1014,6 @@ ROUTE_DESCRIPTIONS_VI = {
     "courses":   "12 khoá đào tạo chuyên sâu — DSA, System Design, ML / Agentic AI, Backend (Go/Java), Behavioural Interview, Machine Coding.",
     "lich-khai-giang": "Lịch khai giảng các lớp mới tại EngineerPro — DSA Level 1/2/3, System Design Level 1/2, Backend Golang, ML / Agentic AI, Behavioral Interview. Lớp online, mentor Big Tech, giờ học GMT+7.",
     "book":          "Coding DSA Interview at Big Tech — 288 bài, 44 patterns, lời giải đầy đủ. Miễn phí cho cộng đồng.",
-    "ebooks":        "E-books của EngineerPro trên Gumroad — 'Forty Seconds: Ten Real CVs That Passed Big Tech' và 'Cafe Talk: The Interview & Career Playbook', từ mentor NVIDIA & AWS (PDF, tiếng Việt).",
     SYSTEM_DESIGN_URL_SLUG: (
         "21 case study System Design Interview gốc — đọc từng chương (VI & EN). "
         "Nội dung gốc bởi EngineerPro."
@@ -1131,14 +1066,17 @@ SPA_FALLBACK_404 = """<!doctype html>
 #   4. location.replace() for visitors with JS — instant, no extra history entry
 #      (clicking Back doesn't bounce them back to the legacy URL).
 #   5. Visible fallback <a> for accessibility / screen-reader users.
+#
+# For an off-site target (a store we don't own) step 1 is dropped: a cross-domain
+# canonical to a domain we can't control is not something Google honours, and
+# claiming it would be wrong anyway. noindex still retires the old URL.
 LEGACY_REDIRECT_HTML = """<!doctype html>
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
   <title>Redirecting → {target_path} · EngineerPro</title>
   <meta name="robots" content="noindex,follow" />
-  <link rel="canonical" href="{target_url}" />
-  <meta http-equiv="refresh" content="0;url={target_url}" />
+{canonical_tag}  <meta http-equiv="refresh" content="0;url={target_url}" />
   <script>location.replace({target_url!r});</script>
 </head>
 <body>
@@ -1291,9 +1229,14 @@ def main() -> int:
     # standalone HTML file that does an immediate client-side redirect to the
     # new path, with rel="canonical" so Google transfers ranking to the new URL
     # over time (GH Pages can't issue real HTTP 301s).
+    # A value starting with http:// or https:// is treated as an off-site target
+    # and used verbatim; anything else is a path on this site.
     legacy_redirects = {
         "/pages/dieu-khoan-dich-vu":  "/terms/",
         "/system-design": f"/{SYSTEM_DESIGN_URL_SLUG}/",
+        # The /ebooks/ listing was retired in favour of sending buyers straight
+        # to the Gumroad store, which is the only place the books are sold.
+        "/ebooks": GUMROAD_STORE_URL,
         # Add more legacy paths here as we discover them:
         # "/blogs/faqs":              "/faq/",
         # "/pages/lien-he":           "/contact/",
@@ -1305,12 +1248,15 @@ def main() -> int:
             )
     for old_path, new_path in legacy_redirects.items():
         rel_dir = old_path.strip("/")
-        target_url = f"{SITE_BASE}{new_path}"
+        offsite = new_path.startswith(("http://", "https://"))
+        target_url = new_path if offsite else f"{SITE_BASE}{new_path}"
+        canonical = "" if offsite else f'  <link rel="canonical" href="{target_url}" />\n'
         write(
             os.path.join(DOCS, rel_dir, "index.html"),
             LEGACY_REDIRECT_HTML.format(
                 target_url=target_url,
                 target_path=new_path,
+                canonical_tag=canonical,
                 site_base=SITE_BASE,
             ),
         )
