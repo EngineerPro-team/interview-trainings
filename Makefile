@@ -12,12 +12,13 @@ PORT      := 8001
 # Override with: make PYTHON=python3 crawl
 PYTHON   ?= python3.11
 
-.PHONY: github local-build serve dev clean crawl crawl-courses crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks review-system-design help
+.PHONY: github local-build serve dev clean crawl crawl-courses course-extras crawl-podcasts crawl-faqs crawl-resources crawl-cs-fundamental parse-stories crawl-story-images crawl-story-bodies translate-stories fix-translations clean-story-html seo stats prerender og masks review-system-design help
 
 help:
 	@echo "EngineerPro rebuild — available targets:"
 	@echo "  make crawl           Refresh all data files (courses + podcasts + FAQ + resources)"
 	@echo "  make crawl-courses   Just the course pages (~10 after EXCLUDED_SLUGS) → src/assets/courses-data.js"
+	@echo "  make course-extras   Re-inject hand-curated course blocks (no crawl, keeps htmlEn)"
 	@echo "  make crawl-podcasts  Just the Substack archive → src/assets/podcasts-data.js"
 	@echo "  make crawl-faqs      Just the FAQ page         → src/assets/faqs-data.js"
 	@echo "  make crawl-resources Just YouTube playlists    → src/assets/resources-data.js"
@@ -38,6 +39,10 @@ crawl: crawl-courses crawl-podcasts crawl-faqs crawl-resources
 crawl-courses:
 	@echo "→ Crawling course pages from engineerprogurus.com ..."
 	@$(PYTHON) scripts/crawl_courses.py
+
+course-extras:
+	@echo "→ Re-injecting hand-curated course blocks (no crawl, keeps htmlEn) ..."
+	@$(PYTHON) scripts/crawl_courses.py --extras-only
 
 crawl-podcasts:
 	@echo "→ Crawling podcast archive from Substack ..."

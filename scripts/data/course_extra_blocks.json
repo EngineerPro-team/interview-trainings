@@ -1,0 +1,24 @@
+[
+  {
+    "slug": "khoa-hoc-system-design-interview-big-tech",
+    "note": "Community System Design techtalk (TikTok realtime) — hosted by EngineerPro.",
+    "id": "techtalk-tiktok-realtime",
+    "insertBefore": {
+      "vi": "<p>Hãy tham gia ngay",
+      "en": "<p>Join now to not miss"
+    },
+    "vi": "<h2><strong>Một buổi techtalk System Design thật do EngineerPro tổ chức</strong></h2><p>Muốn biết trước mình sẽ học kiểu gì? Đây là buổi techtalk System Design team EngineerPro tổ chức cho cộng đồng, mổ xẻ trọn một bài toán thật: TikTok phục vụ 2,1 triệu người xem realtime cùng lúc bằng cách nào — từ việc chốt yêu cầu, ước lượng quy mô, tới kiến trúc cuối cùng. Đúng dạng câu hỏi bạn sẽ gặp ở vòng System Design của Big Tech.</p><div class=\"embed-16x9\"><iframe src=\"https://www.youtube-nocookie.com/embed/7MOXhbB9co8?rel=0&amp;modestbranding=1&amp;playsinline=1\" title=\"[TechTalk] 2,1 TRIỆU NGƯỜI XEM REALTIME. TIKTOK ĐÃ LÀM ĐIỀU ĐÓ NHƯ THẾ NÀO?\" loading=\"lazy\" frameborder=\"0\" allowfullscreen allow=\"accelerometer; encrypted-media; picture-in-picture\"></iframe></div>",
+    "en": "<h2><strong>A real System Design techtalk hosted by EngineerPro</strong></h2><p>Want to see how we teach before you sign up? This is a System Design techtalk our team ran for the community, walking through one real problem end to end: how TikTok serves 2.1 million concurrent realtime viewers — pinning down the requirements, estimating scale, then landing on the final architecture. Exactly the kind of question a Big Tech System Design round asks.</p><div class=\"embed-16x9\"><iframe src=\"https://www.youtube-nocookie.com/embed/7MOXhbB9co8?rel=0&amp;modestbranding=1&amp;playsinline=1\" title=\"[TechTalk] 2,1 TRIỆU NGƯỜI XEM REALTIME. TIKTOK ĐÃ LÀM ĐIỀU ĐÓ NHƯ THẾ NÀO?\" loading=\"lazy\" frameborder=\"0\" allowfullscreen allow=\"accelerometer; encrypted-media; picture-in-picture\"></iframe></div>"
+  },
+  {
+    "slug": "system-design-interview-level-2",
+    "note": "Community System Design techtalk (TikTok realtime) — hosted by EngineerPro.",
+    "id": "techtalk-tiktok-realtime",
+    "insertBefore": {
+      "vi": "<h2><strong>FEEDBACK từ học viên</strong></h2>",
+      "en": "<h2><strong>FEEDBACK from students</strong></h2>"
+    },
+    "vi": "<h2><strong>Một buổi techtalk System Design thật do EngineerPro tổ chức</strong></h2><p>Buổi techtalk team EngineerPro tổ chức cho cộng đồng, chạy trọn một bài toán ở đúng tầm Level 2: TikTok phục vụ 2,1 triệu người xem realtime cùng lúc bằng cách nào. Xem để thấy các trade-off được cân trực tiếp trên bảng — chọn gì, bỏ gì, và vì sao — thay vì chỉ đọc lý thuyết.</p><div class=\"embed-16x9\"><iframe src=\"https://www.youtube-nocookie.com/embed/7MOXhbB9co8?rel=0&amp;modestbranding=1&amp;playsinline=1\" title=\"[TechTalk] 2,1 TRIỆU NGƯỜI XEM REALTIME. TIKTOK ĐÃ LÀM ĐIỀU ĐÓ NHƯ THẾ NÀO?\" loading=\"lazy\" frameborder=\"0\" allowfullscreen allow=\"accelerometer; encrypted-media; picture-in-picture\"></iframe></div>",
+    "en": "<h2><strong>A real System Design techtalk hosted by EngineerPro</strong></h2><p>A techtalk our team ran for the community, taking one Level 2-grade problem all the way through: how TikTok serves 2.1 million concurrent realtime viewers. Watch the trade-offs get weighed live on the whiteboard — what we pick, what we drop, and why — instead of just reading the theory.</p><div class=\"embed-16x9\"><iframe src=\"https://www.youtube-nocookie.com/embed/7MOXhbB9co8?rel=0&amp;modestbranding=1&amp;playsinline=1\" title=\"[TechTalk] 2,1 TRIỆU NGƯỜI XEM REALTIME. TIKTOK ĐÃ LÀM ĐIỀU ĐÓ NHƯ THẾ NÀO?\" loading=\"lazy\" frameborder=\"0\" allowfullscreen allow=\"accelerometer; encrypted-media; picture-in-picture\"></iframe></div>"
+  }
+]

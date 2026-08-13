@@ -8,6 +8,10 @@ Output: src/assets/courses-data.js
 
 Re-run any time you want to refresh the cache:
     python3 scripts/crawl_courses.py
+
+Re-apply only the hand-curated blocks from data/course_extra_blocks.json, with
+no network calls and no loss of the existing htmlEn translations:
+    python3 scripts/crawl_courses.py --extras-only
 """
 from __future__ import annotations
 
@@ -371,9 +375,141 @@ def load_extra_courses() -> list[dict]:
 
 
 # ===================================================================
+#  Extra hand-curated blocks injected into an upstream course body
+# ===================================================================
+# Upstream (engineerprogurus.com) is the source of truth for course bodies, so
+# anything we add by hand would be wiped on the next crawl. Blocks declared in
+# this file are re-injected after every crawl instead.
+EXTRA_BLOCKS_FILE = Path(__file__).resolve().parent / "data" / "course_extra_blocks.json"
+
+
+def load_extra_blocks() -> list[dict]:
+    if not EXTRA_BLOCKS_FILE.exists():
+        return []
+    try:
+        return json.loads(EXTRA_BLOCKS_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"  ! failed to load {EXTRA_BLOCKS_FILE.name}: {e}")
+        return []
+
+
+def _wrap_block(block_id: str, body_html: str) -> str:
+    return f'<div class="course-extra" data-extra="{block_id}">{body_html}</div>'
+
+
+def _replace_block(body: str, block_id: str, wrapped: str) -> str | None:
+    """Swap an already-present block for the current curated version.
+
+    Returns None when the block isn't there yet, and the untouched body when it
+    is already up to date — that keeps us from re-serialising (and subtly
+    reformatting) bodies that need no change.
+    """
+    if f'data-extra="{block_id}"' not in body:
+        return None
+    soup = BeautifulSoup(body, "html.parser")
+    node = soup.find(attrs={"data-extra": block_id})
+    if node is None:
+        return None
+    replacement = BeautifulSoup(wrapped, "html.parser").find(attrs={"data-extra": block_id})
+    # Compare both sides after a parse round-trip; a raw-string compare would
+    # always differ on attribute normalisation (allowfullscreen -> ="").
+    if str(node) == str(replacement):
+        return body
+    node.replace_with(replacement)
+    return str(soup)
+
+
+def inject_extra_blocks(courses: list[dict]) -> None:
+    """Splice hand-curated HTML into the crawled course bodies, in place.
+
+    Safe to run repeatedly: a block already in the body is updated rather than
+    duplicated. That also repairs the `htmlEn` case where a re-crawl dropped the
+    translations and `translate_courses.py` machine-translated our curated
+    English copy back out of the Vietnamese body.
+
+    Blocks land before their per-language `insertBefore` anchor. If upstream ever
+    rewrites that anchor away we append instead, so the content is never lost.
+    """
+    blocks = load_extra_blocks()
+    if not blocks:
+        return
+    by_slug = {c["slug"]: c for c in courses}
+    for block in blocks:
+        course = by_slug.get(block["slug"])
+        if course is None:
+            print(f"  ! extra block target missing: {block['slug']}")
+            continue
+        for lang, field in (("vi", "html"), ("en", "htmlEn")):
+            body, addition = course.get(field), block.get(lang)
+            if not body or not addition:
+                continue
+            wrapped = _wrap_block(block["id"], addition)
+            replaced = _replace_block(body, block["id"], wrapped)
+            if replaced is not None:
+                if replaced == body:
+                    continue
+                course[field] = replaced
+                where = "refreshed in place"
+            else:
+                anchor = (block.get("insertBefore") or {}).get(lang)
+                if anchor and anchor in body:
+                    course[field] = body.replace(anchor, wrapped + anchor, 1)
+                    where = "inserted before anchor"
+                else:
+                    course[field] = body + wrapped
+                    where = "appended (anchor not found)"
+            print(f"  + {block['slug']} [{field}]: {block['id']} {where}")
+
+
+# ===================================================================
 #  Main
 # ===================================================================
+def load_existing() -> list[dict]:
+    """Parse the courses already on disk, so --extras-only can patch them
+    without a full re-crawl (which would drop every htmlEn translation)."""
+    raw = OUT.read_text(encoding="utf-8")
+    m = re.search(r"window\.COURSES\s*=\s*(\[.*\]);", raw, re.S)
+    if not m:
+        raise SystemExit(f"! could not parse {OUT.name}")
+    return json.loads(m.group(1))
+
+
+def write_out(results: list[dict]) -> int:
+    # Normalise legacy brand naming — the upstream blog uses the long form
+    # "EngineerPro / EngineerPro Academy" in many course bodies. We only
+    # operate under "EngineerPro" now.
+    def _strip_academy(s: str) -> str:
+        s = re.sub(r'EngineerPro\s*/\s*EngineerPro Academy', 'EngineerPro', s)
+        s = re.sub(r'EngineerPro và EngineerPro Academy', 'EngineerPro', s)
+        return s.replace(' tại EngineerPro Academy', ' tại EngineerPro') \
+                .replace(' at EngineerPro Academy', ' at EngineerPro') \
+                .replace('EngineerPro Academy', 'EngineerPro')
+
+    for c in results:
+        for k in ("title", "blurb", "html", "htmlEn"):
+            if isinstance(c.get(k), str):
+                c[k] = _strip_academy(c[k])
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(results, ensure_ascii=False, indent=2)
+    OUT.write_text(
+        "// AUTO-GENERATED by scripts/crawl_courses.py — do not edit by hand.\n"
+        "// Source: engineerprogurus.com/blogs/khoa-hoc (pages 1-4)\n"
+        f"window.COURSES = {payload};\n",
+        encoding="utf-8",
+    )
+    rel = OUT.relative_to(OUT.parent.parent.parent)
+    print(f"✓ wrote {len(results)} courses → {rel}")
+    return 0
+
+
 def main() -> int:
+    if "--extras-only" in sys.argv:
+        print(f"→ re-injecting extra blocks into {OUT.name} (no crawl) …")
+        results = load_existing()
+        inject_extra_blocks(results)
+        return write_out(results)
+
     print(f"→ discovering slugs across {PAGES} listing pages …")
     courses = discover_courses()
     print(f"  found {len(courses)} unique courses")
@@ -403,33 +539,9 @@ def main() -> int:
         time.sleep(0.2)
 
     results.extend(load_extra_courses())
+    inject_extra_blocks(results)
 
-    # Normalise legacy brand naming — the upstream blog uses the long form
-    # "EngineerPro / EngineerPro Academy" in many course bodies. We only
-    # operate under "EngineerPro" now.
-    def _strip_academy(s: str) -> str:
-        s = re.sub(r'EngineerPro\s*/\s*EngineerPro Academy', 'EngineerPro', s)
-        s = re.sub(r'EngineerPro và EngineerPro Academy', 'EngineerPro', s)
-        return s.replace(' tại EngineerPro Academy', ' tại EngineerPro') \
-                .replace(' at EngineerPro Academy', ' at EngineerPro') \
-                .replace('EngineerPro Academy', 'EngineerPro')
-
-    for c in results:
-        for k in ("title", "blurb", "html", "htmlEn"):
-            if isinstance(c.get(k), str):
-                c[k] = _strip_academy(c[k])
-
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(results, ensure_ascii=False, indent=2)
-    OUT.write_text(
-        "// AUTO-GENERATED by scripts/crawl_courses.py — do not edit by hand.\n"
-        "// Source: engineerprogurus.com/blogs/khoa-hoc (pages 1-4)\n"
-        f"window.COURSES = {payload};\n",
-        encoding="utf-8",
-    )
-    rel = OUT.relative_to(OUT.parent.parent.parent)
-    print(f"✓ wrote {len(results)} courses → {rel}")
-    return 0
+    return write_out(results)
 
 
 if __name__ == "__main__":
