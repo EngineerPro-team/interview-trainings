@@ -20,20 +20,20 @@ window.SCHEDULE = [
     durVi: "16 buổi · 8 tuần", durEn: "16 sessions · 8 weeks",
   },
   {
+    course: "khoa-hoc-backend-golang",
+    label: "Backend Golang Level 1",
+    date: "2026-10-24",
+    dayVi: "Thứ 7 hàng tuần", dayEn: "Every Saturday",
+    time: "08:00–10:00",
+    durVi: "12 buổi · 12 tuần", durEn: "12 sessions · 12 weeks",
+  },
+  {
     course: "khoa-hoc-dsa",
     label: "DSA Level 1",
     date: "2026-10-13",
     dayVi: "Thứ 3 & Thứ 7 hàng tuần", dayEn: "Tuesday & Saturday",
     time: "20:00–22:00",
     durVi: "22 buổi · 11 tuần", durEn: "22 sessions · 11 weeks",
-  },
-  {
-    course: "khoa-hoc-backend-golang",
-    label: "Backend Golang Level 1",
-    date: "2026-10-03",
-    dayVi: "Thứ 7 hàng tuần", dayEn: "Every Saturday",
-    time: "08:00–10:00",
-    durVi: "12 buổi · 12 tuần", durEn: "12 sessions · 12 weeks",
   },
   {
     course: "khoa-hoc-system-design-interview-big-tech",

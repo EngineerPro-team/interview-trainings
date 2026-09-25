@@ -42,8 +42,8 @@ MONTHS = [
         ("20/09", "System Design Interview L1", "Chủ nhật · 08:00–10:00"),
     ]),
     ("THÁNG 10 · 2026", [
-        ("03/10", "Backend Golang L1", "Thứ 7 · 08:00–10:00"),
         ("13/10", "DSA Level 1", "Thứ 3 & Thứ 7 · 20:00–22:00"),
+        ("24/10", "Backend Golang L1", "Thứ 7 · 08:00–10:00"),
         ("25/10", "DSA Level 2", "Thứ 4 & CN · 20:00–22:00"),
     ]),
 ]
