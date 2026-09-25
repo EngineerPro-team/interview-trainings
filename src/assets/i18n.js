@@ -27,7 +27,7 @@ window.I18N = {
     "nav.contact":    "Liên hệ",
 
     // ============== LỊCH KHAI GIẢNG ==============
-    "sched.eyebrow":     "EngineerPro · Khai giảng 2026",
+    "sched.eyebrow":     "EngineerPro · Khai giảng 2026–2027",
     "sched.title":       "Lịch khai giảng các lớp mới",
     "sched.sub":         "Lớp online, mentor 100% từ Big Tech. Giờ học theo múi giờ Việt Nam (GMT+7) — inbox fanpage để giữ chỗ sớm.",
     "sched.cta.inbox":   "Inbox giữ chỗ ngay",
@@ -38,6 +38,8 @@ window.I18N = {
     "sched.sep":         "Tháng 9 · 2026",
     "sched.oct":         "Tháng 10 · 2026",
     "sched.nov":         "Tháng 11 · 2026",
+    "sched.jan":         "Tháng 1 · 2027",
+    "sched.feb":         "Tháng 2 · 2027",
     "sched.dsa3.day":    "Thứ 7 hàng tuần",
     "sched.dsa3.dur":    "12 buổi · 12 tuần",
     "sched.sd2.day":     "Chủ nhật hàng tuần",
@@ -556,7 +558,7 @@ window.I18N = {
     "nav.contact":    "Contact",
 
     // ============== COURSE SCHEDULE ==============
-    "sched.eyebrow":     "EngineerPro · 2026 Cohorts",
+    "sched.eyebrow":     "EngineerPro · 2026–2027 Cohorts",
     "sched.title":       "Upcoming course launch schedule",
     "sched.sub":         "Online classes, mentors 100% from Big Tech. Times shown in Vietnam time (GMT+7) — inbox our fanpage to reserve a seat early.",
     "sched.cta.inbox":   "Inbox to reserve",
@@ -567,6 +569,8 @@ window.I18N = {
     "sched.sep":         "September · 2026",
     "sched.oct":         "October · 2026",
     "sched.nov":         "November · 2026",
+    "sched.jan":         "January · 2027",
+    "sched.feb":         "February · 2027",
     "sched.dsa3.day":    "Every Saturday",
     "sched.dsa3.dur":    "12 sessions · 12 weeks",
     "sched.sd2.day":     "Every Sunday",

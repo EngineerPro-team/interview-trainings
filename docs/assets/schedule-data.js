@@ -4,6 +4,30 @@
 // `date` is ISO (YYYY-MM-DD) for sorting; `course` matches a COURSES slug.
 window.SCHEDULE = [
   {
+    course: "system-design-interview-level-2",
+    label: "System Design Interview Level 2",
+    date: "2027-02-14",
+    dayVi: "Chủ nhật hàng tuần", dayEn: "Every Sunday",
+    time: "10:00–11:59",
+    durVi: "12 buổi · 12 tuần", durEn: "12 sessions · 12 weeks",
+  },
+  {
+    course: "behaviour-interview-course",
+    label: "Behavioral Interview",
+    date: "2027-01-09",
+    dayVi: "Tối T2 & chiều T7 hàng tuần", dayEn: "Mon evening & Sat afternoon",
+    time: "T2 21:30–23:30 · T7 14:00–16:00",
+    durVi: "12 buổi · 6 tuần", durEn: "12 sessions · 6 weeks",
+  },
+  {
+    course: "khoa-hoc-system-design-interview-big-tech",
+    label: "System Design Interview Level 1",
+    date: "2027-01-03",
+    dayVi: "Chủ nhật hàng tuần", dayEn: "Every Sunday",
+    time: "08:00–10:00",
+    durVi: "12 buổi · 12 tuần", durEn: "12 sessions · 12 weeks",
+  },
+  {
     course: "computer-science-fundamental-interview",
     label: "CS Fundamentals · K09",
     date: "2026-11-07",
