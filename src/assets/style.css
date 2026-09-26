@@ -727,16 +727,21 @@ p {
   color: #fff;
 }
 
-/* Header CTA to the Gumroad store — the only place the books are sold, so it
-   sits outside the collapsible nav and stays visible on every screen size.
-   Navy on orange rather than the usual white on orange: white only reaches
-   2.6:1 against #ff7a18, which is below AA for a control this small. */
+/* Header CTAs sit outside the collapsible nav and stay visible on every
+   screen size. Gumroad (orange) + AI/ML courses (navy) so curious visitors
+   can hop to the sister site without digging through the menu. */
+.nav__ctas {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  margin-left: 0.5rem;
+}
 .nav__store {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   flex: 0 0 auto;
-  margin-left: 0.5rem;
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
   background: var(--orange);
@@ -747,12 +752,22 @@ p {
   box-shadow: 0 6px 16px rgba(255, 122, 24, 0.35);
   transition: background 0.2s, transform 0.12s, box-shadow 0.2s;
 }
+.nav__store--aiml {
+  background: var(--navy);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(11, 29, 58, 0.28);
+}
 .nav__store:hover {
   background: #ff8c33;
   color: #0b1d3a;
   text-decoration: none;
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(255, 122, 24, 0.45);
+}
+.nav__store--aiml:hover {
+  background: #16305a;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(11, 29, 58, 0.38);
 }
 .nav__store:active {
   transform: translateY(0);
@@ -765,14 +780,34 @@ p {
   background: #ff8c33;
   color: #0b1d3a;
 }
+:root[data-theme="dark"] .nav__store--aiml {
+  background: #d6e4ff;
+  color: #0b1d3a;
+}
+:root[data-theme="dark"] .nav__store--aiml:hover {
+  background: #eef3ff;
+  color: #0b1d3a;
+}
+@media (max-width: 1100px) {
+  /* The AI/ML label is long — icon-only before the books button hides its words. */
+  .nav__store--aiml .nav__store-label {
+    display: none;
+  }
+  .nav__store--aiml {
+    padding: 0.45rem 0.65rem;
+  }
+}
 @media (max-width: 600px) {
-  /* Keep the button, drop the words — brand + 3 controls already fill the bar. */
+  /* Keep the buttons, drop the words — brand + controls already fill the bar. */
   .nav__store-label {
     display: none;
   }
+  .nav__ctas {
+    gap: 0.25rem;
+    margin-left: 0.25rem;
+  }
   .nav__store {
     padding: 0.45rem 0.6rem;
-    margin-left: 0.25rem;
   }
   .nav__store-icon {
     font-size: 1.1em;
@@ -797,9 +832,12 @@ p {
   .lang-switch {
     padding: 0.4rem 0.45rem;
   }
+  .nav__ctas {
+    gap: 0.15rem;
+    margin-left: 0.15rem;
+  }
   .nav__store {
     padding: 0.45rem 0.5rem;
-    margin-left: 0.15rem;
   }
 }
 
