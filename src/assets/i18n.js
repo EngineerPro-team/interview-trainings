@@ -194,6 +194,7 @@ window.I18N = {
     "roadmap.benefits.head": "Khi là học viên EngineerPro, bạn nhận được gì?",
     "roadmap.cta1":   "Xem khoá học áp dụng →",
     "roadmap.cta2":   "💬 Bấm vào đây để nhắn fanpage tư vấn lộ trình →",
+    "roadmap.video.caption": "Giải đáp thắc mắc lộ trình ôn tập Big Tech tại EngineerPro (Lần 3)",
 
     // ============== BOOK ==============
     "book.eyebrow":   "📚 Sách miễn phí cho cộng đồng · 2026",
@@ -717,6 +718,7 @@ window.I18N = {
     "roadmap.benefits.head": "What you get as an EngineerPro student",
     "roadmap.cta1":   "See applicable courses →",
     "roadmap.cta2":   "💬 Click here to message our Fanpage for a personalised plan →",
+    "roadmap.video.caption": "Q&A on the Big Tech interview roadmap at EngineerPro (Session 3)",
 
     "book.eyebrow":   "📚 Free for the community · 2026",
     "book.read.en":   "Read in English →",
