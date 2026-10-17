@@ -122,13 +122,15 @@
   // ships a <script> or javascript: URL we don't want it executing on the page.
   // Strips: <script>, <style>, on* event handlers, javascript:/data: hrefs.
   // Allows iframes only for known embed hosts (YouTube, Vimeo, Google Drive,
-  // Facebook page plugin).
+  // Facebook page plugin, Substack video/podcast player).
   const IFRAME_HOST_ALLOWLIST = [
     "www.youtube.com", "youtube.com",
     "www.youtube-nocookie.com", "youtube-nocookie.com",
     "player.vimeo.com",
     "drive.google.com", "docs.google.com",
     "www.facebook.com",
+    "engineerprovn.substack.com",
+    "substack.com",
   ];
   function sanitizeHtml(html) {
     if (!html || typeof html !== "string") return "";
