@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble src/dsa-homework/data/*.json into problems.js."""
+"""Assemble src/homework/data/*.json into problems.js."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HW = os.path.join(ROOT, "src", "dsa-homework")
+HW = os.path.join(ROOT, "src", "homework")
 DATA = os.path.join(HW, "data")
 CATALOG = os.path.join(HW, "catalog.json")
 OUT = os.path.join(HW, "problems.js")
@@ -73,9 +73,9 @@ def main() -> int:
     js = "window.DSA_HW = " + json.dumps(blob, ensure_ascii=False, indent=2) + ";\n"
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(js)
-    print(f"[dsa-homework] wrote {os.path.relpath(OUT, ROOT)}  problems={n_problems} complete={n_complete}")
+    print(f"[homework] wrote {os.path.relpath(OUT, ROOT)}  problems={n_problems} complete={n_complete}")
     if missing:
-        print("[dsa-homework] missing topic files:", ", ".join(missing))
+        print("[homework] missing topic files:", ", ".join(missing))
         return 1
     return 0
 

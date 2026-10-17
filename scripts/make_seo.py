@@ -176,6 +176,19 @@ def main() -> int:
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
         '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ]
+    # Unlisted pages (DSA homework, retired paths) must never appear in the sitemap.
+    PRIVATE_URL_PARTS = (
+        "/homework/",
+        "/dsa-homework/",
+        "/dsa1/",
+        "/dsa2/",
+        "/dsa3/",
+    )
+    urls = [
+        row for row in urls
+        if not any(part in row[0] for part in PRIVATE_URL_PARTS)
+    ]
+
     for loc, lastmod, prio, freq in urls:
         # NOTE: dropping hreflang="en" advertisements until we generate real
         # /en/ pages with English source HTML + self-canonicals. Re-add later.
@@ -200,10 +213,7 @@ def main() -> int:
         "# EngineerPro static site\n"
         "User-agent: *\n"
         "Allow: /\n"
-        f"Disallow: {prefix}/dsa-homework/\n"
-        f"Disallow: {prefix}/dsa1/\n"
-        f"Disallow: {prefix}/dsa2/\n"
-        f"Disallow: {prefix}/dsa3/\n"
+        f"Disallow: {prefix}/homework/\n"
         f"Sitemap: {SITE_BASE}/sitemap.xml\n"
     )
     with open(os.path.join(OUT_DIR, "robots.txt"), "w", encoding="utf-8") as f:
