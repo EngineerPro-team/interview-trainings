@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DSA 3 Homework · EngineerPro</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="Lời giải homework DSA 3 — phân tích + C++ / Java / Python3." />
+    <meta name="theme-color" content="#0b1d3a" />
+    <link rel="icon" type="image/png" href="../assets/img/logo-hero.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../dsa-homework/homework.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("epTheme");
+          var sysDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.setAttribute("data-theme", saved || (sysDark ? "dark" : "light"));
+        } catch (e) {}
+      })();
+      window.DSA_COURSE = "dsa3";
+    </script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="top__inner">
+        <span class="brand">Engineer<strong>Pro</strong> · DSA 3</span>
+        <div style="display:flex;align-items:center;gap:.7rem">
+          <span class="top__meta">Trang không nằm trên menu — chỉ mở bằng URL</span>
+          <button type="button" class="theme-btn" id="themeBtn">Theme</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <aside class="toc" id="toc"></aside>
+      <main>
+        <section class="hero">
+          <h1>Lời giải homework DSA 3</h1>
+          <p>
+            Mỗi bài lấy từ slide cuối buổi (mục Homework), giải đúng theo topic của buổi đó,
+            kèm phân tích và code C++ / Java / Python3 (đổi tab như LeetCode).
+          </p>
+          <div class="notice" id="notice"></div>
+        </section>
+        <div id="content"></div>
+      </main>
+    </div>
+
+    <script src="../dsa-homework/problems.js"></script>
+    <script src="../dsa-homework/homework.js"></script>
+  </body>
+</html>

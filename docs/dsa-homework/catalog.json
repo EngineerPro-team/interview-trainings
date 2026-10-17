@@ -1,9 +1,10 @@
 {
-  "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 1 / 2 / 3. Bài live-coding trên slide không đưa vào đây. <strong>DSA 1 · Graph 1</strong> không có homework (chỉ representation). Một số deck trùng (Trie Java/Quang, UnionFind, Partition, DP on Trees, Binary Search + DP) đã gộp. KMP và Z-function giao cùng 3 bài — mỗi topic giải bằng kỹ thuật của topic đó. Trang này <strong>không nằm trên menu / sitemap</strong>.",
+  "notice": "Trang này không nằm trên menu / sitemap.",
   "courses": [
     {
       "id": "dsa1",
       "title": "DSA 1",
+      "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 1. Bài live-coding không đưa vào đây. <strong>Graph 1</strong> không có homework (chỉ representation). <strong>Greedy</strong> lấy 4 bài Practice cuối buổi vì slide không có heading Homework. Trang này không nằm trên menu / sitemap.",
       "topics": [
         {"id": "array", "title": "DSA 1 · Array", "slide": "1. Array", "lead": "Mandatory + optional trên slide homework. Ưu tiên thao tác mảng / đếm / prefix, không nhảy sang hash nếu không cần."},
         {"id": "string", "title": "DSA 1 · String", "slide": "2. String", "lead": "Gồm bài tự luận trên slide và các bài LeetCode. Giải bằng duyệt chuỗi / đếm ký tự."},
@@ -30,6 +31,7 @@
     {
       "id": "dsa2",
       "title": "DSA 2",
+      "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 2. Deck trùng (Trie Java/Quang, UnionFind, Partition) đã gộp. Trang này không nằm trên menu / sitemap.",
       "topics": [
         {"id": "bit", "title": "DSA 2 · Bit Manipulation", "slide": "1. Bit Manipulation", "lead": "Toán bit, bitmask enumerate, XOR property."},
         {"id": "adv-tree", "title": "DSA 2 · Advanced Tree", "slide": "2. Advanced Tree", "lead": "BST insert/delete, traversal, build tree."},
@@ -52,6 +54,7 @@
     {
       "id": "dsa3",
       "title": "DSA 3",
+      "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 3. KMP và Z-function giao cùng 3 bài — mỗi topic giải bằng kỹ thuật của topic đó. Binary Search + DP gộp 3 bản slide. Trang này không nằm trên menu / sitemap.",
       "topics": [
         {"id": "rolling-hash", "title": "DSA 3 · Rolling Hash", "slide": "2. Rolling Hash", "lead": "Double hash + binary search khi cần. Không dùng KMP ở topic này."},
         {"id": "kmp", "title": "DSA 3 · KMP", "slide": "3. KMP", "lead": "Dùng prefix-function / KMP table. Cùng đề với Z-function nhưng kỹ thuật khác."},

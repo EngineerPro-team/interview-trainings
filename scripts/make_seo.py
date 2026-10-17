@@ -195,12 +195,15 @@ def main() -> int:
     with open(os.path.join(OUT_DIR, "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write("\n".join(sm))
 
-    hw_disallow = f"{BASE_PATH}/dsa-homework/" if BASE_PATH else "/dsa-homework/"
+    prefix = f"{BASE_PATH}" if BASE_PATH else ""
     robots = (
         "# EngineerPro static site\n"
         "User-agent: *\n"
         "Allow: /\n"
-        f"Disallow: {hw_disallow}\n"
+        f"Disallow: {prefix}/dsa-homework/\n"
+        f"Disallow: {prefix}/dsa1/\n"
+        f"Disallow: {prefix}/dsa2/\n"
+        f"Disallow: {prefix}/dsa3/\n"
         f"Sitemap: {SITE_BASE}/sitemap.xml\n"
     )
     with open(os.path.join(OUT_DIR, "robots.txt"), "w", encoding="utf-8") as f:

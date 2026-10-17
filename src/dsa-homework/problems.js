@@ -1,9 +1,10 @@
 window.DSA_HW = {
-  "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 1 / 2 / 3. Bài live-coding trên slide không đưa vào đây. <strong>DSA 1 · Graph 1</strong> không có homework (chỉ representation). Một số deck trùng (Trie Java/Quang, UnionFind, Partition, DP on Trees, Binary Search + DP) đã gộp. KMP và Z-function giao cùng 3 bài — mỗi topic giải bằng kỹ thuật của topic đó. Trang này <strong>không nằm trên menu / sitemap</strong>.",
+  "notice": "Trang này không nằm trên menu / sitemap.",
   "courses": [
     {
       "id": "dsa1",
       "title": "DSA 1",
+      "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 1. Bài live-coding không đưa vào đây. <strong>Graph 1</strong> không có homework (chỉ representation). <strong>Greedy</strong> lấy 4 bài Practice cuối buổi vì slide không có heading Homework. Trang này không nằm trên menu / sitemap.",
       "topics": [
         {
           "id": "array",
@@ -1666,6 +1667,7 @@ window.DSA_HW = {
     {
       "id": "dsa2",
       "title": "DSA 2",
+      "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 2. Deck trùng (Trie Java/Quang, UnionFind, Partition) đã gộp. Trang này không nằm trên menu / sitemap.",
       "topics": [
         {
           "id": "bit",
@@ -2776,6 +2778,7 @@ window.DSA_HW = {
     {
       "id": "dsa3",
       "title": "DSA 3",
+      "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 3. KMP và Z-function giao cùng 3 bài — mỗi topic giải bằng kỹ thuật của topic đó. Binary Search + DP gộp 3 bản slide. Trang này không nằm trên menu / sitemap.",
       "topics": [
         {
           "id": "rolling-hash",

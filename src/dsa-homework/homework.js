@@ -179,12 +179,25 @@
     );
   }
 
+  function selectCourse(raw) {
+    const id = window.DSA_COURSE;
+    if (!raw) return raw;
+    if (!id) return raw;
+    const course = (raw.courses || []).find((c) => c.id === id);
+    if (!course) return { notice: raw.notice, courses: [] };
+    return {
+      notice: course.notice || raw.notice,
+      courses: [course],
+    };
+  }
+
   function renderAll(data, lang) {
     const toc = [];
     const body = [];
     toc.push("<h2>Mục lục</h2>");
+    const single = (data.courses || []).length === 1;
     data.courses.forEach((course) => {
-      toc.push('<div class="toc__course">' + esc(course.title) + "</div>");
+      if (!single) toc.push('<div class="toc__course">' + esc(course.title) + "</div>");
       body.push('<section class="topic" id="' + course.id + '">');
       course.topics.forEach((topic) => {
         toc.push('<a class="toc__topic" href="#' + topic.id + '">' + esc(topic.title) + "</a>");
@@ -203,7 +216,7 @@
   }
 
   function boot() {
-    const data = window.DSA_HW;
+    const data = selectCourse(window.DSA_HW);
     if (!data) return;
     const lang = loadLang();
     const { toc, body } = renderAll(data, lang);

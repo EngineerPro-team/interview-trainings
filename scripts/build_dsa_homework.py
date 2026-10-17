@@ -62,6 +62,7 @@ def main() -> int:
         courses_out.append({
             "id": course["id"],
             "title": course["title"],
+            "notice": course.get("notice") or catalog.get("notice", ""),
             "topics": topics_out,
         })
 

@@ -2,4 +2,7 @@
 User-agent: *
 Allow: /
 Disallow: /dsa-homework/
+Disallow: /dsa1/
+Disallow: /dsa2/
+Disallow: /dsa3/
 Sitemap: https://engineerprogurus.com/sitemap.xml
