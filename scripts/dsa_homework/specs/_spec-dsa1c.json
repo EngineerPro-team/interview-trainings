@@ -1,0 +1,62 @@
+{
+  "out": "src/dsa-homework/data/dsa1c.json",
+  "topics": [
+    {
+      "id": "bfs",
+      "title": "DSA 1 · BFS",
+      "lead": "Grid / multi-source BFS.",
+      "problems": [
+        {"id": "surrounded-regions", "lc": 130, "title": "Surrounded Regions", "difficulty": "Medium"},
+        {"id": "pacific-atlantic-water-flow", "lc": 417, "title": "Pacific Atlantic Water Flow", "difficulty": "Medium"},
+        {"id": "minimum-knight-moves", "lc": 1197, "title": "Minimum Knight Moves", "difficulty": "Medium", "note": "premium"}
+      ]
+    },
+    {
+      "id": "dfs",
+      "title": "DSA 1 · Depth First Search",
+      "lead": "DFS trên graph tổng quát.",
+      "problems": [
+        {"id": "number-of-operations-to-make-network-connected", "lc": 1319, "title": "Number of Operations to Make Network Connected", "difficulty": "Medium"},
+        {"id": "detonate-the-maximum-bombs", "lc": 2101, "title": "Detonate the Maximum Bombs", "difficulty": "Medium"},
+        {"id": "minimum-fuel-cost-to-report-to-the-capital", "lc": 2477, "title": "Minimum Fuel Cost to Report to the Capital", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "island",
+      "title": "DSA 1 · Island / Matrix Traversal",
+      "lead": "DFS/BFS trên grid.",
+      "problems": [
+        {"id": "battleships-in-a-board", "lc": 419, "title": "Battleships in a Board", "difficulty": "Medium"},
+        {"id": "find-all-groups-of-farmland", "lc": 1992, "title": "Find All Groups of Farmland", "difficulty": "Medium"},
+        {"id": "maximum-number-of-fish-in-a-grid", "lc": 2658, "title": "Maximum Number of Fish in a Grid", "difficulty": "Medium"},
+        {"id": "detect-cycles-in-2d-grid", "lc": 1559, "title": "Detect Cycles in 2D Grid", "difficulty": "Medium"},
+        {"id": "path-with-minimum-effort", "lc": 1631, "title": "Path With Minimum Effort", "difficulty": "Medium", "note": "binary search + BFS/DFS trên grid"}
+      ]
+    },
+    {
+      "id": "topo",
+      "title": "DSA 1 · Topological Sort",
+      "lead": "Kahn or DFS topo.",
+      "problems": [
+        {"id": "course-schedule", "lc": 207, "title": "Course Schedule", "difficulty": "Medium"},
+        {"id": "minimum-height-trees", "lc": 310, "title": "Minimum Height Trees", "difficulty": "Medium"},
+        {"id": "build-a-matrix-with-conditions", "lc": 2392, "title": "Build a Matrix With Conditions", "difficulty": "Hard"},
+        {"id": "sort-items-by-groups-respecting-dependencies", "lc": 1203, "title": "Sort Items by Groups Respecting Dependencies", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "intervals",
+      "title": "DSA 1 · Intervals",
+      "lead": "Mandatory + optional. Sort + sweep/greedy.",
+      "problems": [
+        {"id": "minimum-number-of-arrows-to-burst-balloons", "lc": 452, "title": "Minimum Number of Arrows to Burst Balloons", "difficulty": "Medium", "tier": "mandatory"},
+        {"id": "interval-list-intersections", "lc": 986, "title": "Interval List Intersections", "difficulty": "Medium", "tier": "mandatory"},
+        {"id": "remove-covered-intervals", "lc": 1288, "title": "Remove Covered Intervals", "difficulty": "Medium", "tier": "mandatory"},
+        {"id": "find-right-interval", "lc": 436, "title": "Find Right Interval", "difficulty": "Medium", "tier": "optional"},
+        {"id": "divide-intervals-into-minimum-number-of-groups", "lc": 2402, "title": "Divide Intervals Into Minimum Number of Groups", "difficulty": "Medium", "tier": "optional"},
+        {"id": "count-ways-to-group-overlapping-ranges", "lc": 2580, "title": "Count Ways to Group Overlapping Ranges", "difficulty": "Medium", "tier": "optional"},
+        {"id": "data-stream-as-disjoint-intervals", "lc": 352, "title": "Data Stream as Disjoint Intervals", "difficulty": "Hard", "tier": "optional"}
+      ]
+    }
+  ]
+}

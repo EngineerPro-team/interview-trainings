@@ -1,0 +1,69 @@
+{
+  "out": "src/dsa-homework/data/dsa2b.json",
+  "topics": [
+    {
+      "id": "two-pointers",
+      "title": "DSA 2 · Two Pointers",
+      "lead": "Two pointers / fast-slow.",
+      "problems": [
+        {"id": "3sum-closest", "lc": 16, "title": "3Sum Closest", "difficulty": "Medium"},
+        {"id": "reorder-list", "lc": 143, "title": "Reorder List", "difficulty": "Medium"},
+        {"id": "partition-labels", "lc": 763, "title": "Partition Labels", "difficulty": "Medium"},
+        {"id": "boats-to-save-people", "lc": 881, "title": "Boats to Save People", "difficulty": "Medium"},
+        {"id": "minimum-number-of-swaps-to-make-the-string-balanced", "lc": 1963, "title": "Minimum Number of Swaps to Make the String Balanced", "difficulty": "Medium"},
+        {"id": "the-k-strongest-values-in-an-array", "lc": 1471, "title": "The k Strongest Values in an Array", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "sliding-window",
+      "title": "DSA 2 · Sliding Window",
+      "lead": "Cửa sổ trượt.",
+      "problems": [
+        {"id": "frequency-of-the-most-frequent-element", "lc": 1838, "title": "Frequency of the Most Frequent Element", "difficulty": "Medium"},
+        {"id": "fruit-into-baskets", "lc": 904, "title": "Fruit Into Baskets", "difficulty": "Medium"},
+        {"id": "maximum-number-of-vowels-in-a-substring-of-given-length", "lc": 1456, "title": "Maximum Number of Vowels in a Substring of Given Length", "difficulty": "Medium"},
+        {"id": "minimum-size-subarray-sum", "lc": 209, "title": "Minimum Size Subarray Sum", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "bt1",
+      "title": "DSA 2 · Backtracking 1",
+      "lead": "Backtrack thuần, không memo.",
+      "problems": [
+        {"id": "combinations", "lc": 77, "title": "Combinations", "difficulty": "Medium"},
+        {"id": "subsets", "lc": 78, "title": "Subsets", "difficulty": "Medium"},
+        {"id": "palindrome-partitioning", "lc": 131, "title": "Palindrome Partitioning", "difficulty": "Medium"},
+        {"id": "all-paths-from-source-to-target", "lc": 797, "title": "All Paths From Source to Target", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "bt2",
+      "title": "DSA 2 · Backtracking 2 + Memo",
+      "lead": "DFS + memo.",
+      "problems": [
+        {"id": "target-sum", "lc": 494, "title": "Target Sum", "difficulty": "Medium"},
+        {"id": "cheapest-flights-within-k-stops", "lc": 787, "title": "Cheapest Flights Within K Stops", "difficulty": "Medium"},
+        {"id": "house-robber-iii", "lc": 337, "title": "House Robber III", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "dp-knap",
+      "title": "DSA 2 · DP (LCS / LIS / Knapsack)",
+      "lead": "Knapsack-style DP.",
+      "problems": [
+        {"id": "number-of-ways-to-earn-points", "lc": 2585, "title": "Number of Ways to Earn Points", "difficulty": "Hard"},
+        {"id": "number-of-great-partitions", "lc": 2518, "title": "Number of Great Partitions", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "dp-coin-stock",
+      "title": "DSA 2 · DP (Coin / Stock)",
+      "lead": "Coin / stock DP.",
+      "problems": [
+        {"id": "coin-change-ii", "lc": 518, "title": "Coin Change II", "difficulty": "Medium"},
+        {"id": "best-time-to-buy-and-sell-stock-with-transaction-fee", "lc": 714, "title": "Best Time to Buy and Sell Stock with Transaction Fee", "difficulty": "Medium"},
+        {"id": "best-time-to-buy-and-sell-stock-iii", "lc": 123, "title": "Best Time to Buy and Sell Stock III", "difficulty": "Hard"}
+      ]
+    }
+  ]
+}

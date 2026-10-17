@@ -1,0 +1,57 @@
+{
+  "out": "src/dsa-homework/data/dsa2c.json",
+  "topics": [
+    {
+      "id": "partition-dp",
+      "title": "DSA 2 · Partition DP",
+      "lead": "DP chia mảng / subset-sum / meet-in-the-middle.",
+      "problems": [
+        {"id": "partition-array-for-maximum-sum", "lc": 1043, "title": "Partition Array for Maximum Sum", "difficulty": "Medium"},
+        {"id": "partition-to-k-equal-sum-subsets", "lc": 698, "title": "Partition to K Equal Sum Subsets", "difficulty": "Medium"},
+        {"id": "largest-sum-of-averages", "lc": 813, "title": "Largest Sum of Averages", "difficulty": "Medium"},
+        {"id": "number-of-great-partitions-part", "lc": 2518, "title": "Number of Great Partitions", "difficulty": "Hard", "url": "https://leetcode.com/problems/number-of-great-partitions/"},
+        {"id": "closest-subsequence-sum", "lc": 1755, "title": "Closest Subsequence Sum", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "dijkstra",
+      "title": "DSA 2 · Dijkstra",
+      "lead": "Dijkstra / 0-1 BFS. Maze II/III premium.",
+      "problems": [
+        {"id": "the-maze-ii", "lc": 505, "title": "The Maze II", "difficulty": "Medium", "note": "premium; lintcode 788"},
+        {"id": "the-maze-iii", "lc": 499, "title": "The Maze III", "difficulty": "Hard", "note": "premium; lintcode 789"},
+        {"id": "path-with-minimum-effort-dijkstra", "lc": 1631, "title": "Path With Minimum Effort", "difficulty": "Medium", "url": "https://leetcode.com/problems/path-with-minimum-effort/", "note": "Dijkstra, không binary search"},
+        {"id": "minimum-cost-to-make-at-least-one-valid-path-in-a-grid", "lc": 1368, "title": "Minimum Cost to Make at Least One Valid Path in a Grid", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "game-theory",
+      "title": "DSA 2 · Game Theory",
+      "lead": "DP win/lose hoặc greedy game.",
+      "problems": [
+        {"id": "stone-game-iv", "lc": 1510, "title": "Stone Game IV", "difficulty": "Hard"},
+        {"id": "stone-game-vi", "lc": 1686, "title": "Stone Game VI", "difficulty": "Medium"},
+        {"id": "sum-game", "lc": 1927, "title": "Sum Game", "difficulty": "Medium"},
+        {"id": "stone-game-ix", "lc": 2029, "title": "Stone Game IX", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "parser1",
+      "title": "DSA 2 · String Parser 1",
+      "lead": "Recursive descent / stack parser.",
+      "problems": [
+        {"id": "number-of-atoms", "lc": 726, "title": "Number of Atoms", "difficulty": "Hard"},
+        {"id": "parse-lisp-expression", "lc": 736, "title": "Parse Lisp Expression", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "parser2",
+      "title": "DSA 2 · String Parser 2",
+      "lead": "Chỉ homework, không live-coding Text Justification.",
+      "problems": [
+        {"id": "rearrange-words-in-a-sentence", "lc": 1451, "title": "Rearrange Words in a Sentence", "difficulty": "Medium"},
+        {"id": "split-message-based-on-limit", "lc": 2468, "title": "Split Message Based on Limit", "difficulty": "Hard"}
+      ]
+    }
+  ]
+}

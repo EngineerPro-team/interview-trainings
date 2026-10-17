@@ -1,0 +1,398 @@
+{
+  "topics": [
+    {
+      "id": "two-pointers",
+      "title": "DSA 2 · Two Pointers",
+      "lead": "Two pointers / fast-slow.",
+      "problems": [
+        {
+          "id": "3sum-closest",
+          "lc": 16,
+          "title": "3Sum Closest",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/3sum-closest/",
+          "statement": "<p>Cho mảng số nguyên <code>nums</code> độ dài <code>n</code> và số nguyên <code>target</code>. Tìm ba phần tử trong mảng sao cho tổng của chúng gần <code>target</code> nhất. Trả về tổng đó. Đề bảo đảm có đúng một đáp án.</p><p><strong>Ví dụ:</strong> <code>nums = [-1,2,1,-4]</code>, <code>target = 1</code> → <code>2</code> vì <code>-1 + 2 + 1 = 2</code>.</p><p><strong>Giới hạn:</strong> <code>3 ≤ n ≤ 500</code>, <code>-1000 ≤ nums[i] ≤ 1000</code>, <code>-10<sup>4</sup> ≤ target ≤ 10<sup>4</sup></code>.</p>",
+          "approach": "<p>Sort rồi <strong>two pointers</strong> trên cặp còn lại.</p><ol><li>Sort <code>nums</code> tăng dần.</li><li>Với mỗi chỉ số <code>i</code>, đặt <code>l = i+1</code>, <code>r = n-1</code>. Tính tổng ba phần tử.</li><li>Nếu tổng nhỏ hơn <code>target</code> thì tăng <code>l</code>; lớn hơn thì giảm <code>r</code>; bằng thì trả về ngay. Giữ tổng có khoảng cách nhỏ nhất.</li></ol>",
+          "time": "O(n^2)",
+          "space": "O(log n) — stack của sort",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int threeSumClosest(vector<int>& nums, int target) {\n        sort(nums.begin(), nums.end());\n        int n = nums.size();\n        int best = nums[0] + nums[1] + nums[2];\n        for (int i = 0; i < n - 2; ++i) {\n            int l = i + 1, r = n - 1;\n            while (l < r) {\n                int s = nums[i] + nums[l] + nums[r];\n                if (abs(s - target) < abs(best - target)) best = s;\n                if (s < target) ++l;\n                else if (s > target) --r;\n                else return s;\n            }\n        }\n        return best;\n    }\n};",
+            "java": "class Solution {\n    public int threeSumClosest(int[] nums, int target) {\n        Arrays.sort(nums);\n        int n = nums.length;\n        int best = nums[0] + nums[1] + nums[2];\n        for (int i = 0; i < n - 2; i++) {\n            int l = i + 1, r = n - 1;\n            while (l < r) {\n                int s = nums[i] + nums[l] + nums[r];\n                if (Math.abs(s - target) < Math.abs(best - target)) best = s;\n                if (s < target) l++;\n                else if (s > target) r--;\n                else return s;\n            }\n        }\n        return best;\n    }\n}",
+            "python": "class Solution:\n    def threeSumClosest(self, nums: List[int], target: int) -> int:\n        nums.sort()\n        n = len(nums)\n        best = nums[0] + nums[1] + nums[2]\n        for i in range(n - 2):\n            l, r = i + 1, n - 1\n            while l < r:\n                s = nums[i] + nums[l] + nums[r]\n                if abs(s - target) < abs(best - target):\n                    best = s\n                if s < target:\n                    l += 1\n                elif s > target:\n                    r -= 1\n                else:\n                    return s\n        return best"
+          }
+        },
+        {
+          "id": "reorder-list",
+          "lc": 143,
+          "title": "Reorder List",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/reorder-list/",
+          "statement": "<p>Cho <code>head</code> của linked list đơn <code>L<sub>0</sub> → L<sub>1</sub> → … → L<sub>n-1</sub> → L<sub>n</sub></code>. Sắp xếp lại thành <code>L<sub>0</sub> → L<sub>n</sub> → L<sub>1</sub> → L<sub>n-1</sub> → …</code>. Không được đổi giá trị trong node — chỉ được đổi con trỏ. Hàm trả về <code>void</code> (sửa list tại chỗ).</p><p><strong>Ví dụ:</strong> <code>[1,2,3,4]</code> → <code>[1,4,2,3]</code>; <code>[1,2,3,4,5]</code> → <code>[1,5,2,4,3]</code>.</p><p><strong>Giới hạn:</strong> số node trong <code>[1, 5·10<sup>4</sup>]</code>, <code>1 ≤ Node.val ≤ 1000</code>.</p>",
+          "approach": "<p><strong>Fast-slow</strong> tìm giữa, <strong>đảo nửa sau</strong>, rồi trộn xen kẽ hai nửa.</p><ol><li>Slow/fast: khi fast tới cuối, slow đứng trước nửa sau.</li><li>Cắt list, đảo nửa sau (prev/cur).</li><li>Trộn: lần lượt lấy một node từ nửa đầu và một node từ nửa đảo.</li></ol>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "/**\n * Definition for singly-linked list.\n * struct ListNode {\n *     int val;\n *     ListNode *next;\n *     ListNode() : val(0), next(nullptr) {}\n *     ListNode(int x) : val(x), next(nullptr) {}\n *     ListNode(int x, ListNode *next) : val(x), next(next) {}\n * };\n */\nclass Solution {\npublic:\n    void reorderList(ListNode* head) {\n        if (!head || !head->next) return;\n        ListNode* slow = head;\n        ListNode* fast = head;\n        while (fast->next && fast->next->next) {\n            slow = slow->next;\n            fast = fast->next->next;\n        }\n        ListNode* prev = nullptr;\n        ListNode* cur = slow->next;\n        slow->next = nullptr;\n        while (cur) {\n            ListNode* nxt = cur->next;\n            cur->next = prev;\n            prev = cur;\n            cur = nxt;\n        }\n        ListNode* a = head;\n        ListNode* b = prev;\n        while (b) {\n            ListNode* an = a->next;\n            ListNode* bn = b->next;\n            a->next = b;\n            b->next = an;\n            a = an;\n            b = bn;\n        }\n    }\n};",
+            "java": "/**\n * Definition for singly-linked list.\n * public class ListNode {\n *     int val;\n *     ListNode next;\n *     ListNode() {}\n *     ListNode(int val) { this.val = val; }\n *     ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n * }\n */\nclass Solution {\n    public void reorderList(ListNode head) {\n        if (head == null || head.next == null) return;\n        ListNode slow = head, fast = head;\n        while (fast.next != null && fast.next.next != null) {\n            slow = slow.next;\n            fast = fast.next.next;\n        }\n        ListNode prev = null, cur = slow.next;\n        slow.next = null;\n        while (cur != null) {\n            ListNode nxt = cur.next;\n            cur.next = prev;\n            prev = cur;\n            cur = nxt;\n        }\n        ListNode a = head, b = prev;\n        while (b != null) {\n            ListNode an = a.next, bn = b.next;\n            a.next = b;\n            b.next = an;\n            a = an;\n            b = bn;\n        }\n    }\n}",
+            "python": "# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next\nclass Solution:\n    def reorderList(self, head: Optional[ListNode]) -> None:\n        if not head or not head.next:\n            return\n        slow, fast = head, head\n        while fast.next and fast.next.next:\n            slow = slow.next\n            fast = fast.next.next\n        prev, cur = None, slow.next\n        slow.next = None\n        while cur:\n            nxt = cur.next\n            cur.next = prev\n            prev = cur\n            cur = nxt\n        a, b = head, prev\n        while b:\n            an, bn = a.next, b.next\n            a.next = b\n            b.next = an\n            a, b = an, bn"
+          }
+        },
+        {
+          "id": "partition-labels",
+          "lc": 763,
+          "title": "Partition Labels",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/partition-labels/",
+          "statement": "<p>Cho chuỗi <code>s</code> gồm chữ thường. Chia <code>s</code> thành càng nhiều đoạn liên tiếp càng tốt sao cho mỗi chữ cái chỉ xuất hiện trong đúng một đoạn. Trả về độ dài các đoạn theo thứ tự.</p><p><strong>Ví dụ:</strong> <code>s = \"ababcbacadefegdehijhklij\"</code> → <code>[9,7,8]</code> tương ứng <code>ababcbaca / defegde / hijhklij</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ s.length ≤ 500</code>, <code>s</code> chỉ gồm <code>a-z</code>.</p>",
+          "approach": "<p>Two pointers: biên phải của đoạn hiện tại là vị trí xuất hiện <em>cuối cùng</em> của mọi ký tự đã gặp trong đoạn.</p><ol><li>Ghi nhận <code>last[c]</code> = index cuối của mỗi ký tự.</li><li>Duyệt <code>i</code> từ trái, cập nhật <code>end = max(end, last[s[i]])</code>.</li><li>Khi <code>i == end</code>, đóng đoạn <code>[start, end]</code> rồi đặt <code>start = i+1</code>.</li></ol>",
+          "time": "O(n)",
+          "space": "O(1) — 26 chữ cái",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> partitionLabels(string s) {\n        int last[26] = {};\n        for (int i = 0; i < (int)s.size(); ++i) last[s[i] - 'a'] = i;\n        vector<int> ans;\n        int start = 0, end = 0;\n        for (int i = 0; i < (int)s.size(); ++i) {\n            end = max(end, last[s[i] - 'a']);\n            if (i == end) {\n                ans.push_back(end - start + 1);\n                start = i + 1;\n            }\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public List<Integer> partitionLabels(String s) {\n        int[] last = new int[26];\n        for (int i = 0; i < s.length(); i++) last[s.charAt(i) - 'a'] = i;\n        List<Integer> ans = new ArrayList<>();\n        int start = 0, end = 0;\n        for (int i = 0; i < s.length(); i++) {\n            end = Math.max(end, last[s.charAt(i) - 'a']);\n            if (i == end) {\n                ans.add(end - start + 1);\n                start = i + 1;\n            }\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def partitionLabels(self, s: str) -> List[int]:\n        last = {c: i for i, c in enumerate(s)}\n        ans = []\n        start = end = 0\n        for i, c in enumerate(s):\n            end = max(end, last[c])\n            if i == end:\n                ans.append(end - start + 1)\n                start = i + 1\n        return ans"
+          }
+        },
+        {
+          "id": "boats-to-save-people",
+          "lc": 881,
+          "title": "Boats to Save People",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/boats-to-save-people/",
+          "statement": "<p>Cho mảng <code>people</code> (cân nặng từng người) và giới hạn <code>limit</code> của mỗi thuyền. Mỗi thuyền chở tối đa <strong>hai</strong> người, tổng cân ≤ <code>limit</code>. Có vô hạn thuyền. Trả về số thuyền tối thiểu để chở hết.</p><p><strong>Ví dụ:</strong> <code>people = [1,2]</code>, <code>limit = 3</code> → <code>1</code>; <code>people = [3,2,2,1]</code>, <code>limit = 3</code> → <code>3</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 5·10<sup>4</sup></code>, <code>1 ≤ people[i] ≤ limit ≤ 3·10<sup>4</sup></code>.</p>",
+          "approach": "<p>Greedy two pointers sau khi sort: người nặng nhất luôn lên thuyền; nếu còn chỗ thì ghép với người nhẹ nhất.</p><ol><li>Sort tăng dần, <code>i</code> trái (nhẹ), <code>j</code> phải (nặng).</li><li>Nếu <code>people[i] + people[j] ≤ limit</code> thì cả hai lên thuyền, tăng <code>i</code>.</li><li>Luôn giảm <code>j</code> (người nặng đã lên), cộng 1 thuyền. Lặp tới khi <code>i > j</code>.</li></ol>",
+          "time": "O(n log n)",
+          "space": "O(log n) — sort",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int numRescueBoats(vector<int>& people, int limit) {\n        sort(people.begin(), people.end());\n        int i = 0, j = (int)people.size() - 1, boats = 0;\n        while (i <= j) {\n            if (people[i] + people[j] <= limit) ++i;\n            --j;\n            ++boats;\n        }\n        return boats;\n    }\n};",
+            "java": "class Solution {\n    public int numRescueBoats(int[] people, int limit) {\n        Arrays.sort(people);\n        int i = 0, j = people.length - 1, boats = 0;\n        while (i <= j) {\n            if (people[i] + people[j] <= limit) i++;\n            j--;\n            boats++;\n        }\n        return boats;\n    }\n}",
+            "python": "class Solution:\n    def numRescueBoats(self, people: List[int], limit: int) -> int:\n        people.sort()\n        i, j = 0, len(people) - 1\n        boats = 0\n        while i <= j:\n            if people[i] + people[j] <= limit:\n                i += 1\n            j -= 1\n            boats += 1\n        return boats"
+          }
+        },
+        {
+          "id": "minimum-number-of-swaps-to-make-the-string-balanced",
+          "lc": 1963,
+          "title": "Minimum Number of Swaps to Make the String Balanced",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/minimum-number-of-swaps-to-make-the-string-balanced/",
+          "statement": "<p>Cho chuỗi <code>s</code> độ dài chẵn, gồm đúng một nửa <code>'['</code> và một nửa <code>']'</code>. Được swap hai vị trí bất kỳ. Trả về số swap tối thiểu để <code>s</code> cân bằng (ngoặc đúng).</p><p><strong>Ví dụ:</strong> <code>s = \"][][\"</code> → <code>1</code> (swap hai đầu thành <code>[][]</code>); <code>s = \"]]][[[\"</code> → <code>2</code>.</p><p><strong>Giới hạn:</strong> <code>n</code> chẵn, <code>2 ≤ n ≤ 10<sup>6</sup></code>.</p>",
+          "approach": "<p>Two pointers: duyệt trái → phải, khi gặp <code>']'</code> thừa thì swap với <code>'['</code> còn lại từ phía phải.</p><ol><li><code>i</code> chạy từ trái, <code>j</code> từ phải; duy trì <code>bal</code> (số <code>'['</code> đang mở).</li><li>Gặp <code>'['</code> thì <code>bal++</code>, gặp <code>']'</code> thì <code>bal--</code>.</li><li>Nếu <code>bal &lt; 0</code>, lùi <code>j</code> tới <code>'['</code>, swap với <code>s[i]</code>, tăng đáp án, đặt lại <code>bal = 1</code>.</li></ol><p>Công thức tương đương: nếu <code>mx</code> là số <code>']'</code> dư lớn nhất trên prefix thì đáp án là <code>(mx + 1) / 2</code> — cùng kết quả, vẫn O(n).</p>",
+          "time": "O(n)",
+          "space": "O(n) — mảng ký tự (C++ sửa string tại chỗ O(1))",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int minSwaps(string s) {\n        int i = 0, j = (int)s.size() - 1, bal = 0, ans = 0;\n        while (i < j) {\n            if (s[i] == '[') ++bal;\n            else --bal;\n            if (bal < 0) {\n                while (i < j && s[j] != '[') --j;\n                swap(s[i], s[j]);\n                ++ans;\n                bal = 1;\n                --j;\n            }\n            ++i;\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int minSwaps(String s) {\n        char[] a = s.toCharArray();\n        int i = 0, j = a.length - 1, bal = 0, ans = 0;\n        while (i < j) {\n            if (a[i] == '[') bal++;\n            else bal--;\n            if (bal < 0) {\n                while (i < j && a[j] != '[') j--;\n                char tmp = a[i];\n                a[i] = a[j];\n                a[j] = tmp;\n                ans++;\n                bal = 1;\n                j--;\n            }\n            i++;\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def minSwaps(self, s: str) -> int:\n        a = list(s)\n        i, j = 0, len(a) - 1\n        bal = ans = 0\n        while i < j:\n            if a[i] == \"[\":\n                bal += 1\n            else:\n                bal -= 1\n            if bal < 0:\n                while i < j and a[j] != \"[\":\n                    j -= 1\n                a[i], a[j] = a[j], a[i]\n                ans += 1\n                bal = 1\n                j -= 1\n            i += 1\n        return ans"
+          }
+        },
+        {
+          "id": "the-k-strongest-values-in-an-array",
+          "lc": 1471,
+          "title": "The k Strongest Values in an Array",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/the-k-strongest-values-in-an-array/",
+          "statement": "<p>Cho mảng <code>arr</code> và số <code>k</code>. Median <code>m</code> là <code>arr[(n-1)/2]</code> sau khi sort tăng (kể cả khi <code>n</code> chẵn — không lấy trung bình). Giá trị <code>arr[i]</code> mạnh hơn <code>arr[j]</code> nếu <code>|arr[i]-m| > |arr[j]-m|</code>, hòa thì số lớn hơn mạnh hơn. Trả về <code>k</code> giá trị mạnh nhất (thứ tự tùy ý).</p><p><strong>Ví dụ:</strong> <code>arr = [1,2,3,4,5]</code>, <code>k = 2</code> → <code>[5,1]</code> vì <code>m = 3</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ k ≤ n ≤ 10<sup>5</sup></code>, <code>-10<sup>5</sup> ≤ arr[i] ≤ 10<sup>5</sup></code>.</p>",
+          "approach": "<p>Sort rồi two pointers hai đầu: ứng viên mạnh nhất luôn nằm ở biên (xa median nhất).</p><ol><li>Sort, lấy <code>m = arr[(n-1)/2]</code>.</li><li><code>i = 0</code>, <code>j = n-1</code>. So sánh <code>m - arr[i]</code> với <code>arr[j] - m</code>.</li><li>Bên trái lớn hơn thì lấy <code>arr[i++]</code>; không thì lấy <code>arr[j--]</code> (hòa thì số lớn hơn, tức bên phải). Lặp <code>k</code> lần.</li></ol>",
+          "time": "O(n log n)",
+          "space": "O(k) — mảng kết quả",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> getStrongest(vector<int>& arr, int k) {\n        sort(arr.begin(), arr.end());\n        int n = arr.size();\n        int m = arr[(n - 1) / 2];\n        vector<int> ans;\n        int i = 0, j = n - 1;\n        while ((int)ans.size() < k) {\n            if (m - arr[i] > arr[j] - m) ans.push_back(arr[i++]);\n            else ans.push_back(arr[j--]);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int[] getStrongest(int[] arr, int k) {\n        Arrays.sort(arr);\n        int n = arr.length;\n        int m = arr[(n - 1) / 2];\n        int[] ans = new int[k];\n        int i = 0, j = n - 1, p = 0;\n        while (p < k) {\n            if (m - arr[i] > arr[j] - m) ans[p++] = arr[i++];\n            else ans[p++] = arr[j--];\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def getStrongest(self, arr: List[int], k: int) -> List[int]:\n        arr.sort()\n        n = len(arr)\n        m = arr[(n - 1) // 2]\n        ans = []\n        i, j = 0, n - 1\n        while len(ans) < k:\n            if m - arr[i] > arr[j] - m:\n                ans.append(arr[i])\n                i += 1\n            else:\n                ans.append(arr[j])\n                j -= 1\n        return ans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sliding-window",
+      "title": "DSA 2 · Sliding Window",
+      "lead": "Cửa sổ trượt.",
+      "problems": [
+        {
+          "id": "frequency-of-the-most-frequent-element",
+          "lc": 1838,
+          "title": "Frequency of the Most Frequent Element",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/frequency-of-the-most-frequent-element/",
+          "statement": "<p>Cho mảng <code>nums</code> và ngân sách <code>k</code>. Mỗi thao tác cộng 1 vào một phần tử. Tần suất của một giá trị là số lần nó xuất hiện. Sau tối đa <code>k</code> thao tác, trả về tần suất lớn nhất có thể đạt được của <em>một</em> giá trị.</p><p><strong>Ví dụ:</strong> <code>nums = [1,2,4]</code>, <code>k = 5</code> → <code>3</code> (đưa cả ba số thành 4 tốn 3+2+0 = 5).</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 10<sup>5</sup></code>, <code>1 ≤ nums[i] ≤ 10<sup>5</sup></code>, <code>0 ≤ k ≤ 10<sup>5</sup></code>.</p>",
+          "approach": "<p><strong>Sort + sliding window</strong>: cửa sổ <code>[l, r]</code> muốn biến mọi phần tử thành <code>nums[r]</code> (chỉ được tăng, không giảm).</p><ol><li>Sort tăng dần.</li><li>Chi phí cửa sổ = <code>nums[r] * độ_dài - tổng_cửa_sổ</code>. Dùng <code>long</code> vì tích có thể ~ 10<sup>10</sup>.</li><li>Nếu chi phí &gt; <code>k</code> thì tăng <code>l</code>. Đáp án là độ dài cửa sổ lớn nhất còn hợp lệ.</li></ol>",
+          "time": "O(n log n)",
+          "space": "O(log n) — sort",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxFrequency(vector<int>& nums, int k) {\n        sort(nums.begin(), nums.end());\n        long long sum = 0;\n        int left = 0, ans = 1;\n        for (int right = 0; right < (int)nums.size(); ++right) {\n            sum += nums[right];\n            while (1LL * nums[right] * (right - left + 1) - sum > k)\n                sum -= nums[left++];\n            ans = max(ans, right - left + 1);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int maxFrequency(int[] nums, int k) {\n        Arrays.sort(nums);\n        long sum = 0;\n        int left = 0, ans = 1;\n        for (int right = 0; right < nums.length; right++) {\n            sum += nums[right];\n            while ((long) nums[right] * (right - left + 1) - sum > k)\n                sum -= nums[left++];\n            ans = Math.max(ans, right - left + 1);\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def maxFrequency(self, nums: List[int], k: int) -> int:\n        nums.sort()\n        window = 0\n        left = 0\n        ans = 1\n        for right, x in enumerate(nums):\n            window += x\n            while x * (right - left + 1) - window > k:\n                window -= nums[left]\n                left += 1\n            ans = max(ans, right - left + 1)\n        return ans"
+          }
+        },
+        {
+          "id": "fruit-into-baskets",
+          "lc": 904,
+          "title": "Fruit Into Baskets",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/fruit-into-baskets/",
+          "statement": "<p>Có một hàng cây, <code>fruits[i]</code> là loại quả. Bạn có đúng 2 rổ, mỗi rổ một loại. Bắt đầu từ một cây, phải hái liên tiếp sang phải; gặp loại thứ ba thì dừng. Trả về số quả nhiều nhất có thể hái.</p><p><strong>Ví dụ:</strong> <code>fruits = [1,2,1]</code> → <code>3</code>; <code>fruits = [0,1,2,2]</code> → <code>3</code> (các cây <code>[1,2,2]</code>).</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 10<sup>5</sup></code>, <code>0 ≤ fruits[i] &lt; n</code>.</p>",
+          "approach": "<p>Sliding window: subarray dài nhất có <strong>tối đa 2 giá trị phân biệt</strong>.</p><ol><li>Mở rộng <code>right</code>, đếm tần suất trong cửa sổ.</li><li>Khi số loại &gt; 2, co <code>left</code> tới khi còn ≤ 2 loại.</li><li>Cập nhật độ dài lớn nhất.</li></ol>",
+          "time": "O(n)",
+          "space": "O(1) — tối đa 3 khóa trong map",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int totalFruit(vector<int>& fruits) {\n        unordered_map<int, int> cnt;\n        int left = 0, ans = 0;\n        for (int right = 0; right < (int)fruits.size(); ++right) {\n            cnt[fruits[right]]++;\n            while ((int)cnt.size() > 2) {\n                if (--cnt[fruits[left]] == 0) cnt.erase(fruits[left]);\n                ++left;\n            }\n            ans = max(ans, right - left + 1);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int totalFruit(int[] fruits) {\n        Map<Integer, Integer> cnt = new HashMap<>();\n        int left = 0, ans = 0;\n        for (int right = 0; right < fruits.length; right++) {\n            cnt.put(fruits[right], cnt.getOrDefault(fruits[right], 0) + 1);\n            while (cnt.size() > 2) {\n                int x = fruits[left];\n                int c = cnt.get(x) - 1;\n                if (c == 0) cnt.remove(x);\n                else cnt.put(x, c);\n                left++;\n            }\n            ans = Math.max(ans, right - left + 1);\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def totalFruit(self, fruits: List[int]) -> int:\n        cnt = {}\n        left = ans = 0\n        for right, f in enumerate(fruits):\n            cnt[f] = cnt.get(f, 0) + 1\n            while len(cnt) > 2:\n                x = fruits[left]\n                cnt[x] -= 1\n                if cnt[x] == 0:\n                    del cnt[x]\n                left += 1\n            ans = max(ans, right - left + 1)\n        return ans"
+          }
+        },
+        {
+          "id": "maximum-number-of-vowels-in-a-substring-of-given-length",
+          "lc": 1456,
+          "title": "Maximum Number of Vowels in a Substring of Given Length",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/maximum-number-of-vowels-in-a-substring-of-given-length/",
+          "statement": "<p>Cho chuỗi <code>s</code> gồm chữ thường và số nguyên <code>k</code>. Trả về số nguyên âm nhiều nhất trong một substring độ dài đúng <code>k</code>. Nguyên âm: <code>a e i o u</code>.</p><p><strong>Ví dụ:</strong> <code>s = \"abciiidef\"</code>, <code>k = 3</code> → <code>3</code> (substring <code>iii</code>).</p><p><strong>Giới hạn:</strong> <code>1 ≤ k ≤ s.length ≤ 10<sup>5</sup></code>.</p>",
+          "approach": "<p>Cửa sổ trượt <strong>độ dài cố định</strong> <code>k</code>: đếm nguyên âm, mỗi bước thêm <code>s[i]</code> và bỏ <code>s[i-k]</code>.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxVowels(string s, int k) {\n        auto isV = [](char c) {\n            return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u';\n        };\n        int cur = 0;\n        for (int i = 0; i < k; ++i) cur += isV(s[i]);\n        int ans = cur;\n        for (int i = k; i < (int)s.size(); ++i) {\n            cur += isV(s[i]) - isV(s[i - k]);\n            ans = max(ans, cur);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    private boolean isV(char c) {\n        return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u';\n    }\n    public int maxVowels(String s, int k) {\n        int cur = 0;\n        for (int i = 0; i < k; i++) if (isV(s.charAt(i))) cur++;\n        int ans = cur;\n        for (int i = k; i < s.length(); i++) {\n            if (isV(s.charAt(i))) cur++;\n            if (isV(s.charAt(i - k))) cur--;\n            ans = Math.max(ans, cur);\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def maxVowels(self, s: str, k: int) -> int:\n        vowels = set(\"aeiou\")\n        cur = sum(1 for c in s[:k] if c in vowels)\n        ans = cur\n        for i in range(k, len(s)):\n            if s[i] in vowels:\n                cur += 1\n            if s[i - k] in vowels:\n                cur -= 1\n            ans = max(ans, cur)\n        return ans"
+          }
+        },
+        {
+          "id": "minimum-size-subarray-sum",
+          "lc": 209,
+          "title": "Minimum Size Subarray Sum",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/minimum-size-subarray-sum/",
+          "statement": "<p>Cho mảng số nguyên <strong>dương</strong> <code>nums</code> và <code>target</code>. Trả về độ dài subarray (liên tiếp) ngắn nhất có tổng ≥ <code>target</code>. Không có thì trả <code>0</code>.</p><p><strong>Ví dụ:</strong> <code>target = 7</code>, <code>nums = [2,3,1,2,4,3]</code> → <code>2</code> (subarray <code>[4,3]</code>).</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 10<sup>5</sup></code>, <code>1 ≤ nums[i] ≤ 10<sup>4</sup></code>, <code>1 ≤ target ≤ 10<sup>9</sup></code>.</p>",
+          "approach": "<p>Two pointers trên mảng dương (cửa sổ co giãn): tổng chỉ tăng khi mở phải, chỉ giảm khi co trái — không cần binary search trên prefix.</p><ol><li>Mở <code>right</code>, cộng <code>nums[right]</code> vào tổng.</li><li>Khi tổng ≥ <code>target</code>, cập nhật độ dài rồi trừ <code>nums[left]</code>, tăng <code>left</code>.</li><li>Vì mọi phần tử &gt; 0, mỗi chỉ số vào/ra cửa sổ đúng một lần → O(n).</li></ol>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int minSubArrayLen(int target, vector<int>& nums) {\n        int n = nums.size(), left = 0, sum = 0, ans = n + 1;\n        for (int right = 0; right < n; ++right) {\n            sum += nums[right];\n            while (sum >= target) {\n                ans = min(ans, right - left + 1);\n                sum -= nums[left++];\n            }\n        }\n        return ans == n + 1 ? 0 : ans;\n    }\n};",
+            "java": "class Solution {\n    public int minSubArrayLen(int target, int[] nums) {\n        int n = nums.length, left = 0, sum = 0, ans = n + 1;\n        for (int right = 0; right < n; right++) {\n            sum += nums[right];\n            while (sum >= target) {\n                ans = Math.min(ans, right - left + 1);\n                sum -= nums[left++];\n            }\n        }\n        return ans == n + 1 ? 0 : ans;\n    }\n}",
+            "python": "class Solution:\n    def minSubArrayLen(self, target: int, nums: List[int]) -> int:\n        n = len(nums)\n        left = s = 0\n        ans = n + 1\n        for right, x in enumerate(nums):\n            s += x\n            while s >= target:\n                ans = min(ans, right - left + 1)\n                s -= nums[left]\n                left += 1\n        return 0 if ans == n + 1 else ans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bt1",
+      "title": "DSA 2 · Backtracking 1",
+      "lead": "Backtrack thuần, không memo.",
+      "problems": [
+        {
+          "id": "combinations",
+          "lc": 77,
+          "title": "Combinations",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/combinations/",
+          "statement": "<p>Cho hai số nguyên <code>n</code> và <code>k</code>. Trả về mọi tổ hợp <code>k</code> số chọn từ <code>[1, n]</code>. Thứ tự tổ hợp tùy ý.</p><p><strong>Ví dụ:</strong> <code>n = 4</code>, <code>k = 2</code> → <code>[[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]]</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ k ≤ n ≤ 20</code>.</p>",
+          "approach": "<p>Backtrack thuần: xây dãy tăng dần, không memo.</p><ol><li>Trạng thái: dãy hiện tại <code>path</code>, số bắt đầu <code>start</code>.</li><li>Khi <code>len(path) == k</code> thì ghi nhận bản sao.</li><li>Cắt nhánh: cần thêm <code>need</code> số thì <code>i</code> chỉ chạy tới <code>n - need + 1</code> (vẫn là prune, không phải memo).</li></ol>",
+          "time": "O(C(n, k) · k)",
+          "space": "O(k) — độ sâu đệ quy / path",
+          "codes": {
+            "cpp": "class Solution {\n    vector<vector<int>> ans;\n    vector<int> path;\n    int n, k;\n    void dfs(int start) {\n        if ((int)path.size() == k) {\n            ans.push_back(path);\n            return;\n        }\n        int need = k - (int)path.size();\n        for (int i = start; i <= n - need + 1; ++i) {\n            path.push_back(i);\n            dfs(i + 1);\n            path.pop_back();\n        }\n    }\npublic:\n    vector<vector<int>> combine(int n, int k) {\n        this->n = n;\n        this->k = k;\n        ans.clear();\n        path.clear();\n        dfs(1);\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    List<List<Integer>> ans = new ArrayList<>();\n    List<Integer> path = new ArrayList<>();\n    void dfs(int start, int n, int k) {\n        if (path.size() == k) {\n            ans.add(new ArrayList<>(path));\n            return;\n        }\n        int need = k - path.size();\n        for (int i = start; i <= n - need + 1; i++) {\n            path.add(i);\n            dfs(i + 1, n, k);\n            path.remove(path.size() - 1);\n        }\n    }\n    public List<List<Integer>> combine(int n, int k) {\n        ans.clear();\n        path.clear();\n        dfs(1, n, k);\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def combine(self, n: int, k: int) -> List[List[int]]:\n        ans = []\n        path = []\n\n        def dfs(start: int) -> None:\n            if len(path) == k:\n                ans.append(path[:])\n                return\n            need = k - len(path)\n            for i in range(start, n - need + 2):\n                path.append(i)\n                dfs(i + 1)\n                path.pop()\n\n        dfs(1)\n        return ans"
+          }
+        },
+        {
+          "id": "subsets",
+          "lc": 78,
+          "title": "Subsets",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/subsets/",
+          "statement": "<p>Cho mảng <code>nums</code> các phần tử phân biệt. Trả về mọi tập con (power set). Không trùng tập; thứ tự tùy ý.</p><p><strong>Ví dụ:</strong> <code>nums = [1,2,3]</code> → <code>[[],[1],[2],[1,2],[3],[1,3],[2,3],[1,2,3]]</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 10</code>, <code>-10 ≤ nums[i] ≤ 10</code>, mọi phần tử unique.</p>",
+          "approach": "<p>Backtrack chọn / bỏ từng phần tử — không memo (toàn bộ 2<sup>n</sup> tập đều cần liệt kê).</p><ol><li>Tại index <code>i</code>: thêm <code>nums[i]</code> rồi đệ quy, xong thì bỏ ra (backtrack) và đệ quy nhánh không lấy.</li><li>Khi <code>i == n</code> thì ghi nhận <code>path</code>.</li></ol>",
+          "time": "O(n · 2^n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\n    vector<vector<int>> ans;\n    vector<int> path;\n    vector<int> nums;\n    void dfs(int i) {\n        if (i == (int)nums.size()) {\n            ans.push_back(path);\n            return;\n        }\n        path.push_back(nums[i]);\n        dfs(i + 1);\n        path.pop_back();\n        dfs(i + 1);\n    }\npublic:\n    vector<vector<int>> subsets(vector<int>& nums) {\n        this->nums = nums;\n        ans.clear();\n        path.clear();\n        dfs(0);\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    List<List<Integer>> ans = new ArrayList<>();\n    List<Integer> path = new ArrayList<>();\n    void dfs(int i, int[] nums) {\n        if (i == nums.length) {\n            ans.add(new ArrayList<>(path));\n            return;\n        }\n        path.add(nums[i]);\n        dfs(i + 1, nums);\n        path.remove(path.size() - 1);\n        dfs(i + 1, nums);\n    }\n    public List<List<Integer>> subsets(int[] nums) {\n        ans.clear();\n        path.clear();\n        dfs(0, nums);\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def subsets(self, nums: List[int]) -> List[List[int]]:\n        ans = []\n        path = []\n\n        def dfs(i: int) -> None:\n            if i == len(nums):\n                ans.append(path[:])\n                return\n            path.append(nums[i])\n            dfs(i + 1)\n            path.pop()\n            dfs(i + 1)\n\n        dfs(0)\n        return ans"
+          }
+        },
+        {
+          "id": "palindrome-partitioning",
+          "lc": 131,
+          "title": "Palindrome Partitioning",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/palindrome-partitioning/",
+          "statement": "<p>Cho chuỗi <code>s</code>. Chia <code>s</code> thành các substring sao cho <em>mọi</em> substring đều là palindrome. Trả về mọi cách chia.</p><p><strong>Ví dụ:</strong> <code>s = \"aab\"</code> → <code>[[\"a\",\"a\",\"b\"],[\"aa\",\"b\"]]</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ s.length ≤ 16</code>, <code>s</code> gồm chữ thường.</p>",
+          "approach": "<p>Backtrack thuần: tại vị trí <code>start</code>, thử mọi điểm cắt <code>end</code> sao cho <code>s[start..end]</code> là palindrome, rồi đệ quy phần còn lại. Kiểm tra palindrome hai con trỏ O(độ dài) — không DP/memo bảng palindrome.</p>",
+          "time": "O(n · 2^n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\n    vector<vector<string>> ans;\n    vector<string> path;\n    string s;\n    bool isPal(int l, int r) {\n        while (l < r) if (s[l++] != s[r--]) return false;\n        return true;\n    }\n    void dfs(int start) {\n        if (start == (int)s.size()) {\n            ans.push_back(path);\n            return;\n        }\n        for (int end = start; end < (int)s.size(); ++end) {\n            if (!isPal(start, end)) continue;\n            path.push_back(s.substr(start, end - start + 1));\n            dfs(end + 1);\n            path.pop_back();\n        }\n    }\npublic:\n    vector<vector<string>> partition(string s) {\n        this->s = s;\n        ans.clear();\n        path.clear();\n        dfs(0);\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    List<List<String>> ans = new ArrayList<>();\n    List<String> path = new ArrayList<>();\n    boolean isPal(String s, int l, int r) {\n        while (l < r) if (s.charAt(l++) != s.charAt(r--)) return false;\n        return true;\n    }\n    void dfs(int start, String s) {\n        if (start == s.length()) {\n            ans.add(new ArrayList<>(path));\n            return;\n        }\n        for (int end = start; end < s.length(); end++) {\n            if (!isPal(s, start, end)) continue;\n            path.add(s.substring(start, end + 1));\n            dfs(end + 1, s);\n            path.remove(path.size() - 1);\n        }\n    }\n    public List<List<String>> partition(String s) {\n        ans.clear();\n        path.clear();\n        dfs(0, s);\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def partition(self, s: str) -> List[List[str]]:\n        ans = []\n        path = []\n\n        def is_pal(l: int, r: int) -> bool:\n            while l < r:\n                if s[l] != s[r]:\n                    return False\n                l += 1\n                r -= 1\n            return True\n\n        def dfs(start: int) -> None:\n            if start == len(s):\n                ans.append(path[:])\n                return\n            for end in range(start, len(s)):\n                if is_pal(start, end):\n                    path.append(s[start : end + 1])\n                    dfs(end + 1)\n                    path.pop()\n\n        dfs(0)\n        return ans"
+          }
+        },
+        {
+          "id": "all-paths-from-source-to-target",
+          "lc": 797,
+          "title": "All Paths From Source to Target",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/all-paths-from-source-to-target/",
+          "statement": "<p>Cho DAG <code>n</code> đỉnh <code>0 … n-1</code>, <code>graph[i]</code> là danh sách đỉnh kề từ <code>i</code>. Tìm mọi đường đi từ <code>0</code> tới <code>n-1</code>. Thứ tự đường đi tùy ý.</p><p><strong>Ví dụ:</strong> <code>graph = [[1,2],[3],[3],[]]</code> → <code>[[0,1,3],[0,2,3]]</code>.</p><p><strong>Giới hạn:</strong> <code>2 ≤ n ≤ 15</code>, DAG (không chu trình), cạnh không lặp.</p>",
+          "approach": "<p>DFS backtrack trên DAG: đẩy đỉnh vào path, đệ quy, rồi pop. Không memo — phải liệt kê hết đường đi. DAG nên không cần mảng visited.</p>",
+          "time": "O(2^n · n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\n    vector<vector<int>> ans;\n    vector<int> path;\n    vector<vector<int>> g;\n    int n;\n    void dfs(int u) {\n        if (u == n - 1) {\n            ans.push_back(path);\n            return;\n        }\n        for (int v : g[u]) {\n            path.push_back(v);\n            dfs(v);\n            path.pop_back();\n        }\n    }\npublic:\n    vector<vector<int>> allPathsSourceTarget(vector<vector<int>>& graph) {\n        g = graph;\n        n = graph.size();\n        ans.clear();\n        path = {0};\n        dfs(0);\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    List<List<Integer>> ans = new ArrayList<>();\n    List<Integer> path = new ArrayList<>();\n    void dfs(int u, int[][] graph) {\n        if (u == graph.length - 1) {\n            ans.add(new ArrayList<>(path));\n            return;\n        }\n        for (int v : graph[u]) {\n            path.add(v);\n            dfs(v, graph);\n            path.remove(path.size() - 1);\n        }\n    }\n    public List<List<Integer>> allPathsSourceTarget(int[][] graph) {\n        ans.clear();\n        path.clear();\n        path.add(0);\n        dfs(0, graph);\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def allPathsSourceTarget(self, graph: List[List[int]]) -> List[List[int]]:\n        n = len(graph)\n        ans = []\n        path = [0]\n\n        def dfs(u: int) -> None:\n            if u == n - 1:\n                ans.append(path[:])\n                return\n            for v in graph[u]:\n                path.append(v)\n                dfs(v)\n                path.pop()\n\n        dfs(0)\n        return ans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bt2",
+      "title": "DSA 2 · Backtracking 2 + Memo",
+      "lead": "DFS + memo.",
+      "problems": [
+        {
+          "id": "target-sum",
+          "lc": 494,
+          "title": "Target Sum",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/target-sum/",
+          "statement": "<p>Cho mảng <code>nums</code> và <code>target</code>. Trước mỗi phần tử gắn dấu <code>+</code> hoặc <code>-</code>, tạo biểu thức. Trả về số biểu thức có giá trị bằng <code>target</code>.</p><p><strong>Ví dụ:</strong> <code>nums = [1,1,1,1,1]</code>, <code>target = 3</code> → <code>5</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 20</code>, <code>0 ≤ nums[i] ≤ 1000</code>, <code>sum(nums) ≤ 1000</code>, <code>-1000 ≤ target ≤ 1000</code>.</p>",
+          "approach": "<p>DFS + memo theo <code>(i, tổng_hiện_tại)</code>: tại index <code>i</code> thử cộng hoặc trừ <code>nums[i]</code>. Offset <code>sum(nums)</code> để tổng âm map vào mảng. (Tương đương knapsack subset-sum <code>(total+target)/2</code> nhưng trình bày top-down memo.)</p>",
+          "time": "O(n · Σ nums)",
+          "space": "O(n · Σ nums)",
+          "codes": {
+            "cpp": "class Solution {\n    vector<int> nums;\n    int target, offset;\n    vector<vector<int>> memo;\n    int dfs(int i, int cur) {\n        if (i == (int)nums.size()) return cur == target;\n        int& m = memo[i][cur + offset];\n        if (m != -1) return m;\n        return m = dfs(i + 1, cur + nums[i]) + dfs(i + 1, cur - nums[i]);\n    }\npublic:\n    int findTargetSumWays(vector<int>& nums, int target) {\n        this->nums = nums;\n        this->target = target;\n        int total = 0;\n        for (int x : nums) total += x;\n        offset = total;\n        memo.assign(nums.size(), vector<int>(2 * total + 1, -1));\n        return dfs(0, 0);\n    }\n};",
+            "java": "class Solution {\n    int[] nums;\n    int target, offset;\n    Integer[][] memo;\n    int dfs(int i, int cur) {\n        if (i == nums.length) return cur == target ? 1 : 0;\n        if (memo[i][cur + offset] != null) return memo[i][cur + offset];\n        int ans = dfs(i + 1, cur + nums[i]) + dfs(i + 1, cur - nums[i]);\n        return memo[i][cur + offset] = ans;\n    }\n    public int findTargetSumWays(int[] nums, int target) {\n        this.nums = nums;\n        this.target = target;\n        int total = 0;\n        for (int x : nums) total += x;\n        offset = total;\n        memo = new Integer[nums.length][2 * total + 1];\n        return dfs(0, 0);\n    }\n}",
+            "python": "class Solution:\n    def findTargetSumWays(self, nums: List[int], target: int) -> int:\n        total = sum(nums)\n        memo = {}\n\n        def dfs(i: int, cur: int) -> int:\n            if i == len(nums):\n                return 1 if cur == target else 0\n            key = (i, cur)\n            if key in memo:\n                return memo[key]\n            memo[key] = dfs(i + 1, cur + nums[i]) + dfs(i + 1, cur - nums[i])\n            return memo[key]\n\n        if abs(target) > total:\n            return 0\n        return dfs(0, 0)"
+          }
+        },
+        {
+          "id": "cheapest-flights-within-k-stops",
+          "lc": 787,
+          "title": "Cheapest Flights Within K Stops",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/cheapest-flights-within-k-stops/",
+          "statement": "<p>Có <code>n</code> thành phố và các chuyến <code>flights[i] = [from, to, price]</code>. Tìm giá rẻ nhất từ <code>src</code> tới <code>dst</code> với <strong>tối đa <code>k</code> điểm dừng</strong> (tức tối đa <code>k+1</code> chuyến). Không có đường thì <code>-1</code>.</p><p><strong>Ví dụ:</strong> <code>n = 4</code>, <code>flights = [[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]]</code>, <code>src = 0</code>, <code>dst = 3</code>, <code>k = 1</code> → <code>700</code> (đường <code>0→1→3</code>).</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 100</code>, <code>0 ≤ k &lt; n</code>, <code>0 ≤ price ≤ 10<sup>4</sup></code>.</p>",
+          "approach": "<p>DFS + memo (Bellman-Ford dạng đệ quy): <code>dfs(u, left)</code> = chi phí min từ <code>u</code> tới <code>dst</code> còn <code>left</code> chuyến. Graph có thể có chu trình nhưng <code>left</code> giảm nên kết thúc. Memo theo <code>(u, left)</code>.</p>",
+          "time": "O(k · |E|)",
+          "space": "O(n · k)",
+          "codes": {
+            "cpp": "class Solution {\n    vector<vector<pair<int, int>>> g;\n    vector<vector<int>> memo;\n    int dst;\n    static const int INF = 1e9;\n    int dfs(int u, int left) {\n        if (u == dst) return 0;\n        if (left == 0) return INF;\n        int& m = memo[u][left];\n        if (m != -1) return m;\n        int best = INF;\n        for (auto [v, w] : g[u]) {\n            int sub = dfs(v, left - 1);\n            if (sub < INF) best = min(best, w + sub);\n        }\n        return m = best;\n    }\npublic:\n    int findCheapestPrice(int n, vector<vector<int>>& flights, int src, int dst, int k) {\n        this->dst = dst;\n        g.assign(n, {});\n        for (auto& f : flights) g[f[0]].push_back({f[1], f[2]});\n        memo.assign(n, vector<int>(k + 2, -1));\n        int ans = dfs(src, k + 1);\n        return ans >= INF ? -1 : ans;\n    }\n};",
+            "java": "class Solution {\n    List<int[]>[] g;\n    Integer[][] memo;\n    int dst;\n    final int INF = 1_000_000_000;\n    int dfs(int u, int left) {\n        if (u == dst) return 0;\n        if (left == 0) return INF;\n        if (memo[u][left] != null) return memo[u][left];\n        int best = INF;\n        for (int[] e : g[u]) {\n            int sub = dfs(e[0], left - 1);\n            if (sub < INF) best = Math.min(best, e[1] + sub);\n        }\n        return memo[u][left] = best;\n    }\n    public int findCheapestPrice(int n, int[][] flights, int src, int dst, int k) {\n        this.dst = dst;\n        g = new ArrayList[n];\n        for (int i = 0; i < n; i++) g[i] = new ArrayList<>();\n        for (int[] f : flights) g[f[0]].add(new int[]{f[1], f[2]});\n        memo = new Integer[n][k + 2];\n        int ans = dfs(src, k + 1);\n        return ans >= INF ? -1 : ans;\n    }\n}",
+            "python": "class Solution:\n    def findCheapestPrice(self, n: int, flights: List[List[int]], src: int, dst: int, k: int) -> int:\n        g = [[] for _ in range(n)]\n        for u, v, w in flights:\n            g[u].append((v, w))\n        INF = 10**15\n        memo = {}\n\n        def dfs(u: int, left: int) -> int:\n            if u == dst:\n                return 0\n            if left == 0:\n                return INF\n            key = (u, left)\n            if key in memo:\n                return memo[key]\n            best = INF\n            for v, w in g[u]:\n                sub = dfs(v, left - 1)\n                if sub < INF:\n                    best = min(best, w + sub)\n            memo[key] = best\n            return best\n\n        ans = dfs(src, k + 1)\n        return -1 if ans >= INF else ans"
+          }
+        },
+        {
+          "id": "house-robber-iii",
+          "lc": 337,
+          "title": "House Robber III",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/house-robber-iii/",
+          "statement": "<p>Các ngôi nhà tạo thành cây nhị phân. Không được cướp hai nhà kề nhau (cha–con). Trả về số tiền tối đa.</p><p><strong>Ví dụ:</strong> <code>root = [3,2,3,null,3,null,1]</code> → <code>7</code> (cướp 3 + 3 + 1).</p><p><strong>Giới hạn:</strong> số node trong <code>[1, 10<sup>4</sup>]</code>, <code>0 ≤ Node.val ≤ 10<sup>4</sup></code>.</p>",
+          "approach": "<p>DFS + memo trên node: <code>dfs(node)</code> = max tiền trên cây con. Hai lựa chọn — lấy node thì bỏ hai con (lấy cháu), hoặc bỏ node thì lấy <code>dfs(left)+dfs(right)</code>. Memo theo con trỏ node để mỗi cây con tính một lần.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "/**\n * Definition for a binary tree node.\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode() : val(0), left(nullptr), right(nullptr) {}\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n *     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}\n * };\n */\nclass Solution {\n    unordered_map<TreeNode*, int> memo;\n    int dfs(TreeNode* node) {\n        if (!node) return 0;\n        if (memo.count(node)) return memo[node];\n        int take = node->val;\n        if (node->left) take += dfs(node->left->left) + dfs(node->left->right);\n        if (node->right) take += dfs(node->right->left) + dfs(node->right->right);\n        int skip = dfs(node->left) + dfs(node->right);\n        return memo[node] = max(take, skip);\n    }\npublic:\n    int rob(TreeNode* root) {\n        memo.clear();\n        return dfs(root);\n    }\n};",
+            "java": "/**\n * Definition for a binary tree node.\n * public class TreeNode {\n *     int val;\n *     TreeNode left;\n *     TreeNode right;\n *     TreeNode() {}\n *     TreeNode(int val) { this.val = val; }\n *     TreeNode(int val, TreeNode left, TreeNode right) {\n *         this.val = val;\n *         this.left = left;\n *         this.right = right;\n *     }\n * }\n */\nclass Solution {\n    Map<TreeNode, Integer> memo = new HashMap<>();\n    int dfs(TreeNode node) {\n        if (node == null) return 0;\n        if (memo.containsKey(node)) return memo.get(node);\n        int take = node.val;\n        if (node.left != null) take += dfs(node.left.left) + dfs(node.left.right);\n        if (node.right != null) take += dfs(node.right.left) + dfs(node.right.right);\n        int skip = dfs(node.left) + dfs(node.right);\n        memo.put(node, Math.max(take, skip));\n        return memo.get(node);\n    }\n    public int rob(TreeNode root) {\n        memo.clear();\n        return dfs(root);\n    }\n}",
+            "python": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n#         self.val = val\n#         self.left = left\n#         self.right = right\nclass Solution:\n    def rob(self, root: Optional[TreeNode]) -> int:\n        memo = {}\n\n        def dfs(node: Optional[TreeNode]) -> int:\n            if not node:\n                return 0\n            if node in memo:\n                return memo[node]\n            take = node.val\n            if node.left:\n                take += dfs(node.left.left) + dfs(node.left.right)\n            if node.right:\n                take += dfs(node.right.left) + dfs(node.right.right)\n            skip = dfs(node.left) + dfs(node.right)\n            memo[node] = max(take, skip)\n            return memo[node]\n\n        return dfs(root)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dp-knap",
+      "title": "DSA 2 · DP (LCS / LIS / Knapsack)",
+      "lead": "Knapsack-style DP.",
+      "problems": [
+        {
+          "id": "number-of-ways-to-earn-points",
+          "lc": 2585,
+          "title": "Number of Ways to Earn Points",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/number-of-ways-to-earn-points/",
+          "statement": "<p>Có <code>n</code> loại câu hỏi. <code>types[i] = [count<sub>i</sub>, marks<sub>i</sub>]</code>: tối đa <code>count<sub>i</sub></code> câu loại <code>i</code>, mỗi câu <code>marks<sub>i</sub></code> điểm. Câu cùng loại không phân biệt. Trả về số cách đạt <strong>đúng</strong> <code>target</code> điểm, modulo <code>10<sup>9</sup>+7</code>.</p><p><strong>Ví dụ:</strong> <code>target = 6</code>, <code>types = [[6,1],[3,2],[2,3]]</code> → <code>7</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ target ≤ 1000</code>, <code>1 ≤ n ≤ 50</code>, <code>1 ≤ count<sub>i</sub>, marks<sub>i</sub> ≤ 50</code>.</p>",
+          "approach": "<p>Bounded knapsack (group knapsack) đếm số cách: <code>dp[s]</code> = số cách đạt <code>s</code> điểm.</p><ol><li>Khởi tạo <code>dp[0] = 1</code>.</li><li>Với mỗi loại <code>(count, marks)</code>, tạo mảng mới từ mảng cũ: với mỗi tổng <code>s</code> cũ, cộng thêm <code>k = 1..count</code> câu loại này (tổng <code>s + k·marks</code>).</li><li>Dùng bản sao để không lấy lại cùng loại trên giá trị đã cập nhật. Modulo 10<sup>9</sup>+7.</li></ol>",
+          "time": "O(n · target · count)",
+          "space": "O(target)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int waysToReachTarget(int target, vector<vector<int>>& types) {\n        const int MOD = 1e9 + 7;\n        vector<int> dp(target + 1);\n        dp[0] = 1;\n        for (auto& t : types) {\n            int count = t[0], marks = t[1];\n            vector<int> ndp = dp;\n            for (int s = 0; s <= target; ++s) {\n                if (!dp[s]) continue;\n                for (int c = 1; c <= count; ++c) {\n                    int ns = s + c * marks;\n                    if (ns > target) break;\n                    ndp[ns] = (ndp[ns] + dp[s]) % MOD;\n                }\n            }\n            dp.swap(ndp);\n        }\n        return dp[target];\n    }\n};",
+            "java": "class Solution {\n    public int waysToReachTarget(int target, int[][] types) {\n        final int MOD = 1_000_000_007;\n        int[] dp = new int[target + 1];\n        dp[0] = 1;\n        for (int[] t : types) {\n            int count = t[0], marks = t[1];\n            int[] ndp = dp.clone();\n            for (int s = 0; s <= target; s++) {\n                if (dp[s] == 0) continue;\n                for (int c = 1; c <= count; c++) {\n                    int ns = s + c * marks;\n                    if (ns > target) break;\n                    ndp[ns] = (ndp[ns] + dp[s]) % MOD;\n                }\n            }\n            dp = ndp;\n        }\n        return dp[target];\n    }\n}",
+            "python": "class Solution:\n    def waysToReachTarget(self, target: int, types: List[List[int]]) -> int:\n        MOD = 10**9 + 7\n        dp = [0] * (target + 1)\n        dp[0] = 1\n        for count, marks in types:\n            ndp = dp[:]\n            for s in range(target + 1):\n                if dp[s] == 0:\n                    continue\n                for c in range(1, count + 1):\n                    ns = s + c * marks\n                    if ns > target:\n                        break\n                    ndp[ns] = (ndp[ns] + dp[s]) % MOD\n            dp = ndp\n        return dp[target]"
+          }
+        },
+        {
+          "id": "number-of-great-partitions",
+          "lc": 2518,
+          "title": "Number of Great Partitions",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/number-of-great-partitions/",
+          "statement": "<p>Cho mảng dương <code>nums</code> và <code>k</code>. Chia thành <strong>hai nhóm có thứ tự</strong> (mỗi phần tử vào đúng một nhóm). Partition <em>great</em> khi tổng mỗi nhóm ≥ <code>k</code>. Hai cách khác nhau nếu có index nằm khác nhóm. Trả về số great partition modulo <code>10<sup>9</sup>+7</code>.</p><p><strong>Ví dụ:</strong> <code>nums = [1,2,3,4]</code>, <code>k = 4</code> → <code>6</code>; <code>nums = [3,3,3]</code>, <code>k = 4</code> → <code>0</code>; <code>nums = [6,6]</code>, <code>k = 2</code> → <code>2</code>.</p><p><strong>Giới hạn:</strong> <code>1 ≤ n, k ≤ 1000</code>, <code>1 ≤ nums[i] ≤ 10<sup>9</sup></code>.</p>",
+          "approach": "<p>Tổng số gán nhóm: <code>2<sup>n</sup></code>. Invalid khi một nhóm có tổng &lt; <code>k</code>.</p><ol><li>Nếu <code>total &lt; 2k</code> thì không thể — trả <code>0</code> (dùng <code>long</code>, <code>nums[i]</code> tới 10<sup>9</sup>).</li><li>Đếm số tập con có tổng &lt; <code>k</code> bằng knapsack <code>dp[s]</code> trên <code>s &lt; k</code>. Phần tử <code>≥ k</code> bỏ qua nhánh lấy.</li><li>Khi <code>total ≥ 2k</code>, không tập nào vừa tổng &lt; <code>k</code> vừa phần bù &lt; <code>k</code>, nên đáp án = <code>2<sup>n</sup> − 2 · count</code>, lấy modulo (cộng MOD trước khi trừ).</li></ol>",
+          "time": "O(n · k)",
+          "space": "O(k)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int countPartitions(vector<int>& nums, int k) {\n        const int MOD = 1e9 + 7;\n        long long total = 0;\n        for (int x : nums) total += x;\n        if (total < 2LL * k) return 0;\n        vector<int> dp(k);\n        dp[0] = 1;\n        for (int x : nums) {\n            if (x >= k) continue;\n            for (int s = k - 1; s >= x; --s)\n                dp[s] = (dp[s] + dp[s - x]) % MOD;\n        }\n        long long bad = 0;\n        for (int s = 0; s < k; ++s) bad += dp[s];\n        bad %= MOD;\n        long long pow2 = 1;\n        for (int i = 0; i < (int)nums.size(); ++i) pow2 = pow2 * 2 % MOD;\n        return (int)((pow2 - 2 * bad % MOD + MOD) % MOD);\n    }\n};",
+            "java": "class Solution {\n    public int countPartitions(int[] nums, int k) {\n        final int MOD = 1_000_000_007;\n        long total = 0;\n        for (int x : nums) total += x;\n        if (total < 2L * k) return 0;\n        int[] dp = new int[k];\n        dp[0] = 1;\n        for (int x : nums) {\n            if (x >= k) continue;\n            for (int s = k - 1; s >= x; s--)\n                dp[s] = (dp[s] + dp[s - x]) % MOD;\n        }\n        long bad = 0;\n        for (int s = 0; s < k; s++) bad += dp[s];\n        bad %= MOD;\n        long pow2 = 1;\n        for (int i = 0; i < nums.length; i++) pow2 = pow2 * 2 % MOD;\n        return (int) ((pow2 - 2 * bad % MOD + MOD) % MOD);\n    }\n}",
+            "python": "class Solution:\n    def countPartitions(self, nums: List[int], k: int) -> int:\n        MOD = 10**9 + 7\n        if sum(nums) < 2 * k:\n            return 0\n        dp = [0] * k\n        dp[0] = 1\n        for x in nums:\n            if x >= k:\n                continue\n            for s in range(k - 1, x - 1, -1):\n                dp[s] = (dp[s] + dp[s - x]) % MOD\n        bad = sum(dp) % MOD\n        pow2 = pow(2, len(nums), MOD)\n        return (pow2 - 2 * bad) % MOD"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dp-coin-stock",
+      "title": "DSA 2 · DP (Coin / Stock)",
+      "lead": "Coin / stock DP.",
+      "problems": [
+        {
+          "id": "coin-change-ii",
+          "lc": 518,
+          "title": "Coin Change II",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/coin-change-ii/",
+          "statement": "<p>Cho <code>coins</code> (mệnh giá khác nhau, mỗi loại vô hạn) và <code>amount</code>. Trả về số <strong>tổ hợp</strong> (không tính hoán vị) để đổi đúng <code>amount</code>. Không đổi được thì <code>0</code>. Đáp án vừa 32-bit signed.</p><p><strong>Ví dụ:</strong> <code>amount = 5</code>, <code>coins = [1,2,5]</code> → <code>4</code> (<code>5</code>, <code>2+2+1</code>, <code>2+1+1+1</code>, <code>1+1+1+1+1</code>).</p><p><strong>Giới hạn:</strong> <code>1 ≤ amount ≤ 5000</code>, <code>1 ≤ |coins| ≤ 300</code>, <code>1 ≤ coins[i] ≤ 5000</code>, unique.</p>",
+          "approach": "<p>Unbounded knapsack đếm tổ hợp: vòng ngoài coin, vòng trong amount (để mỗi thứ tự coin được tính một lần, không đếm permutation).</p><ol><li><code>dp[0] = 1</code>.</li><li>Với mỗi coin <code>c</code>, với <code>a = c … amount</code>: <code>dp[a] += dp[a-c]</code>.</li></ol>",
+          "time": "O(amount · |coins|)",
+          "space": "O(amount)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int change(int amount, vector<int>& coins) {\n        vector<int> dp(amount + 1);\n        dp[0] = 1;\n        for (int c : coins)\n            for (int a = c; a <= amount; ++a)\n                dp[a] += dp[a - c];\n        return dp[amount];\n    }\n};",
+            "java": "class Solution {\n    public int change(int amount, int[] coins) {\n        int[] dp = new int[amount + 1];\n        dp[0] = 1;\n        for (int c : coins)\n            for (int a = c; a <= amount; a++)\n                dp[a] += dp[a - c];\n        return dp[amount];\n    }\n}",
+            "python": "class Solution:\n    def change(self, amount: int, coins: List[int]) -> int:\n        dp = [0] * (amount + 1)\n        dp[0] = 1\n        for c in coins:\n            for a in range(c, amount + 1):\n                dp[a] += dp[a - c]\n        return dp[amount]"
+          }
+        },
+        {
+          "id": "best-time-to-buy-and-sell-stock-with-transaction-fee",
+          "lc": 714,
+          "title": "Best Time to Buy and Sell Stock with Transaction Fee",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock-with-transaction-fee/",
+          "statement": "<p>Cho giá theo ngày <code>prices</code> và phí <code>fee</code> trả khi <em>bán</em>. Được giao dịch nhiều lần, không được giữ hai cổ phiếu cùng lúc. Tìm lợi nhuận tối đa.</p><p><strong>Ví dụ:</strong> <code>prices = [1,3,2,8,4,9]</code>, <code>fee = 2</code> → <code>8</code> (mua 1 bán 8, mua 4 bán 9; mỗi lần trừ fee 2).</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 5·10<sup>4</sup></code>, <code>1 ≤ prices[i] ≤ 5·10<sup>4</sup></code>, <code>0 ≤ fee ≤ 5·10<sup>4</sup></code>.</p>",
+          "approach": "<p>Stock DP hai trạng thái:</p><ul><li><code>hold</code> = max tiền khi đang giữ 1 cổ phiếu.</li><li><code>cash</code> = max tiền khi không giữ.</li></ul><p>Chuyển: <code>hold = max(hold, cash - price)</code>, <code>cash = max(cash, hold + price - fee)</code>. Dùng biến tạm để không dùng <code>hold</code> mới khi tính <code>cash</code>.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxProfit(vector<int>& prices, int fee) {\n        int hold = -prices[0], cash = 0;\n        for (int i = 1; i < (int)prices.size(); ++i) {\n            int p = prices[i];\n            int newHold = max(hold, cash - p);\n            int newCash = max(cash, hold + p - fee);\n            hold = newHold;\n            cash = newCash;\n        }\n        return cash;\n    }\n};",
+            "java": "class Solution {\n    public int maxProfit(int[] prices, int fee) {\n        int hold = -prices[0], cash = 0;\n        for (int i = 1; i < prices.length; i++) {\n            int p = prices[i];\n            int newHold = Math.max(hold, cash - p);\n            int newCash = Math.max(cash, hold + p - fee);\n            hold = newHold;\n            cash = newCash;\n        }\n        return cash;\n    }\n}",
+            "python": "class Solution:\n    def maxProfit(self, prices: List[int], fee: int) -> int:\n        hold, cash = -prices[0], 0\n        for i in range(1, len(prices)):\n            p = prices[i]\n            hold, cash = max(hold, cash - p), max(cash, hold + p - fee)\n        return cash"
+          }
+        },
+        {
+          "id": "best-time-to-buy-and-sell-stock-iii",
+          "lc": 123,
+          "title": "Best Time to Buy and Sell Stock III",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock-iii/",
+          "statement": "<p>Cho <code>prices[i]</code> giá ngày <code>i</code>. Được thực hiện <strong>tối đa hai</strong> giao dịch (mỗi giao dịch = mua rồi bán). Không giữ hai cổ phiếu cùng lúc. Tìm lợi nhuận tối đa.</p><p><strong>Ví dụ:</strong> <code>prices = [3,3,5,0,0,3,1,4]</code> → <code>6</code> (mua 0 bán 3, mua 1 bán 4).</p><p><strong>Giới hạn:</strong> <code>1 ≤ n ≤ 10<sup>5</sup></code>, <code>0 ≤ prices[i] ≤ 10<sup>5</sup></code>.</p>",
+          "approach": "<p>Stock DP bốn trạng thái theo thứ tự giao dịch:</p><ol><li><code>b1</code> = max tiền sau khi mua lần 1.</li><li><code>s1</code> = max tiền sau khi bán lần 1.</li><li><code>b2</code> = max tiền sau khi mua lần 2 (dùng tiền <code>s1</code>).</li><li><code>s2</code> = max tiền sau khi bán lần 2 — đáp án.</li></ol><p>Cập nhật theo thứ tự <code>b1 → s1 → b2 → s2</code> trên mỗi giá. O(1) bộ nhớ, không cần mảng ngày.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        int b1 = -1e9, b2 = -1e9, s1 = 0, s2 = 0;\n        for (int p : prices) {\n            b1 = max(b1, -p);\n            s1 = max(s1, b1 + p);\n            b2 = max(b2, s1 - p);\n            s2 = max(s2, b2 + p);\n        }\n        return s2;\n    }\n};",
+            "java": "class Solution {\n    public int maxProfit(int[] prices) {\n        int b1 = -1000000000, b2 = -1000000000, s1 = 0, s2 = 0;\n        for (int p : prices) {\n            b1 = Math.max(b1, -p);\n            s1 = Math.max(s1, b1 + p);\n            b2 = Math.max(b2, s1 - p);\n            s2 = Math.max(s2, b2 + p);\n        }\n        return s2;\n    }\n}",
+            "python": "class Solution:\n    def maxProfit(self, prices: List[int]) -> int:\n        b1 = b2 = -10**9\n        s1 = s2 = 0\n        for p in prices:\n            b1 = max(b1, -p)\n            s1 = max(s1, b1 + p)\n            b2 = max(b2, s1 - p)\n            s2 = max(s2, b2 + p)\n        return s2"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,375 @@
+{
+  "topics": [
+    {
+      "id": "binary-search",
+      "title": "DSA 1 · Binary Search",
+      "lead": "Binary search trên mảng sort hoặc trên không gian đáp án.",
+      "problems": [
+        {
+          "id": "binary-search",
+          "lc": 704,
+          "title": "Binary Search",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/binary-search/",
+          "statement": "<p>Cho mảng số nguyên <code>nums</code> đã sắp xếp tăng dần (phần tử phân biệt) và số nguyên <code>target</code>. Trả về chỉ số của <code>target</code> nếu tồn tại, ngược lại trả về <code>-1</code>.</p>\n<p>Bắt buộc viết thuật toán <code>O(log n)</code>.</p>\n<p><strong>Ví dụ:</strong> <code>nums = [-1,0,3,5,9,12]</code>, <code>target = 9</code> → <code>4</code>; <code>target = 2</code> → <code>-1</code>.</p>\n<p><strong>Ràng buộc:</strong> <code>1 &lt;= nums.length &lt;= 10<sup>4</sup></code>, <code>-10<sup>4</sup> &lt; nums[i], target &lt; 10<sup>4</sup></code>.</p>",
+          "approach": "<p>Binary search cổ điển trên mảng đã sort. Giữ hai biên <code>lo</code>, <code>hi</code> (đóng). Mỗi bước lấy <code>mid = lo + (hi - lo) / 2</code> để tránh tràn số, rồi thu hẹp đúng một nửa:</p>\n<ul>\n<li>Nếu <code>nums[mid] == target</code> thì trả về <code>mid</code>.</li>\n<li>Nếu <code>nums[mid] &lt; target</code> thì target nằm bên phải: <code>lo = mid + 1</code>.</li>\n<li>Ngược lại target nằm bên trái: <code>hi = mid - 1</code>.</li>\n</ul>\n<p>Khi <code>lo &gt; hi</code> thì không còn khoảng tìm — trả <code>-1</code>. Phần tử unique nên không cần xử lý trùng.</p>",
+          "time": "O(log n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        int lo = 0, hi = (int)nums.size() - 1;\n        while (lo <= hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (nums[mid] == target) return mid;\n            if (nums[mid] < target) lo = mid + 1;\n            else hi = mid - 1;\n        }\n        return -1;\n    }\n};",
+            "java": "class Solution {\n    public int search(int[] nums, int target) {\n        int lo = 0, hi = nums.length - 1;\n        while (lo <= hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (nums[mid] == target) return mid;\n            if (nums[mid] < target) lo = mid + 1;\n            else hi = mid - 1;\n        }\n        return -1;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def search(self, nums: List[int], target: int) -> int:\n        lo, hi = 0, len(nums) - 1\n        while lo <= hi:\n            mid = lo + (hi - lo) // 2\n            if nums[mid] == target:\n                return mid\n            if nums[mid] < target:\n                lo = mid + 1\n            else:\n                hi = mid - 1\n        return -1"
+          }
+        },
+        {
+          "id": "search-insert-position",
+          "lc": 35,
+          "title": "Search Insert Position",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/search-insert-position/",
+          "statement": "<p>Cho mảng số nguyên phân biệt <code>nums</code> đã sort tăng dần và <code>target</code>. Nếu <code>target</code> có trong mảng thì trả về chỉ số; nếu không, trả về chỉ số nơi nó <em>nên được chèn</em> để mảng vẫn sort.</p>\n<p>Bắt buộc <code>O(log n)</code>.</p>\n<p><strong>Ví dụ:</strong> <code>nums = [1,3,5,6]</code>: <code>target = 5</code> → <code>2</code>; <code>target = 2</code> → <code>1</code>; <code>target = 7</code> → <code>4</code>.</p>",
+          "approach": "<p>Đây là <strong>lower bound</strong>: tìm vị trí trái-nhất mà <code>nums[i] &gt;= target</code>. Dùng binary search với khoảng nửa-mở <code>[lo, hi)</code>:</p>\n<ul>\n<li>Nếu <code>nums[mid] &lt; target</code> thì lower bound nằm bên phải: <code>lo = mid + 1</code>.</li>\n<li>Ngược lại (kể cả bằng target) thu hẹp phải: <code>hi = mid</code>.</li>\n</ul>\n<p>Khi vòng lặp dừng, <code>lo</code> chính là chỉ số chèn (hoặc vị trí tìm thấy). Nếu target lớn hơn mọi phần tử thì <code>lo == n</code>.</p>",
+          "time": "O(log n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int searchInsert(vector<int>& nums, int target) {\n        int lo = 0, hi = (int)nums.size();\n        while (lo < hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (nums[mid] < target) lo = mid + 1;\n            else hi = mid;\n        }\n        return lo;\n    }\n};",
+            "java": "class Solution {\n    public int searchInsert(int[] nums, int target) {\n        int lo = 0, hi = nums.length;\n        while (lo < hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (nums[mid] < target) lo = mid + 1;\n            else hi = mid;\n        }\n        return lo;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def searchInsert(self, nums: List[int], target: int) -> int:\n        lo, hi = 0, len(nums)\n        while lo < hi:\n            mid = lo + (hi - lo) // 2\n            if nums[mid] < target:\n                lo = mid + 1\n            else:\n                hi = mid\n        return lo"
+          }
+        },
+        {
+          "id": "find-first-and-last-position-of-element-in-sorted-array",
+          "lc": 34,
+          "title": "Find First and Last Position of Element in Sorted Array",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/find-first-and-last-position-of-element-in-sorted-array/",
+          "statement": "<p>Cho mảng <code>nums</code> sort không giảm (có thể trùng) và <code>target</code>. Trả về <code>[left, right]</code> — vị trí xuất hiện đầu và cuối của <code>target</code>. Nếu không có, trả <code>[-1, -1]</code>.</p>\n<p>Bắt buộc <code>O(log n)</code>.</p>\n<p><strong>Ví dụ:</strong> <code>nums = [5,7,7,8,8,10]</code>, <code>target = 8</code> → <code>[3,4]</code>; <code>target = 6</code> → <code>[-1,-1]</code>.</p>",
+          "approach": "<p>Gọi <code>lower_bound(x)</code> là chỉ số trái-nhất thỏa <code>nums[i] &gt;= x</code> (cùng kỹ thuật bài Search Insert). Khi đó:</p>\n<ul>\n<li>Vị trí đầu của <code>target</code> là <code>L = lower_bound(target)</code>.</li>\n<li>Vị trí cuối là <code>R = lower_bound(target + 1) - 1</code> (phần tử đầu tiên <em>lớn hơn</em> target, lùi một bước).</li>\n</ul>\n<p>Nếu <code>L</code> ra ngoài mảng hoặc <code>nums[L] != target</code> thì target không tồn tại. Hai lần binary search, không linear scan hai phía từ một hit — vì n có thể tới <code>10<sup>5</sup></code> và yêu cầu log.</p>",
+          "time": "O(log n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\n    int lowerBound(vector<int>& nums, int target) {\n        int lo = 0, hi = (int)nums.size();\n        while (lo < hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (nums[mid] < target) lo = mid + 1;\n            else hi = mid;\n        }\n        return lo;\n    }\n\npublic:\n    vector<int> searchRange(vector<int>& nums, int target) {\n        int L = lowerBound(nums, target);\n        if (L == (int)nums.size() || nums[L] != target) return {-1, -1};\n        int R = lowerBound(nums, target + 1) - 1;\n        return {L, R};\n    }\n};",
+            "java": "class Solution {\n    int lowerBound(int[] nums, int target) {\n        int lo = 0, hi = nums.length;\n        while (lo < hi) {\n            int mid = lo + (hi - lo) / 2;\n            if (nums[mid] < target) lo = mid + 1;\n            else hi = mid;\n        }\n        return lo;\n    }\n\n    public int[] searchRange(int[] nums, int target) {\n        int L = lowerBound(nums, target);\n        if (L == nums.length || nums[L] != target) return new int[]{-1, -1};\n        int R = lowerBound(nums, target + 1) - 1;\n        return new int[]{L, R};\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def searchRange(self, nums: List[int], target: int) -> List[int]:\n        def lower_bound(x: int) -> int:\n            lo, hi = 0, len(nums)\n            while lo < hi:\n                mid = lo + (hi - lo) // 2\n                if nums[mid] < x:\n                    lo = mid + 1\n                else:\n                    hi = mid\n            return lo\n\n        L = lower_bound(target)\n        if L == len(nums) or nums[L] != target:\n            return [-1, -1]\n        R = lower_bound(target + 1) - 1\n        return [L, R]"
+          }
+        },
+        {
+          "id": "search-a-2d-matrix",
+          "lc": 74,
+          "title": "Search a 2D Matrix",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/search-a-2d-matrix/",
+          "statement": "<p>Cho ma trận <code>m x n</code> số nguyên với hai tính chất:</p>\n<ul>\n<li>Mỗi hàng sort không giảm.</li>\n<li>Phần tử đầu hàng sau <strong>lớn hơn</strong> phần tử cuối hàng trước.</li>\n</ul>\n<p>Trả về <code>true</code> nếu <code>target</code> có trong ma trận. Yêu cầu <code>O(log(m·n))</code>.</p>\n<p><strong>Ví dụ:</strong> <code>matrix = [[1,3,5,7],[10,11,16,20],[23,30,34,60]]</code>, <code>target = 3</code> → <code>true</code>; <code>target = 13</code> → <code>false</code>.</p>",
+          "approach": "<p>Hai tính chất khiến cả ma trận tương đương <strong>một mảng 1D đã sort</strong> độ dài <code>m * n</code>. Binary search trên chỉ số phẳng <code>idx ∈ [0, m*n)</code>, map ngược:</p>\n<ul>\n<li><code>row = idx / n</code>, <code>col = idx % n</code>.</li>\n</ul>\n<p>So sánh <code>matrix[row][col]</code> với target rồi thu hẹp như binary search 1D. Không binary search từng hàng (sẽ là <code>O(m log n)</code>) — flatten một lần cho đủ log.</p>",
+          "time": "O(log(m · n))",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    bool searchMatrix(vector<vector<int>>& matrix, int target) {\n        int m = (int)matrix.size(), n = (int)matrix[0].size();\n        int lo = 0, hi = m * n - 1;\n        while (lo <= hi) {\n            int mid = lo + (hi - lo) / 2;\n            int val = matrix[mid / n][mid % n];\n            if (val == target) return true;\n            if (val < target) lo = mid + 1;\n            else hi = mid - 1;\n        }\n        return false;\n    }\n};",
+            "java": "class Solution {\n    public boolean searchMatrix(int[][] matrix, int target) {\n        int m = matrix.length, n = matrix[0].length;\n        int lo = 0, hi = m * n - 1;\n        while (lo <= hi) {\n            int mid = lo + (hi - lo) / 2;\n            int val = matrix[mid / n][mid % n];\n            if (val == target) return true;\n            if (val < target) lo = mid + 1;\n            else hi = mid - 1;\n        }\n        return false;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def searchMatrix(self, matrix: List[List[int]], target: int) -> bool:\n        m, n = len(matrix), len(matrix[0])\n        lo, hi = 0, m * n - 1\n        while lo <= hi:\n            mid = lo + (hi - lo) // 2\n            val = matrix[mid // n][mid % n]\n            if val == target:\n                return True\n            if val < target:\n                lo = mid + 1\n            else:\n                hi = mid - 1\n        return False"
+          }
+        },
+        {
+          "id": "successful-pairs-of-spells-and-potions",
+          "lc": 2300,
+          "title": "Successful Pairs of Spells and Potions",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/successful-pairs-of-spells-and-potions/",
+          "statement": "<p>Cho hai mảng dương <code>spells</code> (dài n) và <code>potions</code> (dài m), cùng ngưỡng <code>success</code>. Một cặp <code>(spell, potion)</code> thành công nếu tích sức mạnh <code>≥ success</code>.</p>\n<p>Trả về mảng <code>pairs</code> dài n, trong đó <code>pairs[i]</code> là số potion tạo cặp thành công với <code>spells[i]</code>.</p>\n<p><strong>Ví dụ:</strong> <code>spells = [5,1,3]</code>, <code>potions = [1,2,3,4,5]</code>, <code>success = 7</code> → <code>[4,0,3]</code>.</p>\n<p><strong>Ràng buộc:</strong> n, m ≤ <code>10<sup>5</sup></code>, <code>success</code> tới <code>10<sup>10</sup></code> — không brute-force O(n·m).</p>",
+          "approach": "<p>Sort <code>potions</code> tăng dần. Với mỗi spell, cần số potion thỏa <code>spell * potion ≥ success</code> tức <code>potion ≥ ceil(success / spell)</code>. Vì potions đã sort, đây là <strong>lower bound</strong> — binary search vị trí đầu tiên hợp lệ, rồi đếm <code>m - idx</code>.</p>\n<p>So sánh bằng <code>spell * potions[mid] ≥ success</code> với kiểu 64-bit (tích tối đa <code>10<sup>10</sup></code>). Sort một lần O(m log m), mỗi spell O(log m).</p>",
+          "time": "O((n + m) log m)",
+          "space": "O(1) thêm (sort potions tại chỗ), không kể mảng kết quả",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> successfulPairs(vector<int>& spells, vector<int>& potions, long long success) {\n        sort(potions.begin(), potions.end());\n        int m = (int)potions.size();\n        vector<int> ans;\n        ans.reserve(spells.size());\n        for (int spell : spells) {\n            int lo = 0, hi = m;\n            while (lo < hi) {\n                int mid = lo + (hi - lo) / 2;\n                if ((long long)spell * potions[mid] >= success) hi = mid;\n                else lo = mid + 1;\n            }\n            ans.push_back(m - lo);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int[] successfulPairs(int[] spells, int[] potions, long success) {\n        Arrays.sort(potions);\n        int m = potions.length;\n        int[] ans = new int[spells.length];\n        for (int i = 0; i < spells.length; i++) {\n            long spell = spells[i];\n            int lo = 0, hi = m;\n            while (lo < hi) {\n                int mid = lo + (hi - lo) / 2;\n                if (spell * (long) potions[mid] >= success) hi = mid;\n                else lo = mid + 1;\n            }\n            ans[i] = m - lo;\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def successfulPairs(self, spells: List[int], potions: List[int], success: int) -> List[int]:\n        potions.sort()\n        m = len(potions)\n        ans: List[int] = []\n        for spell in spells:\n            lo, hi = 0, m\n            while lo < hi:\n                mid = lo + (hi - lo) // 2\n                if spell * potions[mid] >= success:\n                    hi = mid\n                else:\n                    lo = mid + 1\n            ans.append(m - lo)\n        return ans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hashtable",
+      "title": "DSA 1 · Hash Table",
+      "lead": "Hash map / set, đếm tần suất.",
+      "problems": [
+        {
+          "id": "find-lucky-integer-in-an-array",
+          "lc": 1394,
+          "title": "Find Lucky Integer in an Array",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/find-lucky-integer-in-an-array/",
+          "statement": "<p>Số <em>lucky</em> là số nguyên xuất hiện đúng bằng giá trị của nó (tần suất = giá trị). Cho mảng <code>arr</code>, trả về lucky <strong>lớn nhất</strong>; nếu không có thì <code>-1</code>.</p>\n<p><strong>Ví dụ:</strong> <code>[2,2,3,4]</code> → <code>2</code>; <code>[1,2,2,3,3,3]</code> → <code>3</code>; <code>[2,2,2,3,3]</code> → <code>-1</code>.</p>",
+          "approach": "<p>Dùng hash map đếm tần suất mỗi giá trị. Duyệt các cặp <code>(x, cnt)</code>: nếu <code>x == cnt</code> thì cập nhật đáp án max. Không sort — hash cho O(n) trung bình.</p>",
+          "time": "O(n)",
+          "space": "O(k) — k số giá trị khác nhau",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int findLucky(vector<int>& arr) {\n        unordered_map<int, int> cnt;\n        for (int x : arr) cnt[x]++;\n        int ans = -1;\n        for (auto& [x, c] : cnt) {\n            if (x == c) ans = max(ans, x);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int findLucky(int[] arr) {\n        Map<Integer, Integer> cnt = new HashMap<>();\n        for (int x : arr) cnt.merge(x, 1, Integer::sum);\n        int ans = -1;\n        for (Map.Entry<Integer, Integer> e : cnt.entrySet()) {\n            if (e.getKey().equals(e.getValue())) ans = Math.max(ans, e.getKey());\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import Dict, List\n\nclass Solution:\n    def findLucky(self, arr: List[int]) -> int:\n        cnt: Dict[int, int] = {}\n        for x in arr:\n            cnt[x] = cnt.get(x, 0) + 1\n        ans = -1\n        for x, c in cnt.items():\n            if x == c:\n                ans = max(ans, x)\n        return ans"
+          }
+        },
+        {
+          "id": "maximum-number-of-balls-in-a-box",
+          "lc": 1742,
+          "title": "Maximum Number of Balls in a Box",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/maximum-number-of-balls-in-a-box/",
+          "statement": "<p>Có các quả bóng đánh số từ <code>lowLimit</code> đến <code>highLimit</code> (inclusive). Bỏ bóng vào hộp có số hiệu bằng <strong>tổng chữ số</strong> của số bóng. Trả về số bóng trong hộp đông nhất.</p>\n<p><strong>Ví dụ:</strong> <code>lowLimit = 1</code>, <code>highLimit = 10</code> → <code>2</code> (hộp 1 chứa bóng 1 và 10).</p>",
+          "approach": "<p>Với mỗi số trong đoạn, tính digit-sum rồi tăng đếm trong hash map <code>digitSum → count</code>. Đồng thời giữ max count. Đoạn dài tối đa <code>10<sup>5</sup></code>, mỗi digit-sum O(số chữ số) nên đủ nhanh. Hash map vì số hộp = số digit-sum khác nhau (không cần mảng 46 ô, để đúng topic hash).</p>",
+          "time": "O((highLimit − lowLimit) · log₁₀(highLimit))",
+          "space": "O(số digit-sum khác nhau)",
+          "codes": {
+            "cpp": "class Solution {\n    int digitSum(int x) {\n        int s = 0;\n        while (x > 0) {\n            s += x % 10;\n            x /= 10;\n        }\n        return s;\n    }\n\npublic:\n    int countBalls(int lowLimit, int highLimit) {\n        unordered_map<int, int> box;\n        int ans = 0;\n        for (int x = lowLimit; x <= highLimit; x++) {\n            int b = digitSum(x);\n            ans = max(ans, ++box[b]);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    int digitSum(int x) {\n        int s = 0;\n        while (x > 0) {\n            s += x % 10;\n            x /= 10;\n        }\n        return s;\n    }\n\n    public int countBalls(int lowLimit, int highLimit) {\n        Map<Integer, Integer> box = new HashMap<>();\n        int ans = 0;\n        for (int x = lowLimit; x <= highLimit; x++) {\n            int b = digitSum(x);\n            int c = box.merge(b, 1, Integer::sum);\n            ans = Math.max(ans, c);\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import Dict\n\nclass Solution:\n    def countBalls(self, lowLimit: int, highLimit: int) -> int:\n        def digit_sum(x: int) -> int:\n            s = 0\n            while x > 0:\n                s += x % 10\n                x //= 10\n            return s\n\n        box: Dict[int, int] = {}\n        ans = 0\n        for x in range(lowLimit, highLimit + 1):\n            b = digit_sum(x)\n            box[b] = box.get(b, 0) + 1\n            ans = max(ans, box[b])\n        return ans"
+          }
+        },
+        {
+          "id": "jewels-and-stones",
+          "lc": 771,
+          "title": "Jewels and Stones",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/jewels-and-stones/",
+          "statement": "<p><code>jewels</code> là các loại đá quý (ký tự phân biệt), <code>stones</code> là những viên bạn đang có. Đếm bao nhiêu viên trong <code>stones</code> là đá quý. Phân biệt hoa/thường.</p>\n<p><strong>Ví dụ:</strong> <code>jewels = \"aA\"</code>, <code>stones = \"aAAbbbb\"</code> → <code>3</code>.</p>",
+          "approach": "<p>Bỏ mọi ký tự của <code>jewels</code> vào hash set để kiểm tra O(1). Duyệt <code>stones</code>, cộng 1 mỗi khi viên đá nằm trong set. Không lồng hai vòng O(|J|·|S|) — set đúng topic.</p>",
+          "time": "O(|jewels| + |stones|)",
+          "space": "O(|jewels|)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int numJewelsInStones(string jewels, string stones) {\n        unordered_set<char> good(jewels.begin(), jewels.end());\n        int ans = 0;\n        for (char c : stones) {\n            if (good.count(c)) ans++;\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int numJewelsInStones(String jewels, String stones) {\n        Set<Character> good = new HashSet<>();\n        for (int i = 0; i < jewels.length(); i++) good.add(jewels.charAt(i));\n        int ans = 0;\n        for (int i = 0; i < stones.length(); i++) {\n            if (good.contains(stones.charAt(i))) ans++;\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def numJewelsInStones(self, jewels: str, stones: str) -> int:\n        good: set[str] = set(jewels)\n        return sum(1 for ch in stones if ch in good)"
+          }
+        },
+        {
+          "id": "optimal-partition-of-string",
+          "lc": 2405,
+          "title": "Optimal Partition of String",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/optimal-partition-of-string/",
+          "statement": "<p>Chia chuỗi <code>s</code> thành ít substring nhất sao cho mỗi substring có ký tự <strong>phân biệt</strong> (không chữ nào lặp trong cùng một đoạn). Mỗi ký tự thuộc đúng một đoạn.</p>\n<p><strong>Ví dụ:</strong> <code>s = \"abacaba\"</code> → <code>4</code> (ví dụ <code>a|ba|c|aba</code>); <code>\"ssssss\"</code> → <code>6</code>.</p>",
+          "approach": "<p>Greedy + hash set: giữ set các chữ của đoạn hiện tại. Khi gặp chữ đã có trong set, bắt buộc cắt — tăng số đoạn, xóa set, bắt đầu đoạn mới với chữ đó. Lý do tối ưu: cắt muộn nhất có thể (để đoạn hiện tại dài tối đa) không làm tăng số đoạn so với cắt sớm hơn.</p>\n<p>Một lần duyệt, set tối đa 26 chữ thường.</p>",
+          "time": "O(n)",
+          "space": "O(1) — tối đa 26 ký tự trong set",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int partitionString(string s) {\n        unordered_set<char> seen;\n        int parts = 1;\n        for (char c : s) {\n            if (seen.count(c)) {\n                parts++;\n                seen.clear();\n            }\n            seen.insert(c);\n        }\n        return parts;\n    }\n};",
+            "java": "class Solution {\n    public int partitionString(String s) {\n        Set<Character> seen = new HashSet<>();\n        int parts = 1;\n        for (int i = 0; i < s.length(); i++) {\n            char c = s.charAt(i);\n            if (seen.contains(c)) {\n                parts++;\n                seen.clear();\n            }\n            seen.add(c);\n        }\n        return parts;\n    }\n}",
+            "python": "class Solution:\n    def partitionString(self, s: str) -> int:\n        seen: set[str] = set()\n        parts = 1\n        for ch in s:\n            if ch in seen:\n                parts += 1\n                seen.clear()\n            seen.add(ch)\n        return parts"
+          }
+        }
+      ]
+    },
+    {
+      "id": "linked-list",
+      "title": "DSA 1 · Linked List",
+      "lead": "BTVN: Max Stack + LFU Cache — doubly linked list + hashmap.",
+      "problems": [
+        {
+          "id": "max-stack",
+          "lc": 716,
+          "title": "Max Stack",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/max-stack/",
+          "statement": "<p><em>LeetCode Premium</em> (cũng có trên LintCode). Thiết kế stack hỗ trợ thao tác stack thông thường <em>và</em> lấy / xóa phần tử lớn nhất:</p>\n<ul>\n<li><code>push(x)</code> — đẩy x lên đỉnh.</li>\n<li><code>pop()</code> — xóa và trả về đỉnh.</li>\n<li><code>top()</code> — xem đỉnh, không xóa.</li>\n<li><code>peekMax()</code> — xem giá trị max hiện có.</li>\n<li><code>popMax()</code> — xóa phần tử max <strong>gần đỉnh nhất</strong> (nếu trùng max) và trả về nó. Các phần tử khác giữ nguyên thứ tự stack.</li>\n</ul>\n<p>Follow-up: <code>top</code> / <code>peekMax</code> O(1) hoặc O(log n), <code>push</code> / <code>pop</code> / <code>popMax</code> O(log n). Tới <code>10<sup>5</sup></code> thao tác.</p>\n<p><strong>Ví dụ:</strong> push 5, 1, 5 → <code>top=5</code>, <code>popMax=5</code> (đỉnh), còn <code>[5,1]</code>, <code>top=1</code>, <code>peekMax=5</code>, <code>pop=1</code>, <code>top=5</code>.</p>",
+          "approach": "<p>Đúng tinh thần BTVN linked list: <strong>doubly linked list</strong> giữ thứ tự stack (đuôi = đỉnh) + <strong>hash map giá trị → danh sách node</strong> để nhảy tới node cần xóa O(1), rồi unlink khỏi DLL.</p>\n<ul>\n<li>DLL: <code>push</code> gắn node mới vào đuôi; <code>pop</code> gỡ đuôi.</li>\n<li>Hash map: mỗi key trỏ tới stack các node cùng giá trị; phần tử cuối = lần xuất hiện gần đỉnh nhất — đúng yêu cầu <code>popMax</code> xóa max gần top.</li>\n<li>Để <code>peekMax</code> / <code>popMax</code> không duyệt O(n): C++ dùng <code>std::map</code>, Java dùng <code>TreeMap</code> (map có thứ tự). Python stdlib không có TreeMap nên kèm max-heap lazy (chỉ hỗ trợ lấy max, vẫn bắt buộc DLL + hashmap để xóa giữa stack).</li>\n</ul>\n<p><code>popMax</code>: lấy max, gỡ node cuối của key đó khỏi DLL và map. Các node khác giữ nguyên thứ tự.</p>",
+          "time": "O(1) top; O(log n) push / pop / peekMax / popMax (amortized với heap lazy)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class MaxStack {\n    list<int> dll;  // back() = top of stack\n    map<int, vector<list<int>::iterator>> idx;\n\npublic:\n    MaxStack() {}\n\n    void push(int x) {\n        dll.push_back(x);\n        auto it = dll.end();\n        --it;\n        idx[x].push_back(it);\n    }\n\n    int pop() {\n        int x = dll.back();\n        dll.pop_back();\n        idx[x].pop_back();\n        if (idx[x].empty()) idx.erase(x);\n        return x;\n    }\n\n    int top() {\n        return dll.back();\n    }\n\n    int peekMax() {\n        return idx.rbegin()->first;\n    }\n\n    int popMax() {\n        int x = peekMax();\n        auto it = idx[x].back();\n        idx[x].pop_back();\n        if (idx[x].empty()) idx.erase(x);\n        dll.erase(it);\n        return x;\n    }\n};",
+            "java": "class MaxStack {\n    static class Node {\n        int val;\n        Node prev, next;\n        Node(int v) { val = v; }\n    }\n\n    private final Node head, tail;\n    private final TreeMap<Integer, Deque<Node>> idx;\n\n    public MaxStack() {\n        head = new Node(0);\n        tail = new Node(0);\n        head.next = tail;\n        tail.prev = head;\n        idx = new TreeMap<>();\n    }\n\n    private void append(Node n) {\n        n.prev = tail.prev;\n        n.next = tail;\n        tail.prev.next = n;\n        tail.prev = n;\n    }\n\n    private void unlink(Node n) {\n        n.prev.next = n.next;\n        n.next.prev = n.prev;\n    }\n\n    public void push(int x) {\n        Node n = new Node(x);\n        append(n);\n        idx.computeIfAbsent(x, k -> new ArrayDeque<>()).addLast(n);\n    }\n\n    public int pop() {\n        Node n = tail.prev;\n        unlink(n);\n        Deque<Node> dq = idx.get(n.val);\n        dq.removeLast();\n        if (dq.isEmpty()) idx.remove(n.val);\n        return n.val;\n    }\n\n    public int top() {\n        return tail.prev.val;\n    }\n\n    public int peekMax() {\n        return idx.lastKey();\n    }\n\n    public int popMax() {\n        int x = idx.lastKey();\n        Deque<Node> dq = idx.get(x);\n        Node n = dq.removeLast();\n        if (dq.isEmpty()) idx.remove(x);\n        unlink(n);\n        return x;\n    }\n}",
+            "python": "import heapq\nfrom typing import Dict, List, Optional\n\n\nclass Node:\n    def __init__(self, val: int) -> None:\n        self.val = val\n        self.prev: Optional[\"Node\"] = None\n        self.next: Optional[\"Node\"] = None\n\n\nclass MaxStack:\n    def __init__(self) -> None:\n        self.head = Node(0)\n        self.tail = Node(0)\n        self.head.next = self.tail\n        self.tail.prev = self.head\n        self.idx: Dict[int, List[Node]] = {}\n        self.heap: List[int] = []  # max-heap of (-value)\n\n    def _append(self, node: Node) -> None:\n        node.prev = self.tail.prev\n        node.next = self.tail\n        self.tail.prev.next = node\n        self.tail.prev = node\n\n    def _unlink(self, node: Node) -> None:\n        node.prev.next = node.next\n        node.next.prev = node.prev\n\n    def _drop(self, x: int) -> None:\n        bucket = self.idx[x]\n        bucket.pop()\n        if not bucket:\n            del self.idx[x]\n\n    def _clean(self) -> None:\n        while self.heap and -self.heap[0] not in self.idx:\n            heapq.heappop(self.heap)\n\n    def push(self, x: int) -> None:\n        node = Node(x)\n        self._append(node)\n        self.idx.setdefault(x, []).append(node)\n        heapq.heappush(self.heap, -x)\n\n    def pop(self) -> int:\n        node = self.tail.prev\n        self._unlink(node)\n        self._drop(node.val)\n        return node.val\n\n    def top(self) -> int:\n        return self.tail.prev.val\n\n    def peekMax(self) -> int:\n        self._clean()\n        return -self.heap[0]\n\n    def popMax(self) -> int:\n        x = self.peekMax()\n        node = self.idx[x][-1]\n        self._unlink(node)\n        self._drop(x)\n        return x"
+          }
+        },
+        {
+          "id": "lfu-cache",
+          "lc": 460,
+          "title": "LFU Cache",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/lfu-cache/",
+          "statement": "<p>Thiết kế cache LFU (Least Frequently Used) dung lượng <code>capacity</code>:</p>\n<ul>\n<li><code>get(key)</code> — trả value nếu có, không thì <code>-1</code>. Mỗi lần get thành công tăng tần suất dùng.</li>\n<li><code>put(key, value)</code> — cập nhật hoặc chèn. Nếu đầy, trước khi chèn mới phải evict key <strong>ít dùng nhất</strong>; hòa tần suất thì evict key <strong>lâu không dùng nhất</strong> (LRU trong cùng freq).</li>\n</ul>\n<p>Key mới có freq = 1. <code>get</code> / <code>put</code> trung bình O(1). <code>capacity ≥ 1</code>, tới <code>2·10<sup>5</sup></code> lệnh.</p>\n<p><strong>Ví dụ:</strong> capacity 2; put(1,1), put(2,2), get(1)→1, put(3,3) evict key 2 (freq 1, cũ hơn), get(2)→-1, get(3)→3, put(4,4) evict key 1, get(1)→-1, get(3)→3, get(4)→4.</p>",
+          "approach": "<p>Hai hash map + doubly linked list (không dùng LinkedHashSet che giấu DLL):</p>\n<ul>\n<li><code>key → node</code> (key, value, freq) — get/put O(1).</li>\n<li><code>freq → DLL</code> các node cùng tần suất, thứ tự LRU: đầu = mới dùng, đuôi = cũ nhất.</li>\n<li><code>minFreq</code> — freq nhỏ nhất hiện có, để evict O(1) (gỡ đuôi của bucket đó).</li>\n</ul>\n<p>Khi chạm node (get/put hit): gỡ khỏi DLL freq cũ; nếu bucket trống và đó là minFreq thì <code>minFreq++</code>; tăng freq, chèn đầu bucket mới. Khi chèn key mới: nếu đầy, evict đuôi <code>minFreq</code>, rồi đặt freq = 1 và <code>minFreq = 1</code>.</p>",
+          "time": "O(1) trung bình cho get / put",
+          "space": "O(capacity)",
+          "codes": {
+            "cpp": "class LFUCache {\n    struct Node {\n        int key, val, freq;\n        Node(int k, int v, int f) : key(k), val(v), freq(f) {}\n    };\n\n    int cap, minf;\n    unordered_map<int, list<Node>::iterator> where;\n    unordered_map<int, list<Node>> buckets;\n\n    void touch(list<Node>::iterator it) {\n        int f = it->freq;\n        Node node = *it;\n        buckets[f].erase(it);\n        if (buckets[f].empty()) {\n            buckets.erase(f);\n            if (minf == f) minf++;\n        }\n        node.freq++;\n        buckets[node.freq].push_front(node);\n        where[node.key] = buckets[node.freq].begin();\n    }\n\npublic:\n    LFUCache(int capacity) : cap(capacity), minf(0) {}\n\n    int get(int key) {\n        if (!where.count(key)) return -1;\n        auto it = where[key];\n        int val = it->val;\n        touch(it);\n        return val;\n    }\n\n    void put(int key, int value) {\n        if (cap == 0) return;\n        if (where.count(key)) {\n            auto it = where[key];\n            it->val = value;\n            touch(it);\n            return;\n        }\n        if ((int)where.size() == cap) {\n            Node victim = buckets[minf].back();\n            where.erase(victim.key);\n            buckets[minf].pop_back();\n            if (buckets[minf].empty()) buckets.erase(minf);\n        }\n        minf = 1;\n        buckets[1].push_front(Node(key, value, 1));\n        where[key] = buckets[1].begin();\n    }\n};",
+            "java": "class LFUCache {\n    static class Node {\n        int key, val, freq;\n        Node prev, next;\n        Node(int k, int v) {\n            key = k;\n            val = v;\n            freq = 1;\n        }\n    }\n\n    static class DLList {\n        Node head, tail;\n        int size;\n        DLList() {\n            head = new Node(0, 0);\n            tail = new Node(0, 0);\n            head.next = tail;\n            tail.prev = head;\n        }\n        void addFirst(Node n) {\n            n.next = head.next;\n            n.prev = head;\n            head.next.prev = n;\n            head.next = n;\n            size++;\n        }\n        void remove(Node n) {\n            n.prev.next = n.next;\n            n.next.prev = n.prev;\n            size--;\n        }\n        Node removeLast() {\n            Node n = tail.prev;\n            remove(n);\n            return n;\n        }\n    }\n\n    private final int cap;\n    private int minf;\n    private final Map<Integer, Node> where;\n    private final Map<Integer, DLList> buckets;\n\n    public LFUCache(int capacity) {\n        cap = capacity;\n        minf = 0;\n        where = new HashMap<>();\n        buckets = new HashMap<>();\n    }\n\n    private void touch(Node n) {\n        DLList old = buckets.get(n.freq);\n        old.remove(n);\n        if (old.size == 0) {\n            buckets.remove(n.freq);\n            if (minf == n.freq) minf++;\n        }\n        n.freq++;\n        buckets.computeIfAbsent(n.freq, k -> new DLList()).addFirst(n);\n    }\n\n    public int get(int key) {\n        Node n = where.get(key);\n        if (n == null) return -1;\n        touch(n);\n        return n.val;\n    }\n\n    public void put(int key, int value) {\n        if (cap == 0) return;\n        Node n = where.get(key);\n        if (n != null) {\n            n.val = value;\n            touch(n);\n            return;\n        }\n        if (where.size() == cap) {\n            DLList list = buckets.get(minf);\n            Node victim = list.removeLast();\n            where.remove(victim.key);\n            if (list.size == 0) buckets.remove(minf);\n        }\n        Node fresh = new Node(key, value);\n        where.put(key, fresh);\n        buckets.computeIfAbsent(1, k -> new DLList()).addFirst(fresh);\n        minf = 1;\n    }\n}",
+            "python": "from typing import Dict, Optional\n\n\nclass Node:\n    def __init__(self, key: int = 0, val: int = 0, freq: int = 1) -> None:\n        self.key = key\n        self.val = val\n        self.freq = freq\n        self.prev: Optional[\"Node\"] = None\n        self.next: Optional[\"Node\"] = None\n\n\nclass DLList:\n    def __init__(self) -> None:\n        self.head = Node()\n        self.tail = Node()\n        self.head.next = self.tail\n        self.tail.prev = self.head\n        self.size = 0\n\n    def add_first(self, node: Node) -> None:\n        node.next = self.head.next\n        node.prev = self.head\n        self.head.next.prev = node\n        self.head.next = node\n        self.size += 1\n\n    def remove(self, node: Node) -> None:\n        node.prev.next = node.next\n        node.next.prev = node.prev\n        self.size -= 1\n\n    def remove_last(self) -> Node:\n        node = self.tail.prev\n        self.remove(node)\n        return node\n\n\nclass LFUCache:\n    def __init__(self, capacity: int) -> None:\n        self.cap = capacity\n        self.minf = 0\n        self.where: Dict[int, Node] = {}\n        self.buckets: Dict[int, DLList] = {}\n\n    def _touch(self, node: Node) -> None:\n        old = self.buckets[node.freq]\n        old.remove(node)\n        if old.size == 0:\n            del self.buckets[node.freq]\n            if self.minf == node.freq:\n                self.minf += 1\n        node.freq += 1\n        self.buckets.setdefault(node.freq, DLList()).add_first(node)\n\n    def get(self, key: int) -> int:\n        node = self.where.get(key)\n        if node is None:\n            return -1\n        self._touch(node)\n        return node.val\n\n    def put(self, key: int, value: int) -> None:\n        if self.cap == 0:\n            return\n        node = self.where.get(key)\n        if node is not None:\n            node.val = value\n            self._touch(node)\n            return\n        if len(self.where) == self.cap:\n            victim = self.buckets[self.minf].remove_last()\n            del self.where[victim.key]\n            if self.buckets[self.minf].size == 0:\n                del self.buckets[self.minf]\n        fresh = Node(key, value, 1)\n        self.where[key] = fresh\n        self.buckets.setdefault(1, DLList()).add_first(fresh)\n        self.minf = 1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stack-queue",
+      "title": "DSA 1 · Stack & Queue",
+      "lead": "Stack / queue mô phỏng. Calculator dùng stack.",
+      "problems": [
+        {
+          "id": "remove-all-adjacent-duplicates-in-string",
+          "lc": 1047,
+          "title": "Remove All Adjacent Duplicates In String",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/remove-all-adjacent-duplicates-in-string/",
+          "statement": "<p>Cho chuỗi chữ thường <code>s</code>. Lặp lại thao tác: chọn hai ký tự kề nhau giống nhau và xóa chúng, cho tới khi không còn cặp nào. Kết quả duy nhất — trả về chuỗi sau khi xóa hết.</p>\n<p><strong>Ví dụ:</strong> <code>s = \"abbaca\"</code> → xóa <code>bb</code> còn <code>aaca</code>, xóa <code>aa</code> còn <code>ca</code>.</p>",
+          "approach": "<p>Stack mô phỏng xóa cặp kề: duyệt trái → phải, nếu đỉnh stack trùng ký tự hiện tại thì pop (xóa cặp), không thì push. Mỗi ký tự vào/ra stack tối đa một lần. Nối stack lúc kết thúc.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    string removeDuplicates(string s) {\n        string st;\n        for (char c : s) {\n            if (!st.empty() && st.back() == c) st.pop_back();\n            else st.push_back(c);\n        }\n        return st;\n    }\n};",
+            "java": "class Solution {\n    public String removeDuplicates(String s) {\n        StringBuilder st = new StringBuilder();\n        for (int i = 0; i < s.length(); i++) {\n            char c = s.charAt(i);\n            int n = st.length();\n            if (n > 0 && st.charAt(n - 1) == c) st.deleteCharAt(n - 1);\n            else st.append(c);\n        }\n        return st.toString();\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def removeDuplicates(self, s: str) -> str:\n        st: List[str] = []\n        for ch in s:\n            if st and st[-1] == ch:\n                st.pop()\n            else:\n                st.append(ch)\n        return \"\".join(st)"
+          }
+        },
+        {
+          "id": "time-needed-to-buy-tickets",
+          "lc": 2073,
+          "title": "Time Needed to Buy Tickets",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/time-needed-to-buy-tickets/",
+          "statement": "<p>Hàng người mua vé: người i muốn <code>tickets[i]</code> vé. Mỗi giây, người đầu hàng mua đúng 1 vé rồi ra về nếu hết nhu cầu, không thì xuống cuối hàng. Trả về số giây tới khi người ở vị trí <code>k</code> mua xong.</p>\n<p><strong>Ví dụ:</strong> <code>tickets = [2,3,2]</code>, <code>k = 2</code> → <code>6</code>; <code>[5,1,1,1]</code>, <code>k = 0</code> → <code>8</code>.</p>",
+          "approach": "<p>Mô phỏng đúng đề bằng <strong>queue</strong>: đưa chỉ số người vào hàng đợi. Mỗi bước dequeue một người, giảm 1 vé, tăng thời gian; nếu còn vé thì enqueue lại. Khi người <code>k</code> vừa mua vé cuối cùng thì dừng.</p>\n<p>n ≤ 100, tickets[i] ≤ 100 nên mô phỏng O(n · max tickets) đủ. (Có công thức O(n) nhưng topic này dùng queue.)</p>",
+          "time": "O(n · max(tickets))",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int timeRequiredToBuy(vector<int>& tickets, int k) {\n        queue<int> q;\n        for (int i = 0; i < (int)tickets.size(); i++) q.push(i);\n        int time = 0;\n        while (!q.empty()) {\n            int i = q.front();\n            q.pop();\n            tickets[i]--;\n            time++;\n            if (tickets[i] > 0) q.push(i);\n            else if (i == k) return time;\n        }\n        return time;\n    }\n};",
+            "java": "class Solution {\n    public int timeRequiredToBuy(int[] tickets, int k) {\n        Queue<Integer> q = new ArrayDeque<>();\n        for (int i = 0; i < tickets.length; i++) q.add(i);\n        int time = 0;\n        while (!q.isEmpty()) {\n            int i = q.poll();\n            tickets[i]--;\n            time++;\n            if (tickets[i] > 0) q.add(i);\n            else if (i == k) return time;\n        }\n        return time;\n    }\n}",
+            "python": "from collections import deque\nfrom typing import Deque, List\n\nclass Solution:\n    def timeRequiredToBuy(self, tickets: List[int], k: int) -> int:\n        q: Deque[int] = deque(range(len(tickets)))\n        time = 0\n        while q:\n            i = q.popleft()\n            tickets[i] -= 1\n            time += 1\n            if tickets[i] > 0:\n                q.append(i)\n            elif i == k:\n                return time\n        return time"
+          }
+        },
+        {
+          "id": "baseball-game",
+          "lc": 682,
+          "title": "Baseball Game",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/baseball-game/",
+          "statement": "<p>Bắt đầu với record rỗng. Áp lần lượt các thao tác:</p>\n<ul>\n<li>Số nguyên x — ghi điểm x.</li>\n<li><code>\"+\"</code> — ghi tổng hai điểm gần nhất.</li>\n<li><code>\"D\"</code> — ghi gấp đôi điểm gần nhất.</li>\n<li><code>\"C\"</code> — hủy điểm gần nhất.</li>\n</ul>\n<p>Trả về tổng record cuối. Đề đảm bảo luôn đủ phần tử cho +, D, C.</p>\n<p><strong>Ví dụ:</strong> <code>[\"5\",\"2\",\"C\",\"D\",\"+\"]</code> → record <code>[5,10,15]</code>, tổng <code>30</code>.</p>",
+          "approach": "<p>Stack lưu các điểm còn hiệu lực. Duyệt operations: số thì push; C pop; D push <code>2 * top</code>; + push tổng hai đỉnh. Cuối cùng cộng stack.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int calPoints(vector<string>& operations) {\n        vector<int> st;\n        for (const string& op : operations) {\n            if (op == \"C\") st.pop_back();\n            else if (op == \"D\") st.push_back(st.back() * 2);\n            else if (op == \"+\") st.push_back(st[st.size() - 2] + st.back());\n            else st.push_back(stoi(op));\n        }\n        int sum = 0;\n        for (int x : st) sum += x;\n        return sum;\n    }\n};",
+            "java": "class Solution {\n    public int calPoints(String[] operations) {\n        Deque<Integer> st = new ArrayDeque<>();\n        for (String op : operations) {\n            if (op.equals(\"C\")) st.removeLast();\n            else if (op.equals(\"D\")) st.addLast(st.peekLast() * 2);\n            else if (op.equals(\"+\")) {\n                int a = st.removeLast();\n                int b = st.peekLast();\n                st.addLast(a);\n                st.addLast(a + b);\n            } else st.addLast(Integer.parseInt(op));\n        }\n        int sum = 0;\n        for (int x : st) sum += x;\n        return sum;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def calPoints(self, operations: List[str]) -> int:\n        st: List[int] = []\n        for op in operations:\n            if op == \"C\":\n                st.pop()\n            elif op == \"D\":\n                st.append(st[-1] * 2)\n            elif op == \"+\":\n                st.append(st[-2] + st[-1])\n            else:\n                st.append(int(op))\n        return sum(st)"
+          }
+        },
+        {
+          "id": "make-the-string-great",
+          "lc": 1544,
+          "title": "Make The String Great",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/make-the-string-great/",
+          "statement": "<p>Chuỗi “tốt” không chứa hai ký tự kề nhau là cùng chữ cái nhưng khác hoa/thường (ví dụ <code>eE</code>, <code>Bb</code>). Được xóa các cặp xấu cho tới khi chuỗi tốt. Kết quả duy nhất.</p>\n<p><strong>Ví dụ:</strong> <code>\"leEeetcode\"</code> → <code>\"leetcode\"</code>; <code>\"abBAcC\"</code> → <code>\"\"</code>.</p>",
+          "approach": "<p>Stack: với mỗi ký tự, nếu đỉnh và ký tự hiện tại tạo cặp xấu — cùng letter, khác case, tức <code>abs(ord(a) - ord(b)) == 32</code> — thì pop; không thì push. Giống xóa cặp ngoặc / duplicates, chỉ khác điều kiện khớp.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    string makeGood(string s) {\n        string st;\n        for (char c : s) {\n            if (!st.empty() && (st.back() + 32 == c || c + 32 == st.back())) st.pop_back();\n            else st.push_back(c);\n        }\n        return st;\n    }\n};",
+            "java": "class Solution {\n    public String makeGood(String s) {\n        StringBuilder st = new StringBuilder();\n        for (int i = 0; i < s.length(); i++) {\n            char c = s.charAt(i);\n            int n = st.length();\n            if (n > 0 && Math.abs(st.charAt(n - 1) - c) == 32) st.deleteCharAt(n - 1);\n            else st.append(c);\n        }\n        return st.toString();\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def makeGood(self, s: str) -> str:\n        st: List[str] = []\n        for ch in s:\n            if st and abs(ord(st[-1]) - ord(ch)) == 32:\n                st.pop()\n            else:\n                st.append(ch)\n        return \"\".join(st)"
+          }
+        },
+        {
+          "id": "minimum-string-length-after-removing-substrings",
+          "lc": 2696,
+          "title": "Minimum String Length After Removing Substrings",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/minimum-string-length-after-removing-substrings/",
+          "statement": "<p>Chuỗi chỉ gồm chữ hoa. Mỗi bước được xóa một lần xuất hiện substring <code>\"AB\"</code> hoặc <code>\"CD\"</code> (chuỗi nối lại sau khi xóa, có thể tạo cặp mới). Trả về độ dài ngắn nhất có thể.</p>\n<p><strong>Ví dụ:</strong> <code>\"ABFCACDB\"</code> → <code>2</code> (còn <code>\"FC\"</code>); <code>\"ACBBD\"</code> → <code>5</code>.</p>",
+          "approach": "<p>Xóa cặp kề kiểu ngoặc — stack. Push từng chữ; nếu hai đỉnh tạo <code>AB</code> hoặc <code>CD</code> thì pop. Thứ tự xóa không đổi kết quả (như 1047). Độ dài stack cuối là đáp án.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int minLength(string s) {\n        string st;\n        for (char c : s) {\n            if (!st.empty() && ((st.back() == 'A' && c == 'B') || (st.back() == 'C' && c == 'D'))) {\n                st.pop_back();\n            } else {\n                st.push_back(c);\n            }\n        }\n        return (int)st.size();\n    }\n};",
+            "java": "class Solution {\n    public int minLength(String s) {\n        StringBuilder st = new StringBuilder();\n        for (int i = 0; i < s.length(); i++) {\n            char c = s.charAt(i);\n            int n = st.length();\n            if (n > 0) {\n                char t = st.charAt(n - 1);\n                if ((t == 'A' && c == 'B') || (t == 'C' && c == 'D')) {\n                    st.deleteCharAt(n - 1);\n                    continue;\n                }\n            }\n            st.append(c);\n        }\n        return st.length();\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def minLength(self, s: str) -> int:\n        st: List[str] = []\n        for ch in s:\n            if st and ((st[-1] == \"A\" and ch == \"B\") or (st[-1] == \"C\" and ch == \"D\")):\n                st.pop()\n            else:\n                st.append(ch)\n        return len(st)"
+          }
+        },
+        {
+          "id": "basic-calculator",
+          "lc": 224,
+          "title": "Basic Calculator",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/basic-calculator/",
+          "statement": "<p>Tính giá trị biểu thức hợp lệ <code>s</code> gồm số không âm, <code>+</code>, <code>-</code>, ngoặc đơn và khoảng trắng. Không được <code>eval</code>. Dấu <code>-</code> có thể unary (<code>-1</code>, <code>-(2+3)</code>); không có unary <code>+</code>. Mọi tính trung gian fit 32-bit signed.</p>\n<p><strong>Ví dụ:</strong> <code>\"1 + 1\"</code> → <code>2</code>; <code>\"2-1 + 2\"</code> → <code>3</code>; <code>\"(1+(4+5+2)-3)+(6+8)\"</code> → <code>23</code>.</p>",
+          "approach": "<p>Một pass + stack cho ngoặc. Giữ <code>res</code> (tổng đoạn hiện tại), <code>sign</code> (±1 cho số sắp đọc), <code>num</code> đang ghép chữ số.</p>\n<ul>\n<li>Gặp chữ số: <code>num = num * 10 + d</code>.</li>\n<li>Gặp <code>+</code> / <code>-</code>: cộng <code>sign * num</code> vào <code>res</code>, reset <code>num</code>, đặt <code>sign</code> mới.</li>\n<li>Gặp <code>(</code>: push <code>res</code> rồi <code>sign</code> (dấu đứng trước ngoặc), reset <code>res = 0</code>, <code>sign = 1</code> để tính trong ngoặc.</li>\n<li>Gặp <code>)</code>: cộng nốt <code>num</code>, nhân <code>res</code> với sign đã push, cộng res ngoài ngoặc đã push.</li>\n</ul>\n<p>Không cần toán tử <code>*</code>/<code>/</code> — chỉ cộng trừ có dấu, stack đủ.</p>",
+          "time": "O(n)",
+          "space": "O(n) — độ sâu ngoặc",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int calculate(string s) {\n        vector<long long> st;\n        long long res = 0, num = 0, sign = 1;\n        for (char c : s) {\n            if (c >= '0' && c <= '9') {\n                num = num * 10 + (c - '0');\n            } else if (c == '+' || c == '-') {\n                res += sign * num;\n                num = 0;\n                sign = (c == '+') ? 1 : -1;\n            } else if (c == '(') {\n                st.push_back(res);\n                st.push_back(sign);\n                res = 0;\n                sign = 1;\n            } else if (c == ')') {\n                res += sign * num;\n                num = 0;\n                res *= st.back();\n                st.pop_back();\n                res += st.back();\n                st.pop_back();\n            }\n        }\n        return (int)(res + sign * num);\n    }\n};",
+            "java": "class Solution {\n    public int calculate(String s) {\n        Deque<Integer> st = new ArrayDeque<>();\n        int res = 0, num = 0, sign = 1;\n        for (int i = 0; i < s.length(); i++) {\n            char c = s.charAt(i);\n            if (c >= '0' && c <= '9') {\n                num = num * 10 + (c - '0');\n            } else if (c == '+' || c == '-') {\n                res += sign * num;\n                num = 0;\n                sign = (c == '+') ? 1 : -1;\n            } else if (c == '(') {\n                st.addLast(res);\n                st.addLast(sign);\n                res = 0;\n                sign = 1;\n            } else if (c == ')') {\n                res += sign * num;\n                num = 0;\n                res *= st.removeLast();\n                res += st.removeLast();\n            }\n        }\n        return res + sign * num;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def calculate(self, s: str) -> int:\n        st: List[int] = []\n        res, num, sign = 0, 0, 1\n        for ch in s:\n            if ch.isdigit():\n                num = num * 10 + ord(ch) - 48\n            elif ch in \"+-\":\n                res += sign * num\n                num = 0\n                sign = 1 if ch == \"+\" else -1\n            elif ch == \"(\":\n                st.append(res)\n                st.append(sign)\n                res, sign = 0, 1\n            elif ch == \")\":\n                res += sign * num\n                num = 0\n                res *= st.pop()\n                res += st.pop()\n        return res + sign * num"
+          }
+        },
+        {
+          "id": "basic-calculator-ii",
+          "lc": 227,
+          "title": "Basic Calculator II",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/basic-calculator-ii/",
+          "statement": "<p>Tính biểu thức <code>s</code> gồm số không âm, <code>+</code> <code>-</code> <code>*</code> <code>/</code> và khoảng trắng. Không ngoặc. Chia nguyên cắt về 0. Không <code>eval</code>. Biểu thức hợp lệ, kết quả 32-bit.</p>\n<p><strong>Ví dụ:</strong> <code>\"3+2*2\"</code> → <code>7</code>; <code>\" 3/2 \"</code> → <code>1</code>; <code>\" 3+5 / 2 \"</code> → <code>5</code>.</p>",
+          "approach": "<p>Không ngoặc nên ưu tiên <code>*</code>/<code>/</code> bằng stack số hạng đã mang dấu. Giữ toán tử <code>op</code> <em>đứng trước</em> số đang đọc (ban đầu <code>+</code>):</p>\n<ul>\n<li><code>+</code> push <code>+num</code>; <code>-</code> push <code>-num</code>.</li>\n<li><code>*</code> pop rồi push tích; <code>/</code> pop rồi chia cắt về 0 (C++/Java <code>/</code> int đã vậy; Python dùng <code>int(a / b)</code> chứ không <code>//</code> — <code>//</code> làm tròn xuống).</li>\n</ul>\n<p>Bỏ qua space. Khi hết chuỗi vẫn áp <code>op</code> cho số cuối. Tổng stack là kết quả.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int calculate(string s) {\n        vector<int> st;\n        long long num = 0;\n        char op = '+';\n        int n = (int)s.size();\n        for (int i = 0; i < n; i++) {\n            char c = s[i];\n            if (c >= '0' && c <= '9') num = num * 10 + (c - '0');\n            if (c == '+' || c == '-' || c == '*' || c == '/' || i == n - 1) {\n                if (op == '+') st.push_back((int)num);\n                else if (op == '-') st.push_back((int)-num);\n                else if (op == '*') {\n                    int top = st.back();\n                    st.pop_back();\n                    st.push_back((int)(top * num));\n                } else if (op == '/') {\n                    int top = st.back();\n                    st.pop_back();\n                    st.push_back((int)(top / num));\n                }\n                op = c;\n                num = 0;\n            }\n        }\n        int sum = 0;\n        for (int x : st) sum += x;\n        return sum;\n    }\n};",
+            "java": "class Solution {\n    public int calculate(String s) {\n        Deque<Integer> st = new ArrayDeque<>();\n        long num = 0;\n        char op = '+';\n        int n = s.length();\n        for (int i = 0; i < n; i++) {\n            char c = s.charAt(i);\n            if (c >= '0' && c <= '9') num = num * 10 + (c - '0');\n            if (c == '+' || c == '-' || c == '*' || c == '/' || i == n - 1) {\n                if (op == '+') st.addLast((int) num);\n                else if (op == '-') st.addLast((int) -num);\n                else if (op == '*') st.addLast((int) (st.removeLast() * num));\n                else if (op == '/') st.addLast((int) (st.removeLast() / num));\n                op = c;\n                num = 0;\n            }\n        }\n        int sum = 0;\n        for (int x : st) sum += x;\n        return sum;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def calculate(self, s: str) -> int:\n        st: List[int] = []\n        num = 0\n        op = \"+\"\n        n = len(s)\n        for i, ch in enumerate(s):\n            if ch.isdigit():\n                num = num * 10 + ord(ch) - 48\n            if ch in \"+-*/\" or i == n - 1:\n                if op == \"+\":\n                    st.append(num)\n                elif op == \"-\":\n                    st.append(-num)\n                elif op == \"*\":\n                    st.append(st.pop() * num)\n                elif op == \"/\":\n                    top = st.pop()\n                    st.append(int(top / num))  # truncate toward 0\n                op = ch\n                num = 0\n        return sum(st)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "graph2-tree",
+      "title": "DSA 1 · Graph 2 (Binary Tree)",
+      "lead": "Homework là 3 bài tree. DFS đệ quy.",
+      "problems": [
+        {
+          "id": "invert-binary-tree",
+          "lc": 226,
+          "title": "Invert Binary Tree",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/invert-binary-tree/",
+          "statement": "<p>Cho root của cây nhị phân, đảo cây (swap left/right mọi node) rồi trả về root.</p>\n<p><strong>Ví dụ:</strong> <code>[4,2,7,1,3,6,9]</code> → <code>[4,7,2,9,6,3,1]</code>.</p>",
+          "approach": "<p>DFS đệ quy: base case <code>root == null</code>. Đảo hai cây con rồi gán chéo <code>left, right = invert(right), invert(left)</code>. Phải invert cả hai <em>trước</em> khi gán — nếu gán <code>left = invert(right)</code> rồi mới <code>right = invert(left)</code> sẽ dùng left đã bị ghi đè.</p>",
+          "time": "O(n)",
+          "space": "O(h) — stack đệ quy, h chiều cao cây",
+          "codes": {
+            "cpp": "/**\n * Definition for a binary tree node.\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode() : val(0), left(nullptr), right(nullptr) {}\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n *     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}\n * };\n */\nclass Solution {\npublic:\n    TreeNode* invertTree(TreeNode* root) {\n        if (!root) return nullptr;\n        TreeNode* L = invertTree(root->left);\n        TreeNode* R = invertTree(root->right);\n        root->left = R;\n        root->right = L;\n        return root;\n    }\n};",
+            "java": "/**\n * Definition for a binary tree node.\n * public class TreeNode {\n *     int val;\n *     TreeNode left;\n *     TreeNode right;\n *     TreeNode() {}\n *     TreeNode(int val) { this.val = val; }\n *     TreeNode(int val, TreeNode left, TreeNode right) {\n *         this.val = val;\n *         this.left = left;\n *         this.right = right;\n *     }\n * }\n */\nclass Solution {\n    public TreeNode invertTree(TreeNode root) {\n        if (root == null) return null;\n        TreeNode L = invertTree(root.left);\n        TreeNode R = invertTree(root.right);\n        root.left = R;\n        root.right = L;\n        return root;\n    }\n}",
+            "python": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n#         self.val = val\n#         self.left = left\n#         self.right = right\n\nfrom typing import Optional\n\nclass Solution:\n    def invertTree(self, root: Optional[TreeNode]) -> Optional[TreeNode]:\n        if root is None:\n            return None\n        left = self.invertTree(root.left)\n        right = self.invertTree(root.right)\n        root.left, root.right = right, left\n        return root"
+          }
+        },
+        {
+          "id": "balanced-binary-tree",
+          "lc": 110,
+          "title": "Balanced Binary Tree",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/balanced-binary-tree/",
+          "statement": "<p>Cây cân bằng chiều cao: với mọi node, độ sâu hai cây con lệch không quá 1. Cho root, trả về có cân bằng hay không.</p>\n<p><strong>Ví dụ:</strong> <code>[3,9,20,null,null,15,7]</code> → <code>true</code>; <code>[1,2,2,3,3,null,null,4,4]</code> → <code>false</code>.</p>",
+          "approach": "<p>DFS hậu tự: hàm <code>height(node)</code> trả chiều cao, hoặc <code>-1</code> nếu cây con đã lệch. Với mỗi node lấy height trái/phải; nếu một bên <code>-1</code> hoặc <code>|L-R| &gt; 1</code> thì propagate <code>-1</code>; không thì <code>1 + max(L, R)</code>. Một lần duyệt, cắt nhánh sớm khi đã lệch — không tính height tách rồi check (sẽ O(n log n) / O(n²)).</p>",
+          "time": "O(n)",
+          "space": "O(h)",
+          "codes": {
+            "cpp": "/**\n * Definition for a binary tree node.\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode() : val(0), left(nullptr), right(nullptr) {}\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n *     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}\n * };\n */\nclass Solution {\n    int height(TreeNode* node) {\n        if (!node) return 0;\n        int L = height(node->left);\n        if (L < 0) return -1;\n        int R = height(node->right);\n        if (R < 0) return -1;\n        if (L - R > 1 || R - L > 1) return -1;\n        return 1 + (L > R ? L : R);\n    }\n\npublic:\n    bool isBalanced(TreeNode* root) {\n        return height(root) >= 0;\n    }\n};",
+            "java": "/**\n * Definition for a binary tree node.\n * public class TreeNode {\n *     int val;\n *     TreeNode left;\n *     TreeNode right;\n *     TreeNode() {}\n *     TreeNode(int val) { this.val = val; }\n *     TreeNode(int val, TreeNode left, TreeNode right) {\n *         this.val = val;\n *         this.left = left;\n *         this.right = right;\n *     }\n * }\n */\nclass Solution {\n    int height(TreeNode node) {\n        if (node == null) return 0;\n        int L = height(node.left);\n        if (L < 0) return -1;\n        int R = height(node.right);\n        if (R < 0) return -1;\n        if (L - R > 1 || R - L > 1) return -1;\n        return 1 + Math.max(L, R);\n    }\n\n    public boolean isBalanced(TreeNode root) {\n        return height(root) >= 0;\n    }\n}",
+            "python": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n#         self.val = val\n#         self.left = left\n#         self.right = right\n\nfrom typing import Optional\n\nclass Solution:\n    def isBalanced(self, root: Optional[TreeNode]) -> bool:\n        def height(node: Optional[TreeNode]) -> int:\n            if node is None:\n                return 0\n            L = height(node.left)\n            if L < 0:\n                return -1\n            R = height(node.right)\n            if R < 0:\n                return -1\n            if abs(L - R) > 1:\n                return -1\n            return 1 + max(L, R)\n\n        return height(root) >= 0"
+          }
+        },
+        {
+          "id": "binary-tree-paths",
+          "lc": 257,
+          "title": "Binary Tree Paths",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/binary-tree-paths/",
+          "statement": "<p>Cho root, trả về mọi đường root → lá, định dạng <code>\"1-&gt;2-&gt;5\"</code>. Lá là node không có con. Thứ tự tùy ý.</p>\n<p><strong>Ví dụ:</strong> <code>[1,2,3,null,5]</code> → <code>[\"1-&gt;2-&gt;5\",\"1-&gt;3\"]</code>.</p>",
+          "approach": "<p>DFS đệ quy, mang theo path string từ root tới node hiện tại. Tới lá thì push path vào kết quả. Không lá thì đệ quy trái rồi phải. Base <code>node == null</code> return. Nối <code>\"-&gt;\"</code> chỉ khi path đã có node trước — tránh <code>\"-&gt;1\"</code>.</p>",
+          "time": "O(n · h) — mỗi path copy chuỗi độ dài O(h)",
+          "space": "O(h) ngoài mảng kết quả (stack đệ quy + path)",
+          "codes": {
+            "cpp": "/**\n * Definition for a binary tree node.\n * struct TreeNode {\n *     int val;\n *     TreeNode *left;\n *     TreeNode *right;\n *     TreeNode() : val(0), left(nullptr), right(nullptr) {}\n *     TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}\n *     TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}\n * };\n */\nclass Solution {\n    void dfs(TreeNode* node, string path, vector<string>& ans) {\n        if (!node) return;\n        if (!path.empty()) path += \"->\";\n        path += to_string(node->val);\n        if (!node->left && !node->right) {\n            ans.push_back(path);\n            return;\n        }\n        dfs(node->left, path, ans);\n        dfs(node->right, path, ans);\n    }\n\npublic:\n    vector<string> binaryTreePaths(TreeNode* root) {\n        vector<string> ans;\n        dfs(root, \"\", ans);\n        return ans;\n    }\n};",
+            "java": "/**\n * Definition for a binary tree node.\n * public class TreeNode {\n *     int val;\n *     TreeNode left;\n *     TreeNode right;\n *     TreeNode() {}\n *     TreeNode(int val) { this.val = val; }\n *     TreeNode(int val, TreeNode left, TreeNode right) {\n *         this.val = val;\n *         this.left = left;\n *         this.right = right;\n *     }\n * }\n */\nclass Solution {\n    void dfs(TreeNode node, String path, List<String> ans) {\n        if (node == null) return;\n        String nxt = path.isEmpty() ? String.valueOf(node.val) : path + \"->\" + node.val;\n        if (node.left == null && node.right == null) {\n            ans.add(nxt);\n            return;\n        }\n        dfs(node.left, nxt, ans);\n        dfs(node.right, nxt, ans);\n    }\n\n    public List<String> binaryTreePaths(TreeNode root) {\n        List<String> ans = new ArrayList<>();\n        dfs(root, \"\", ans);\n        return ans;\n    }\n}",
+            "python": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, val=0, left=None, right=None):\n#         self.val = val\n#         self.left = left\n#         self.right = right\n\nfrom typing import List, Optional\n\nclass Solution:\n    def binaryTreePaths(self, root: Optional[TreeNode]) -> List[str]:\n        ans: List[str] = []\n\n        def dfs(node: Optional[TreeNode], path: str) -> None:\n            if node is None:\n                return\n            nxt = str(node.val) if not path else path + \"->\" + str(node.val)\n            if node.left is None and node.right is None:\n                ans.append(nxt)\n                return\n            dfs(node.left, nxt)\n            dfs(node.right, nxt)\n\n        dfs(root, \"\")\n        return ans"
+          }
+        }
+      ]
+    }
+  ]
+}

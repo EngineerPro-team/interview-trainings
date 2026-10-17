@@ -1,0 +1,63 @@
+{
+  "out": "src/dsa-homework/data/dsa2a.json",
+  "topics": [
+    {
+      "id": "bit",
+      "title": "DSA 2 · Bit Manipulation",
+      "lead": "Bit / XOR / bitmask.",
+      "problems": [
+        {"id": "find-xor-sum-of-all-pairs-bitwise-and", "lc": 1835, "title": "Find XOR Sum of All Pairs Bitwise AND", "difficulty": "Hard"},
+        {"id": "triples-with-bitwise-and-equal-to-zero", "lc": 982, "title": "Triples with Bitwise AND Equal To Zero", "difficulty": "Hard"},
+        {"id": "transform-to-chessboard", "lc": 782, "title": "Transform to Chessboard", "difficulty": "Hard"},
+        {"id": "minimum-score-after-removals-on-a-tree", "lc": 2322, "title": "Minimum Score After Removals on a Tree", "difficulty": "Hard"},
+        {"id": "minimum-number-of-flips-to-convert-binary-matrix-to-zero-matrix", "lc": 1284, "title": "Minimum Number of Flips to Convert Binary Matrix to Zero Matrix", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "adv-tree",
+      "title": "DSA 2 · Advanced Tree",
+      "lead": "BST + traversal.",
+      "problems": [
+        {"id": "construct-binary-tree-from-preorder-and-inorder-traversal", "lc": 105, "title": "Construct Binary Tree from Preorder and Inorder Traversal", "difficulty": "Medium"},
+        {"id": "binary-tree-right-side-view", "lc": 199, "title": "Binary Tree Right Side View", "difficulty": "Medium"},
+        {"id": "binary-search-tree-iterator", "lc": 173, "title": "Binary Search Tree Iterator", "difficulty": "Medium"},
+        {"id": "sum-root-to-leaf-numbers", "lc": 129, "title": "Sum Root to Leaf Numbers", "difficulty": "Medium"},
+        {"id": "insert-into-a-binary-search-tree", "lc": 701, "title": "Insert into a Binary Search Tree", "difficulty": "Medium"},
+        {"id": "delete-node-in-a-bst", "lc": 450, "title": "Delete Node in a BST", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "trie",
+      "title": "DSA 2 · Trie",
+      "lead": "Bắt buộc Trie / bit-trie.",
+      "problems": [
+        {"id": "word-break-ii", "lc": 140, "title": "Word Break II", "difficulty": "Hard"},
+        {"id": "word-search-ii", "lc": 212, "title": "Word Search II", "difficulty": "Hard"},
+        {"id": "search-suggestions-system", "lc": 1268, "title": "Search Suggestions System", "difficulty": "Medium"},
+        {"id": "map-sum-pairs", "lc": 677, "title": "Map Sum Pairs", "difficulty": "Medium"},
+        {"id": "maximum-xor-with-an-element-from-array", "lc": 1707, "title": "Maximum XOR With an Element From Array", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "union-find",
+      "title": "DSA 2 · Union-Find",
+      "lead": "DSU path compression + union by rank.",
+      "problems": [
+        {"id": "number-of-good-paths", "lc": 2421, "title": "Number of Good Paths", "difficulty": "Hard"},
+        {"id": "accounts-merge", "lc": 721, "title": "Accounts Merge", "difficulty": "Medium"},
+        {"id": "couples-holding-hands", "lc": 765, "title": "Couples Holding Hands", "difficulty": "Hard"},
+        {"id": "find-all-people-with-secret", "lc": 2092, "title": "Find All People With Secret", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "adv-bs",
+      "title": "DSA 2 · Advanced Binary Search",
+      "lead": "Binary search on answer.",
+      "problems": [
+        {"id": "koko-eating-bananas", "lc": 875, "title": "Koko Eating Bananas", "difficulty": "Medium"},
+        {"id": "minimum-time-to-complete-trips", "lc": 2187, "title": "Minimum Time to Complete Trips", "difficulty": "Medium"},
+        {"id": "minimize-the-maximum-difference-of-pairs", "lc": 2616, "title": "Minimize the Maximum Difference of Pairs", "difficulty": "Medium"}
+      ]
+    }
+  ]
+}

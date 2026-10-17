@@ -1,4 +1,5 @@
 # EngineerPro static site
 User-agent: *
 Allow: /
+Disallow: /dsa-homework/
 Sitemap: https://engineerprogurus.com/sitemap.xml

@@ -1,0 +1,58 @@
+{
+  "out": "src/dsa-homework/data/dsa1a.json",
+  "topics": [
+    {
+      "id": "array",
+      "title": "DSA 1 · Array",
+      "lead": "Mandatory + optional. Giải bằng mảng / đếm / prefix.",
+      "problems": [
+        {"id": "find-all-numbers-disappeared-in-an-array", "lc": 448, "title": "Find All Numbers Disappeared in an Array", "difficulty": "Easy", "tier": "mandatory"},
+        {"id": "range-sum-query-immutable", "lc": 303, "title": "Range Sum Query - Immutable", "difficulty": "Easy", "tier": "mandatory"},
+        {"id": "can-place-flowers", "lc": 605, "title": "Can Place Flowers", "difficulty": "Easy", "tier": "mandatory"},
+        {"id": "product-of-array-except-self", "lc": 238, "title": "Product of Array Except Self", "difficulty": "Medium", "tier": "optional"},
+        {"id": "best-time-to-buy-and-sell-stock-ii", "lc": 122, "title": "Best Time to Buy and Sell Stock II", "difficulty": "Medium", "tier": "optional"},
+        {"id": "valid-sudoku", "lc": 36, "title": "Valid Sudoku", "difficulty": "Medium", "tier": "optional"}
+      ]
+    },
+    {
+      "id": "string",
+      "title": "DSA 1 · String",
+      "lead": "Bài tự luận trên slide + LeetCode. Duyệt chuỗi / đếm ký tự.",
+      "problems": [
+        {"id": "string-reverse-check", "title": "S1 đảo của S2", "difficulty": "Easy", "url": null, "statement_hint": "Cho 2 string S1, S2. Kiểm tra S1 có phải đảo ngược của S2 không."},
+        {"id": "count-letters", "title": "Đếm tần suất chữ cái", "difficulty": "Easy", "url": null, "statement_hint": "String S chỉ chữ thường. Đếm số lần mỗi chữ cái."},
+        {"id": "string-builtins", "title": "Built-in string + độ phức tạp", "difficulty": "Easy", "url": null, "statement_hint": "Liệt kê built-in string phổ biến của C++/Java/Python và time complexity. Không cần class Solution chạy LeetCode — trình bày bảng + hàm demo."},
+        {"id": "valid-anagram", "lc": 242, "title": "Valid Anagram", "difficulty": "Easy"},
+        {"id": "shuffle-string", "lc": 1528, "title": "Shuffle String", "difficulty": "Easy"},
+        {"id": "split-a-string-in-balanced-strings", "lc": 1221, "title": "Split a String in Balanced Strings", "difficulty": "Easy"},
+        {"id": "goal-parser-interpretation", "lc": 1678, "title": "Goal Parser Interpretation", "difficulty": "Easy"},
+        {"id": "decode-the-message", "lc": 2325, "title": "Decode the Message", "difficulty": "Easy"},
+        {"id": "calculate-digit-sum-of-a-string", "lc": 2243, "title": "Calculate Digit Sum of a String", "difficulty": "Easy"}
+      ]
+    },
+    {
+      "id": "recursion",
+      "title": "DSA 1 · Recursion",
+      "lead": "Đệ quy, base case rõ. Có Tower of Hanoi (không LeetCode).",
+      "problems": [
+        {"id": "power-of-four", "lc": 342, "title": "Power of Four", "difficulty": "Easy"},
+        {"id": "base-7", "lc": 504, "title": "Base 7", "difficulty": "Easy"},
+        {"id": "tower-of-hanoi", "title": "Tower of Hanoi", "difficulty": "Medium", "url": null, "statement_hint": "In các bước chuyển n đĩa từ A sang C, dùng B làm trung gian. Hàm moves(n, src, dst, aux)."},
+        {"id": "k-th-symbol-in-grammar", "lc": 779, "title": "K-th Symbol in Grammar", "difficulty": "Medium"},
+        {"id": "happy-number", "lc": 202, "title": "Happy Number", "difficulty": "Easy"}
+      ]
+    },
+    {
+      "id": "sorting",
+      "title": "DSA 1 · Sorting",
+      "lead": "Sort rồi duyệt, hoặc merge hai mảng đã sort.",
+      "problems": [
+        {"id": "height-checker", "lc": 1051, "title": "Height Checker", "difficulty": "Easy"},
+        {"id": "merge-sorted-array", "lc": 88, "title": "Merge Sorted Array", "difficulty": "Easy"},
+        {"id": "minimum-cost-of-buying-candies-with-discount", "lc": 2144, "title": "Minimum Cost of Buying Candies With Discount", "difficulty": "Easy"},
+        {"id": "make-array-zero-by-subtracting-equal-amounts", "lc": 2357, "title": "Make Array Zero by Subtracting Equal Amounts", "difficulty": "Easy"},
+        {"id": "widest-vertical-area-between-two-points-containing-no-points", "lc": 1637, "title": "Widest Vertical Area Between Two Points Containing No Points", "difficulty": "Medium"}
+      ]
+    }
+  ]
+}

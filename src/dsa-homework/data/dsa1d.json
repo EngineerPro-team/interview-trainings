@@ -1,0 +1,478 @@
+{
+  "topics": [
+    {
+      "id": "heap",
+      "title": "DSA 1 · Heap",
+      "lead": "Mandatory + optional. Dùng heap.",
+      "problems": [
+        {
+          "id": "merge-k-sorted-lists",
+          "lc": 23,
+          "title": "Merge k Sorted Lists",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/merge-k-sorted-lists/",
+          "statement": "<p><strong>Bắt buộc.</strong> Cho <code>k</code> danh sách liên kết đơn, mỗi list đã xếp tăng dần. Gộp tất cả thành <em>một</em> list tăng dần và trả về node đầu. Một số list có thể rỗng.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Dùng <strong>min-heap</strong> chứa tối đa <code>k</code> node — mỗi list góp phần tử nhỏ nhất còn lại.</p><ol><li>Đưa head khác null của mọi list vào heap.</li><li>Lặp: lấy node nhỏ nhất, nối vào kết quả, đẩy <code>next</code> của list đó vào heap nếu còn.</li></ol><p>Mỗi node vào/ra heap đúng một lần nên không merge tuần tự từng cặp (chậm hơn khi <code>k</code> lớn).</p>",
+          "time": "O(N log k) — N tổng số node, k số list",
+          "space": "O(k)",
+          "codes": {
+            "cpp": "/**\n * Definition for singly-linked list.\n * struct ListNode {\n *     int val;\n *     ListNode *next;\n *     ListNode() : val(0), next(nullptr) {}\n *     ListNode(int x) : val(x), next(nullptr) {}\n *     ListNode(int x, ListNode *next) : val(x), next(next) {}\n * };\n */\nclass Solution {\n    struct Cmp {\n        bool operator()(ListNode* a, ListNode* b) const { return a->val > b->val; }\n    };\npublic:\n    ListNode* mergeKLists(vector<ListNode*>& lists) {\n        priority_queue<ListNode*, vector<ListNode*>, Cmp> pq;\n        for (ListNode* node : lists) {\n            if (node) pq.push(node);\n        }\n        ListNode dummy(0);\n        ListNode* tail = &dummy;\n        while (!pq.empty()) {\n            ListNode* cur = pq.top();\n            pq.pop();\n            tail->next = cur;\n            tail = cur;\n            if (cur->next) pq.push(cur->next);\n        }\n        return dummy.next;\n    }\n};",
+            "java": "/**\n * Definition for singly-linked list.\n * public class ListNode {\n *     int val;\n *     ListNode next;\n *     ListNode() {}\n *     ListNode(int val) { this.val = val; }\n *     ListNode(int val, ListNode next) { this.val = val; this.next = next; }\n * }\n */\nclass Solution {\n    public ListNode mergeKLists(ListNode[] lists) {\n        PriorityQueue<ListNode> pq = new PriorityQueue<>((a, b) -> Integer.compare(a.val, b.val));\n        for (ListNode node : lists) {\n            if (node != null) pq.offer(node);\n        }\n        ListNode dummy = new ListNode(0);\n        ListNode tail = dummy;\n        while (!pq.isEmpty()) {\n            ListNode cur = pq.poll();\n            tail.next = cur;\n            tail = cur;\n            if (cur.next != null) pq.offer(cur.next);\n        }\n        return dummy.next;\n    }\n}",
+            "python": "from typing import List, Optional\nimport heapq\n\n# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next\nclass Solution:\n    def mergeKLists(self, lists: List[Optional[ListNode]]) -> Optional[ListNode]:\n        dummy = ListNode(0)\n        tail = dummy\n        heap = []\n        for i, node in enumerate(lists):\n            if node:\n                heapq.heappush(heap, (node.val, i, node))\n        while heap:\n            _, i, node = heapq.heappop(heap)\n            tail.next = node\n            tail = node\n            if node.next:\n                heapq.heappush(heap, (node.next.val, i, node.next))\n        return dummy.next"
+          }
+        },
+        {
+          "id": "top-k-frequent-elements",
+          "lc": 347,
+          "title": "Top K Frequent Elements",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/top-k-frequent-elements/",
+          "statement": "<p><strong>Bắt buộc.</strong> Cho mảng <code>nums</code> và số nguyên <code>k</code>. Trả về <code>k</code> phần tử xuất hiện nhiều nhất. Thứ tự kết quả tùy ý. Đảm bảo đáp án duy nhất.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đếm tần suất bằng hash map, rồi dùng <strong>min-heap kích thước k</strong> theo tần suất: duyệt từng (giá trị, tần suất), đẩy vào heap, nếu quá <code>k</code> thì pop phần tử ít xuất hiện nhất.</p><p>Không sort toàn bộ unique keys (O(U log U)) và <em>không</em> quickselect — bài heap phải dùng priority queue. (Bài Divide and Conquer cùng LC 347 mới dùng quickselect.)</p>",
+          "time": "O(N log k) — N = len(nums)",
+          "space": "O(U) — U số giá trị phân biệt, heap O(k)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> topKFrequent(vector<int>& nums, int k) {\n        unordered_map<int, int> cnt;\n        for (int x : nums) cnt[x]++;\n        priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;\n        for (auto& [num, freq] : cnt) {\n            pq.push({freq, num});\n            if ((int)pq.size() > k) pq.pop();\n        }\n        vector<int> ans;\n        while (!pq.empty()) {\n            ans.push_back(pq.top().second);\n            pq.pop();\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int[] topKFrequent(int[] nums, int k) {\n        Map<Integer, Integer> cnt = new HashMap<>();\n        for (int x : nums) cnt.put(x, cnt.getOrDefault(x, 0) + 1);\n        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> Integer.compare(a[1], b[1]));\n        for (Map.Entry<Integer, Integer> e : cnt.entrySet()) {\n            pq.offer(new int[]{e.getKey(), e.getValue()});\n            if (pq.size() > k) pq.poll();\n        }\n        int[] ans = new int[k];\n        for (int i = 0; i < k; i++) ans[i] = pq.poll()[0];\n        return ans;\n    }\n}",
+            "python": "from typing import List\nimport heapq\nfrom collections import Counter\n\nclass Solution:\n    def topKFrequent(self, nums: List[int], k: int) -> List[int]:\n        cnt = Counter(nums)\n        heap = []\n        for num, freq in cnt.items():\n            heapq.heappush(heap, (freq, num))\n            if len(heap) > k:\n                heapq.heappop(heap)\n        return [num for _, num in heap]"
+          }
+        },
+        {
+          "id": "smallest-number-in-infinite-set",
+          "lc": 2336,
+          "title": "Smallest Number in Infinite Set",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/smallest-number-in-infinite-set/",
+          "statement": "<p><strong>Bắt buộc.</strong> Tập hợp ban đầu chứa mọi số nguyên dương. Hỗ trợ hai thao tác: <code>popSmallest()</code> lấy và xóa số nhỏ nhất đang có; <code>addBack(num)</code> thêm <code>num</code> trở lại nếu nó đang không thuộc tập.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Mọi số từ một ngưỡng <code>next</code> trở lên vẫn còn trong tập (chưa bị pop). Các số nhỏ hơn <code>next</code> mà được <code>addBack</code> nằm trong <strong>min-heap</strong> (kèm hash set để không thêm trùng).</p><ul><li><code>popSmallest</code>: nếu heap không rỗng, lấy đỉnh heap; không thì lấy <code>next</code> rồi tăng <code>next</code>.</li><li><code>addBack(num)</code>: chỉ đẩy vào heap khi <code>num &lt; next</code> và chưa có trong heap.</li></ul>",
+          "time": "O(log n) mỗi thao tác — n số được addBack",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class SmallestInfiniteSet {\n    int next = 1;\n    priority_queue<int, vector<int>, greater<int>> added;\n    unordered_set<int> inAdded;\npublic:\n    int popSmallest() {\n        if (!added.empty()) {\n            int x = added.top();\n            added.pop();\n            inAdded.erase(x);\n            return x;\n        }\n        return next++;\n    }\n    void addBack(int num) {\n        if (num < next && !inAdded.count(num)) {\n            added.push(num);\n            inAdded.insert(num);\n        }\n    }\n};",
+            "java": "class SmallestInfiniteSet {\n    int next = 1;\n    PriorityQueue<Integer> added = new PriorityQueue<>();\n    Set<Integer> inAdded = new HashSet<>();\n\n    public int popSmallest() {\n        if (!added.isEmpty()) {\n            int x = added.poll();\n            inAdded.remove(x);\n            return x;\n        }\n        return next++;\n    }\n\n    public void addBack(int num) {\n        if (num < next && inAdded.add(num)) added.offer(num);\n    }\n}",
+            "python": "import heapq\n\nclass SmallestInfiniteSet:\n    def __init__(self):\n        self.next = 1\n        self.added = []\n        self.in_added = set()\n\n    def popSmallest(self) -> int:\n        if self.added:\n            x = heapq.heappop(self.added)\n            self.in_added.remove(x)\n            return x\n        x = self.next\n        self.next += 1\n        return x\n\n    def addBack(self, num: int) -> None:\n        if num < self.next and num not in self.in_added:\n            heapq.heappush(self.added, num)\n            self.in_added.add(num)"
+          }
+        },
+        {
+          "id": "remove-stones-to-minimize-the-total",
+          "lc": 1962,
+          "title": "Remove Stones to Minimize the Total",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/remove-stones-to-minimize-the-total/",
+          "statement": "<p><strong>Bắt buộc.</strong> Có <code>n</code> đống đá <code>piles[i]</code>. Trong một thao tác, chọn một đống và bỏ đi <code>floor(piles[i] / 2)</code> viên. Thực hiện đúng <code>k</code> thao tác. Trả về tổng số đá nhỏ nhất còn lại.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Muốn tổng giảm nhiều nhất thì mỗi bước phải chọn đống <em>lớn nhất</em> hiện tại — đúng tính chất max-heap.</p><p>Đưa mọi pile vào <strong>max-heap</strong>. Lặp <code>k</code> lần: lấy đỉnh <code>x</code>, thay bằng <code>x - floor(x/2)</code> (tức <code>ceil(x/2)</code>), đẩy lại heap.</p>",
+          "time": "O((n + k) log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int minStoneSum(vector<int>& piles, int k) {\n        priority_queue<int> pq(piles.begin(), piles.end());\n        while (k--) {\n            int x = pq.top();\n            pq.pop();\n            pq.push(x - x / 2);\n        }\n        int sum = 0;\n        while (!pq.empty()) {\n            sum += pq.top();\n            pq.pop();\n        }\n        return sum;\n    }\n};",
+            "java": "class Solution {\n    public int minStoneSum(int[] piles, int k) {\n        PriorityQueue<Integer> pq = new PriorityQueue<>(Collections.reverseOrder());\n        int sum = 0;\n        for (int p : piles) {\n            pq.offer(p);\n            sum += p;\n        }\n        while (k-- > 0) {\n            int x = pq.poll();\n            int remove = x / 2;\n            sum -= remove;\n            pq.offer(x - remove);\n        }\n        return sum;\n    }\n}",
+            "python": "from typing import List\nimport heapq\n\nclass Solution:\n    def minStoneSum(self, piles: List[int], k: int) -> int:\n        heap = [-p for p in piles]\n        heapq.heapify(heap)\n        for _ in range(k):\n            x = -heapq.heappop(heap)\n            heapq.heappush(heap, -(x - x // 2))\n        return -sum(heap)"
+          }
+        },
+        {
+          "id": "k-closest-points-to-origin",
+          "lc": 973,
+          "title": "K Closest Points to Origin",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/k-closest-points-to-origin/",
+          "statement": "<p><strong>Tuỳ chọn.</strong> Cho mảng điểm <code>points[i] = [x<sub>i</sub>, y<sub>i</sub>]</code> trên mặt phẳng. Trả về <code>k</code> điểm gần gốc tọa độ (0, 0) nhất theo khoảng cách Euclid. Thứ tự tùy ý.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Dùng <strong>max-heap kích thước k</strong> theo bình phương khoảng cách (không cần căn bậc hai). Duyệt từng điểm, đẩy vào heap; khi quá <code>k</code> thì pop điểm xa nhất. Heap luôn giữ k điểm gần nhất đã thấy.</p>",
+          "time": "O(N log k)",
+          "space": "O(k)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<vector<int>> kClosest(vector<vector<int>>& points, int k) {\n        auto dist = [](const vector<int>& p) {\n            return 1LL * p[0] * p[0] + 1LL * p[1] * p[1];\n        };\n        priority_queue<pair<long long, int>> pq;\n        for (int i = 0; i < (int)points.size(); i++) {\n            pq.push({dist(points[i]), i});\n            if ((int)pq.size() > k) pq.pop();\n        }\n        vector<vector<int>> ans;\n        while (!pq.empty()) {\n            ans.push_back(points[pq.top().second]);\n            pq.pop();\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int[][] kClosest(int[][] points, int k) {\n        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> Long.compare(dist(b), dist(a)));\n        for (int[] p : points) {\n            pq.offer(p);\n            if (pq.size() > k) pq.poll();\n        }\n        int[][] ans = new int[k][];\n        for (int i = 0; i < k; i++) ans[i] = pq.poll();\n        return ans;\n    }\n    private long dist(int[] p) {\n        return (long) p[0] * p[0] + (long) p[1] * p[1];\n    }\n}",
+            "python": "from typing import List\nimport heapq\n\nclass Solution:\n    def kClosest(self, points: List[List[int]], k: int) -> List[List[int]]:\n        heap = []\n        for x, y in points:\n            d = x * x + y * y\n            heapq.heappush(heap, (-d, x, y))\n            if len(heap) > k:\n                heapq.heappop(heap)\n        return [[x, y] for _, x, y in heap]"
+          }
+        },
+        {
+          "id": "kth-smallest-element-in-a-sorted-matrix",
+          "lc": 378,
+          "title": "Kth Smallest Element in a Sorted Matrix",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/kth-smallest-element-in-a-sorted-matrix/",
+          "statement": "<p><strong>Tuỳ chọn.</strong> Ma trận <code>n × n</code> đã sắp xếp tăng dần theo mọi hàng và mọi cột. Tìm phần tử nhỏ thứ <code>k</code> (1-index, tính cả trùng).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Giống merge k list đã sort: mỗi hàng là một list. Bỏ phần tử đầu mỗi hàng vào <strong>min-heap</strong> <code>(value, row, col)</code>. Lặp <code>k</code> lần: pop nhỏ nhất, nếu hàng đó còn phần tử kế thì push.</p><p>Không binary search trên giá trị — homework heap yêu cầu priority queue.</p>",
+          "time": "O(k log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int kthSmallest(vector<vector<int>>& matrix, int k) {\n        int n = (int)matrix.size();\n        using T = tuple<int, int, int>;\n        priority_queue<T, vector<T>, greater<T>> pq;\n        for (int i = 0; i < n; i++) pq.push({matrix[i][0], i, 0});\n        int val = 0;\n        while (k--) {\n            auto [v, i, j] = pq.top();\n            pq.pop();\n            val = v;\n            if (j + 1 < n) pq.push({matrix[i][j + 1], i, j + 1});\n        }\n        return val;\n    }\n};",
+            "java": "class Solution {\n    public int kthSmallest(int[][] matrix, int k) {\n        int n = matrix.length;\n        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> Integer.compare(a[0], b[0]));\n        for (int i = 0; i < n; i++) pq.offer(new int[]{matrix[i][0], i, 0});\n        int val = 0;\n        while (k-- > 0) {\n            int[] cur = pq.poll();\n            val = cur[0];\n            int i = cur[1], j = cur[2];\n            if (j + 1 < n) pq.offer(new int[]{matrix[i][j + 1], i, j + 1});\n        }\n        return val;\n    }\n}",
+            "python": "from typing import List\nimport heapq\n\nclass Solution:\n    def kthSmallest(self, matrix: List[List[int]], k: int) -> int:\n        n = len(matrix)\n        heap = [(matrix[i][0], i, 0) for i in range(n)]\n        heapq.heapify(heap)\n        val = 0\n        for _ in range(k):\n            val, i, j = heapq.heappop(heap)\n            if j + 1 < n:\n                heapq.heappush(heap, (matrix[i][j + 1], i, j + 1))\n        return val"
+          }
+        },
+        {
+          "id": "maximum-subsequence-score",
+          "lc": 2542,
+          "title": "Maximum Subsequence Score",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/maximum-subsequence-score/",
+          "statement": "<p><strong>Tuỳ chọn.</strong> Cho hai mảng cùng độ dài <code>nums1</code>, <code>nums2</code> và số <code>k</code>. Chọn đúng <code>k</code> chỉ số phân biệt. Điểm = (tổng <code>nums1</code> tại các chỉ số đó) × (min <code>nums2</code> tại các chỉ số đó). Tìm điểm lớn nhất.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Ghép cặp <code>(nums2[i], nums1[i])</code>, sort giảm dần theo <code>nums2</code>. Khi xét cặp thứ i làm <em>min nums2</em> của bộ k, ta chỉ được chọn trong các cặp có <code>nums2 ≥ nums2[i]</code> (tức các cặp đã duyệt).</p><p>Giữ <strong>min-heap k phần tử nums1</strong> lớn nhất trong vùng đã xét: thêm nums1 hiện tại, nếu quá k thì pop nhỏ nhất. Khi heap đủ k, cập nhật <code>sum(heap) * nums2 hiện tại</code>.</p>",
+          "time": "O(n log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    long long maxScore(vector<int>& nums1, vector<int>& nums2, int k) {\n        int n = (int)nums1.size();\n        vector<pair<int, int>> a(n);\n        for (int i = 0; i < n; i++) a[i] = {nums2[i], nums1[i]};\n        sort(a.begin(), a.end(), greater<pair<int, int>>());\n        priority_queue<int, vector<int>, greater<int>> pq;\n        long long sum = 0, ans = 0;\n        for (auto [n2, n1] : a) {\n            pq.push(n1);\n            sum += n1;\n            if ((int)pq.size() > k) {\n                sum -= pq.top();\n                pq.pop();\n            }\n            if ((int)pq.size() == k) ans = max(ans, sum * n2);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public long maxScore(int[] nums1, int[] nums2, int k) {\n        int n = nums1.length;\n        int[][] a = new int[n][2];\n        for (int i = 0; i < n; i++) {\n            a[i][0] = nums2[i];\n            a[i][1] = nums1[i];\n        }\n        Arrays.sort(a, (x, y) -> Integer.compare(y[0], x[0]));\n        PriorityQueue<Integer> pq = new PriorityQueue<>();\n        long sum = 0, ans = 0;\n        for (int[] p : a) {\n            pq.offer(p[1]);\n            sum += p[1];\n            if (pq.size() > k) sum -= pq.poll();\n            if (pq.size() == k) ans = Math.max(ans, sum * p[0]);\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\nimport heapq\n\nclass Solution:\n    def maxScore(self, nums1: List[int], nums2: List[int], k: int) -> int:\n        pairs = sorted(zip(nums2, nums1), reverse=True)\n        heap = []\n        s = 0\n        ans = 0\n        for n2, n1 in pairs:\n            heapq.heappush(heap, n1)\n            s += n1\n            if len(heap) > k:\n                s -= heapq.heappop(heap)\n            if len(heap) == k:\n                ans = max(ans, s * n2)\n        return ans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "greedy",
+      "title": "DSA 1 · Greedy",
+      "lead": "4 bài Practice cuối slide (không có heading Homework).",
+      "problems": [
+        {
+          "id": "maximize-sum-of-array-after-k-negations",
+          "lc": 1005,
+          "title": "Maximize Sum Of Array After K Negations",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/maximize-sum-of-array-after-k-negations/",
+          "statement": "<p>Cho mảng <code>nums</code> và số nguyên <code>k</code>. Trong một thao tác, chọn một chỉ số và đổi dấu phần tử đó. Thực hiện đúng <code>k</code> lần. Tối đa hóa tổng mảng sau cùng.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Greedy: mỗi bước luôn đổi dấu phần tử <em>nhỏ nhất</em> hiện tại (số âm lớn về độ lớn được ưu tiên, sau đó mới tới số dương nhỏ).</p><ol><li>Sort tăng dần, đổi dấu các số âm từ trái sang phải cho đến hết <code>k</code> hoặc hết số âm.</li><li>Nếu <code>k</code> còn lại chẵn: không đổi gì nữa (đổi hai lần về như cũ).</li><li>Nếu lẻ: đổi dấu phần tử nhỏ nhất còn lại (trừ đi <code>2 * min</code>).</li></ol>",
+          "time": "O(n log n)",
+          "space": "O(1) nếu sort tại chỗ",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int largestSumAfterKNegations(vector<int>& nums, int k) {\n        sort(nums.begin(), nums.end());\n        for (int i = 0; i < (int)nums.size() && k > 0 && nums[i] < 0; i++, k--) {\n            nums[i] = -nums[i];\n        }\n        int sum = 0, mn = INT_MAX;\n        for (int x : nums) {\n            sum += x;\n            mn = min(mn, x);\n        }\n        if (k % 2) sum -= 2 * mn;\n        return sum;\n    }\n};",
+            "java": "class Solution {\n    public int largestSumAfterKNegations(int[] nums, int k) {\n        Arrays.sort(nums);\n        for (int i = 0; i < nums.length && k > 0 && nums[i] < 0; i++, k--) {\n            nums[i] = -nums[i];\n        }\n        int sum = 0, mn = Integer.MAX_VALUE;\n        for (int x : nums) {\n            sum += x;\n            mn = Math.min(mn, x);\n        }\n        if (k % 2 == 1) sum -= 2 * mn;\n        return sum;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def largestSumAfterKNegations(self, nums: List[int], k: int) -> int:\n        nums.sort()\n        i = 0\n        while k > 0 and i < len(nums) and nums[i] < 0:\n            nums[i] = -nums[i]\n            k -= 1\n            i += 1\n        s = sum(nums)\n        if k % 2:\n            s -= 2 * min(nums)\n        return s"
+          }
+        },
+        {
+          "id": "jump-game",
+          "lc": 55,
+          "title": "Jump Game",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/jump-game/",
+          "statement": "<p>Xuất phát ở chỉ số 0. Tại vị trí <code>i</code> có thể nhảy tối đa <code>nums[i]</code> bước về phía trước. Hỏi có tới được phần tử cuối không.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Greedy <strong>farthest</strong>: duyệt trái → phải, duy trì <code>far</code> = chỉ số xa nhất tới được. Nếu gặp <code>i &gt; far</code> thì bị kẹt. Cập nhật <code>far = max(far, i + nums[i])</code>.</p><p>Không cần DP O(n²): một lần duyệt đủ vì chỉ quan tâm biên phải của vùng tới được.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    bool canJump(vector<int>& nums) {\n        int far = 0;\n        for (int i = 0; i < (int)nums.size(); i++) {\n            if (i > far) return false;\n            far = max(far, i + nums[i]);\n        }\n        return true;\n    }\n};",
+            "java": "class Solution {\n    public boolean canJump(int[] nums) {\n        int far = 0;\n        for (int i = 0; i < nums.length; i++) {\n            if (i > far) return false;\n            far = Math.max(far, i + nums[i]);\n        }\n        return true;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def canJump(self, nums: List[int]) -> bool:\n        far = 0\n        for i, x in enumerate(nums):\n            if i > far:\n                return False\n            far = max(far, i + x)\n        return True"
+          }
+        },
+        {
+          "id": "jump-game-ii",
+          "lc": 45,
+          "title": "Jump Game II",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/jump-game-ii/",
+          "statement": "<p>Cùng luật Jump Game, nhưng luôn tới được cuối mảng. Trả về <em>số bước nhảy tối thiểu</em> để tới phần tử cuối.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Greedy theo lớp (giống BFS trên mảng): <code>end</code> là biên phải của bước hiện tại, <code>far</code> là biên phải xa nhất nếu nhảy từ trong lớp này.</p><p>Duyệt <code>i</code> từ 0 đến n−2: cập nhật <code>far</code>. Khi <code>i == end</code>, phải nhảy thêm một lần, gán <code>end = far</code>.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int jump(vector<int>& nums) {\n        int jumps = 0, end = 0, far = 0;\n        for (int i = 0; i < (int)nums.size() - 1; i++) {\n            far = max(far, i + nums[i]);\n            if (i == end) {\n                jumps++;\n                end = far;\n            }\n        }\n        return jumps;\n    }\n};",
+            "java": "class Solution {\n    public int jump(int[] nums) {\n        int jumps = 0, end = 0, far = 0;\n        for (int i = 0; i < nums.length - 1; i++) {\n            far = Math.max(far, i + nums[i]);\n            if (i == end) {\n                jumps++;\n                end = far;\n            }\n        }\n        return jumps;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def jump(self, nums: List[int]) -> int:\n        jumps = end = far = 0\n        for i in range(len(nums) - 1):\n            far = max(far, i + nums[i])\n            if i == end:\n                jumps += 1\n                end = far\n        return jumps"
+          }
+        },
+        {
+          "id": "gas-station",
+          "lc": 134,
+          "title": "Gas Station",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/gas-station/",
+          "statement": "<p>Có <code>n</code> trạm xăng trên vòng tròn. <code>gas[i]</code> lượng đổ được tại i, <code>cost[i]</code> xăng cần để đi i → i+1. Xe bắt đầu bình rỗng. Trả về chỉ số trạm xuất phát để đi hết vòng; nếu không được thì <code>-1</code>. Đáp án (nếu có) là duy nhất.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Nếu <code>sum(gas) &lt; sum(cost)</code> thì vô nghiệm.</p><p>Ngược lại luôn có đúng một điểm xuất phát. Duyệt một vòng, giữ <code>tank</code> tích lũy. Khi <code>tank</code> âm, mọi trạm từ <code>start</code> tới i đều không thể là điểm bắt đầu — đặt <code>start = i+1</code>, reset tank. Đây là “tank trick”: đoạn vừa thất bại không cần thử lại.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int canCompleteCircuit(vector<int>& gas, vector<int>& cost) {\n        int total = 0, tank = 0, start = 0;\n        for (int i = 0; i < (int)gas.size(); i++) {\n            int d = gas[i] - cost[i];\n            total += d;\n            tank += d;\n            if (tank < 0) {\n                start = i + 1;\n                tank = 0;\n            }\n        }\n        return total >= 0 ? start : -1;\n    }\n};",
+            "java": "class Solution {\n    public int canCompleteCircuit(int[] gas, int[] cost) {\n        int total = 0, tank = 0, start = 0;\n        for (int i = 0; i < gas.length; i++) {\n            int d = gas[i] - cost[i];\n            total += d;\n            tank += d;\n            if (tank < 0) {\n                start = i + 1;\n                tank = 0;\n            }\n        }\n        return total >= 0 ? start : -1;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def canCompleteCircuit(self, gas: List[int], cost: List[int]) -> int:\n        total = tank = start = 0\n        for i in range(len(gas)):\n            d = gas[i] - cost[i]\n            total += d\n            tank += d\n            if tank < 0:\n                start = i + 1\n                tank = 0\n        return start if total >= 0 else -1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "divide-conquer",
+      "title": "DSA 1 · Divide and Conquer",
+      "lead": "Chia đôi / quickselect / merge đếm. Top K Frequent = Quickselect (khác Heap).",
+      "problems": [
+        {
+          "id": "top-k-frequent-elements-dc",
+          "lc": 347,
+          "title": "Top K Frequent Elements",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/top-k-frequent-elements/",
+          "statement": "<p>Cùng đề LC 347: trả về <code>k</code> phần tử xuất hiện nhiều nhất. Bài này thuộc topic Divide and Conquer nên <strong>phải Quickselect</strong>, không dùng heap (heap nằm ở homework Heap).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đếm tần suất, lấy danh sách unique. Quickselect theo tần suất để đưa k phần tử có freq lớn nhất về phía phải (partition giống Quicksort, pivot ngẫu nhiên). Trung bình O(U), xấu nhất O(U²) — shuffle/random pivot để tránh degenerate.</p><p>Sau khi pivot đứng tại index <code>U − k</code>, slice bên phải chính là đáp án.</p>",
+          "time": "O(U) trung bình, O(U²) xấu nhất — U số giá trị phân biệt",
+          "space": "O(U)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> topKFrequent(vector<int>& nums, int k) {\n        unordered_map<int, int> cnt;\n        for (int x : nums) cnt[x]++;\n        vector<int> uniq;\n        uniq.reserve(cnt.size());\n        for (auto& [x, _] : cnt) uniq.push_back(x);\n        int n = (int)uniq.size();\n        int l = 0, r = n - 1, idx = n - k;\n        while (l < r) {\n            int pvt = l + rand() % (r - l + 1);\n            swap(uniq[pvt], uniq[r]);\n            int pivot = cnt[uniq[r]], store = l;\n            for (int i = l; i < r; i++) {\n                if (cnt[uniq[i]] < pivot) {\n                    swap(uniq[store], uniq[i]);\n                    store++;\n                }\n            }\n            swap(uniq[store], uniq[r]);\n            if (store == idx) break;\n            if (store < idx) l = store + 1;\n            else r = store - 1;\n        }\n        return vector<int>(uniq.begin() + idx, uniq.end());\n    }\n};",
+            "java": "class Solution {\n    public int[] topKFrequent(int[] nums, int k) {\n        Map<Integer, Integer> cnt = new HashMap<>();\n        for (int x : nums) cnt.put(x, cnt.getOrDefault(x, 0) + 1);\n        int[] uniq = new int[cnt.size()];\n        int t = 0;\n        for (int x : cnt.keySet()) uniq[t++] = x;\n        int n = uniq.length;\n        Random rng = new Random();\n        int l = 0, r = n - 1, idx = n - k;\n        while (l < r) {\n            int pvt = l + rng.nextInt(r - l + 1);\n            swap(uniq, pvt, r);\n            int pivot = cnt.get(uniq[r]), store = l;\n            for (int i = l; i < r; i++) {\n                if (cnt.get(uniq[i]) < pivot) {\n                    swap(uniq, store, i);\n                    store++;\n                }\n            }\n            swap(uniq, store, r);\n            if (store == idx) break;\n            if (store < idx) l = store + 1;\n            else r = store - 1;\n        }\n        return Arrays.copyOfRange(uniq, idx, n);\n    }\n    private void swap(int[] a, int i, int j) {\n        int tmp = a[i];\n        a[i] = a[j];\n        a[j] = tmp;\n    }\n}",
+            "python": "from typing import List\nimport random\nfrom collections import Counter\n\nclass Solution:\n    def topKFrequent(self, nums: List[int], k: int) -> List[int]:\n        cnt = Counter(nums)\n        uniq = list(cnt.keys())\n        n = len(uniq)\n        l, r, idx = 0, n - 1, n - k\n        while l < r:\n            pvt = random.randint(l, r)\n            uniq[pvt], uniq[r] = uniq[r], uniq[pvt]\n            pivot, store = cnt[uniq[r]], l\n            for i in range(l, r):\n                if cnt[uniq[i]] < pivot:\n                    uniq[store], uniq[i] = uniq[i], uniq[store]\n                    store += 1\n            uniq[store], uniq[r] = uniq[r], uniq[store]\n            if store == idx:\n                break\n            if store < idx:\n                l = store + 1\n            else:\n                r = store - 1\n        return uniq[idx:]"
+          }
+        },
+        {
+          "id": "super-pow",
+          "lc": 372,
+          "title": "Super Pow",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/super-pow/",
+          "statement": "<p>Tính <code>a<sup>b</sup> mod 1337</code>, trong đó số mũ <code>b</code> cho dưới dạng mảng chữ số (có thể rất dài). Ví dụ <code>b = [1,0]</code> nghĩa là mũ 10.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Chia để trị trên chữ số của mũ: nếu prefix là <code>b[0..i−1]</code> thì</p><p><code>a^{b[0..i]} = (a^{b[0..i−1]})<sup>10</sup> · a<sup>b[i]</sup></code></p><p>Đệ quy tính lũy thừa prefix rồi nhân. Lũy thừa modulo dùng binary exponentiation. 1337 không nguyên tố nên chỉ nhân modulo, không Fermat.</p>",
+          "time": "O(d log 10 + log a) — d = độ dài b",
+          "space": "O(d) stack đệ quy",
+          "codes": {
+            "cpp": "class Solution {\n    static const int MOD = 1337;\n    int powmod(int x, int n) {\n        long long res = 1, base = x % MOD;\n        while (n) {\n            if (n & 1) res = res * base % MOD;\n            base = base * base % MOD;\n            n >>= 1;\n        }\n        return (int)res;\n    }\n    int dfs(int a, const vector<int>& b, int i) {\n        if (i < 0) return 1;\n        return (int)(1LL * powmod(dfs(a, b, i - 1), 10) * powmod(a, b[i]) % MOD);\n    }\npublic:\n    int superPow(int a, vector<int>& b) {\n        return dfs(a, b, (int)b.size() - 1);\n    }\n};",
+            "java": "class Solution {\n    static final int MOD = 1337;\n    public int superPow(int a, int[] b) {\n        return dfs(a, b, b.length - 1);\n    }\n    private int dfs(int a, int[] b, int i) {\n        if (i < 0) return 1;\n        return (int) ((long) powmod(dfs(a, b, i - 1), 10) * powmod(a, b[i]) % MOD);\n    }\n    private int powmod(int x, int n) {\n        long res = 1, base = x % MOD;\n        while (n > 0) {\n            if ((n & 1) == 1) res = res * base % MOD;\n            base = base * base % MOD;\n            n >>= 1;\n        }\n        return (int) res;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def superPow(self, a: int, b: List[int]) -> int:\n        MOD = 1337\n        def powmod(x: int, n: int) -> int:\n            res, base = 1, x % MOD\n            while n:\n                if n & 1:\n                    res = res * base % MOD\n                base = base * base % MOD\n                n >>= 1\n            return res\n        def dfs(i: int) -> int:\n            if i < 0:\n                return 1\n            return powmod(dfs(i - 1), 10) * powmod(a, b[i]) % MOD\n        return dfs(len(b) - 1)"
+          }
+        },
+        {
+          "id": "beautiful-array",
+          "lc": 932,
+          "title": "Beautiful Array",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/beautiful-array/",
+          "statement": "<p>Một mảng hoán vị <code>1..n</code> được gọi là đẹp nếu không tồn tại <code>i &lt; k &lt; j</code> sao cho <code>2 * nums[k] = nums[i] + nums[j]</code> (không có trung bình cộng nằm giữa hai đầu).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Chia để trị: nếu <code>A</code> đẹp thì <code>2A−1</code> (các số lẻ) và <code>2A</code> (các số chẵn) cũng đẹp. Nối <em>toàn bộ lẻ rồi toàn bộ chẵn</em>:</p><ul><li>Hai phần tử khác phía (lẻ/chẵn) có tổng lẻ → không thể = 2·k.</li><li>Hai phần tử cùng phía: quy về tính đẹp của mảng con, đã đảm bảo bằng đệ quy.</li></ul><p>Base: <code>[1]</code>. Đệ quy xây nửa lẻ (kích thước <code>ceil(n/2)</code>) và nửa chẵn (<code>floor(n/2)</code>).</p>",
+          "time": "O(n log n)",
+          "space": "O(n log n) stack + mảng tạm",
+          "codes": {
+            "cpp": "class Solution {\n    vector<int> build(int n) {\n        if (n == 1) return {1};\n        vector<int> odd = build((n + 1) / 2);\n        vector<int> even = build(n / 2);\n        vector<int> ans;\n        ans.reserve(n);\n        for (int x : odd) ans.push_back(2 * x - 1);\n        for (int x : even) ans.push_back(2 * x);\n        return ans;\n    }\npublic:\n    vector<int> beautifulArray(int n) {\n        return build(n);\n    }\n};",
+            "java": "class Solution {\n    public int[] beautifulArray(int n) {\n        return build(n);\n    }\n    private int[] build(int n) {\n        if (n == 1) return new int[]{1};\n        int[] odd = build((n + 1) / 2);\n        int[] even = build(n / 2);\n        int[] ans = new int[n];\n        int t = 0;\n        for (int x : odd) ans[t++] = 2 * x - 1;\n        for (int x : even) ans[t++] = 2 * x;\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def beautifulArray(self, n: int) -> List[int]:\n        def build(m: int) -> List[int]:\n            if m == 1:\n                return [1]\n            odd = build((m + 1) // 2)\n            even = build(m // 2)\n            return [2 * x - 1 for x in odd] + [2 * x for x in even]\n        return build(n)"
+          }
+        },
+        {
+          "id": "number-of-pairs-satisfying-inequality",
+          "lc": 2426,
+          "title": "Number of Pairs Satisfying Inequality",
+          "difficulty": "Hard",
+          "url": "https://leetcode.com/problems/number-of-pairs-satisfying-inequality/",
+          "statement": "<p>Đếm số cặp chỉ số <code>i &lt; j</code> thỏa <code>nums1[i] − nums1[j] ≤ nums2[i] − nums2[j] + diff</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đặt <code>a[t] = nums1[t] − nums2[t]</code>. Bất đẳng thức trở thành <code>a[i] ≤ a[j] + diff</code> với <code>i &lt; j</code>.</p><p>Đây là đếm cặp khi merge (giống inversion): merge-sort <code>a</code>. Khi hai nửa đã sort, mọi index trái &lt; index phải. Với mỗi <code>x</code> bên trái, đếm số <code>y</code> bên phải sao cho <code>y ≥ x − diff</code> bằng two pointers trên mảng đã sort, rồi merge như bình thường.</p>",
+          "time": "O(n log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\n    long long ans = 0;\n    int diff;\n    void mergeSort(vector<long long>& a, int l, int r, vector<long long>& tmp) {\n        if (l >= r) return;\n        int m = (l + r) / 2;\n        mergeSort(a, l, m, tmp);\n        mergeSort(a, m + 1, r, tmp);\n        int j = m + 1;\n        for (int i = l; i <= m; i++) {\n            while (j <= r && a[j] < a[i] - diff) j++;\n            ans += r - j + 1;\n        }\n        int i = l, p = m + 1, k = l;\n        while (i <= m && p <= r) {\n            tmp[k++] = (a[i] <= a[p]) ? a[i++] : a[p++];\n        }\n        while (i <= m) tmp[k++] = a[i++];\n        while (p <= r) tmp[k++] = a[p++];\n        for (int t = l; t <= r; t++) a[t] = tmp[t];\n    }\npublic:\n    long long numberOfPairs(vector<int>& nums1, vector<int>& nums2, int diff) {\n        this->diff = diff;\n        int n = (int)nums1.size();\n        vector<long long> a(n), tmp(n);\n        for (int i = 0; i < n; i++) a[i] = (long long)nums1[i] - nums2[i];\n        mergeSort(a, 0, n - 1, tmp);\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    long ans = 0;\n    int diff;\n    public long numberOfPairs(int[] nums1, int[] nums2, int diff) {\n        this.diff = diff;\n        int n = nums1.length;\n        long[] a = new long[n];\n        for (int i = 0; i < n; i++) a[i] = (long) nums1[i] - nums2[i];\n        mergeSort(a, 0, n - 1, new long[n]);\n        return ans;\n    }\n    private void mergeSort(long[] a, int l, int r, long[] tmp) {\n        if (l >= r) return;\n        int m = (l + r) / 2;\n        mergeSort(a, l, m, tmp);\n        mergeSort(a, m + 1, r, tmp);\n        int j = m + 1;\n        for (int i = l; i <= m; i++) {\n            while (j <= r && a[j] < a[i] - diff) j++;\n            ans += r - j + 1;\n        }\n        int i = l, p = m + 1, k = l;\n        while (i <= m && p <= r) tmp[k++] = a[i] <= a[p] ? a[i++] : a[p++];\n        while (i <= m) tmp[k++] = a[i++];\n        while (p <= r) tmp[k++] = a[p++];\n        for (int t = l; t <= r; t++) a[t] = tmp[t];\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def numberOfPairs(self, nums1: List[int], nums2: List[int], diff: int) -> int:\n        a = [x - y for x, y in zip(nums1, nums2)]\n        self.ans = 0\n        def merge_sort(l: int, r: int, tmp: List[int]) -> None:\n            if l >= r:\n                return\n            m = (l + r) // 2\n            merge_sort(l, m, tmp)\n            merge_sort(m + 1, r, tmp)\n            j = m + 1\n            for i in range(l, m + 1):\n                while j <= r and a[j] < a[i] - diff:\n                    j += 1\n                self.ans += r - j + 1\n            i, p, k = l, m + 1, l\n            while i <= m and p <= r:\n                if a[i] <= a[p]:\n                    tmp[k] = a[i]\n                    i += 1\n                else:\n                    tmp[k] = a[p]\n                    p += 1\n                k += 1\n            while i <= m:\n                tmp[k] = a[i]\n                i += 1\n                k += 1\n            while p <= r:\n                tmp[k] = a[p]\n                p += 1\n                k += 1\n            for t in range(l, r + 1):\n                a[t] = tmp[t]\n        merge_sort(0, len(a) - 1, [0] * len(a))\n        return self.ans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "monotonic",
+      "title": "DSA 1 · Monotonic Stack / Queue",
+      "lead": "Monotonic stack hoặc deque.",
+      "problems": [
+        {
+          "id": "remove-duplicate-letters",
+          "lc": 316,
+          "title": "Remove Duplicate Letters",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/remove-duplicate-letters/",
+          "statement": "<p>Cho chuỗi chữ thường. Xóa chữ trùng sao cho mỗi ký tự còn đúng một lần, và chuỗi còn lại là <em>nhỏ nhất theo thứ tự từ điển</em> trong các cách xóa hợp lệ. (Tương đương LC 1081.)</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> <strong>Monotonic stack tăng dần</strong> (lex nhỏ): duyệt trái → phải. Nếu ký tự chưa có trong stack, pop các ký tự lớn hơn đang ở đỉnh <em>nếu chúng còn xuất hiện sau này</em> (nhìn last-occurrence), rồi push. Dùng set/boolean để biết ký tự đã nằm trong stack.</p>",
+          "time": "O(n)",
+          "space": "O(1) — tối đa 26 ký tự trên stack",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    string removeDuplicateLetters(string s) {\n        vector<int> last(26);\n        for (int i = 0; i < (int)s.size(); i++) last[s[i] - 'a'] = i;\n        string st;\n        vector<int> in(26);\n        for (int i = 0; i < (int)s.size(); i++) {\n            char c = s[i];\n            if (in[c - 'a']) continue;\n            while (!st.empty() && c < st.back() && last[st.back() - 'a'] > i) {\n                in[st.back() - 'a'] = 0;\n                st.pop_back();\n            }\n            st.push_back(c);\n            in[c - 'a'] = 1;\n        }\n        return st;\n    }\n};",
+            "java": "class Solution {\n    public String removeDuplicateLetters(String s) {\n        int[] last = new int[26];\n        for (int i = 0; i < s.length(); i++) last[s.charAt(i) - 'a'] = i;\n        StringBuilder st = new StringBuilder();\n        boolean[] in = new boolean[26];\n        for (int i = 0; i < s.length(); i++) {\n            char c = s.charAt(i);\n            if (in[c - 'a']) continue;\n            while (st.length() > 0 && c < st.charAt(st.length() - 1)\n                    && last[st.charAt(st.length() - 1) - 'a'] > i) {\n                in[st.charAt(st.length() - 1) - 'a'] = false;\n                st.deleteCharAt(st.length() - 1);\n            }\n            st.append(c);\n            in[c - 'a'] = true;\n        }\n        return st.toString();\n    }\n}",
+            "python": "class Solution:\n    def removeDuplicateLetters(self, s: str) -> str:\n        last = {c: i for i, c in enumerate(s)}\n        stack = []\n        in_stack = set()\n        for i, c in enumerate(s):\n            if c in in_stack:\n                continue\n            while stack and c < stack[-1] and last[stack[-1]] > i:\n                in_stack.remove(stack.pop())\n            stack.append(c)\n            in_stack.add(c)\n        return \"\".join(stack)"
+          }
+        },
+        {
+          "id": "online-stock-span",
+          "lc": 901,
+          "title": "Online Stock Span",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/online-stock-span/",
+          "statement": "<p>Thiết kế class nhận lần lượt giá cổ phiếu mỗi ngày. <code>next(price)</code> trả về <em>span</em>: số ngày liên tiếp kết thúc hôm nay mà giá đều ≤ <code>price</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> <strong>Monotonic stack giảm dần</strong> lưu <code>(price, span)</code>. Khi giá mới ≥ đỉnh, pop và cộng dồn span (những ngày đó bị “che” bởi hôm nay). Push cặp mới. Mỗi ngày vào/ra stack tối đa một lần.</p>",
+          "time": "O(1) amortized mỗi next",
+          "space": "O(n) sau n lần gọi",
+          "codes": {
+            "cpp": "class StockSpanner {\n    vector<pair<int, int>> st;\npublic:\n    int next(int price) {\n        int span = 1;\n        while (!st.empty() && st.back().first <= price) {\n            span += st.back().second;\n            st.pop_back();\n        }\n        st.push_back({price, span});\n        return span;\n    }\n};",
+            "java": "class StockSpanner {\n    Deque<int[]> st = new ArrayDeque<>();\n    public int next(int price) {\n        int span = 1;\n        while (!st.isEmpty() && st.peek()[0] <= price) span += st.pop()[1];\n        st.push(new int[]{price, span});\n        return span;\n    }\n}",
+            "python": "class StockSpanner:\n    def __init__(self):\n        self.stack = []\n\n    def next(self, price: int) -> int:\n        span = 1\n        while self.stack and self.stack[-1][0] <= price:\n            span += self.stack.pop()[1]\n        self.stack.append((price, span))\n        return span"
+          }
+        },
+        {
+          "id": "jump-game-vi",
+          "lc": 1696,
+          "title": "Jump Game VI",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/jump-game-vi/",
+          "statement": "<p>Bắt đầu tại index 0, mỗi bước nhảy tới i+1 … i+k (trong biên mảng). Điểm = tổng <code>nums</code> tại các index đi qua (kể cả đầu và cuối). Tối đa hóa điểm khi tới n−1. <code>nums[i]</code> có thể âm.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> <code>dp[i] = nums[i] + max(dp[i−k] … dp[i−1])</code>. Để lấy max cửa sổ trượt độ dài k, dùng <strong>deque đơn điệu giảm</strong> theo giá trị dp: đầu deque luôn là index có dp lớn nhất còn trong cửa sổ. Pop trái khi ra khỏi [i−k, i), pop phải khi dp không lớn hơn dp[i].</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxResult(vector<int>& nums, int k) {\n        int n = (int)nums.size();\n        vector<int> dp(n);\n        dp[0] = nums[0];\n        deque<int> q;\n        q.push_back(0);\n        for (int i = 1; i < n; i++) {\n            while (!q.empty() && q.front() < i - k) q.pop_front();\n            dp[i] = nums[i] + dp[q.front()];\n            while (!q.empty() && dp[q.back()] <= dp[i]) q.pop_back();\n            q.push_back(i);\n        }\n        return dp[n - 1];\n    }\n};",
+            "java": "class Solution {\n    public int maxResult(int[] nums, int k) {\n        int n = nums.length;\n        int[] dp = new int[n];\n        dp[0] = nums[0];\n        Deque<Integer> q = new ArrayDeque<>();\n        q.add(0);\n        for (int i = 1; i < n; i++) {\n            while (!q.isEmpty() && q.peekFirst() < i - k) q.pollFirst();\n            dp[i] = nums[i] + dp[q.peekFirst()];\n            while (!q.isEmpty() && dp[q.peekLast()] <= dp[i]) q.pollLast();\n            q.addLast(i);\n        }\n        return dp[n - 1];\n    }\n}",
+            "python": "from typing import List\nfrom collections import deque\n\nclass Solution:\n    def maxResult(self, nums: List[int], k: int) -> int:\n        n = len(nums)\n        dp = [0] * n\n        dp[0] = nums[0]\n        q = deque([0])\n        for i in range(1, n):\n            while q and q[0] < i - k:\n                q.popleft()\n            dp[i] = nums[i] + dp[q[0]]\n            while q and dp[q[-1]] <= dp[i]:\n                q.pop()\n            q.append(i)\n        return dp[-1]"
+          }
+        },
+        {
+          "id": "132-pattern",
+          "lc": 456,
+          "title": "132 Pattern",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/132-pattern/",
+          "statement": "<p>Có tồn tại bộ ba chỉ số <code>i &lt; j &lt; k</code> sao cho <code>nums[i] &lt; nums[k] &lt; nums[j]</code> không? (mẫu 1-3-2 theo giá trị.)</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Duyệt phải → trái với <strong>monotonic stack giảm</strong>. Stack chứa ứng viên cho <code>nums[j]</code> (đỉnh là số nhỏ hơn bên phải). Khi gặp số lớn hơn đỉnh, pop — giá trị pop được là ứng viên <code>nums[k]</code> (số “2”). Giữ <code>third</code> = max các ứng viên k. Nếu phần tử hiện tại &lt; <code>third</code> thì nó đóng vai “1”.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    bool find132pattern(vector<int>& nums) {\n        int third = INT_MIN;\n        vector<int> st;\n        for (int i = (int)nums.size() - 1; i >= 0; i--) {\n            if (nums[i] < third) return true;\n            while (!st.empty() && st.back() < nums[i]) {\n                third = st.back();\n                st.pop_back();\n            }\n            st.push_back(nums[i]);\n        }\n        return false;\n    }\n};",
+            "java": "class Solution {\n    public boolean find132pattern(int[] nums) {\n        int third = Integer.MIN_VALUE;\n        Deque<Integer> st = new ArrayDeque<>();\n        for (int i = nums.length - 1; i >= 0; i--) {\n            if (nums[i] < third) return true;\n            while (!st.isEmpty() && st.peek() < nums[i]) third = st.pop();\n            st.push(nums[i]);\n        }\n        return false;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def find132pattern(self, nums: List[int]) -> bool:\n        third = float(\"-inf\")\n        stack = []\n        for x in reversed(nums):\n            if x < third:\n                return True\n            while stack and stack[-1] < x:\n                third = stack.pop()\n            stack.append(x)\n        return False"
+          }
+        },
+        {
+          "id": "sum-of-subarray-minimums",
+          "lc": 907,
+          "title": "Sum of Subarray Minimums",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/sum-of-subarray-minimums/",
+          "statement": "<p>Với mọi subarray liên tiếp, lấy phần tử nhỏ nhất rồi cộng lại. Trả về tổng modulo 10<sup>9</sup>+7.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Với mỗi <code>arr[i]</code>, đếm số subarray mà nó là min: nhân khoảng cách tới <em>phần tử nhỏ hơn sát bên trái</em> và <em>nhỏ hơn hoặc bằng sát bên phải</em> (một phía strict để không đếm trùng khi có số bằng nhau). Hai khoảng cách lấy bằng <strong>monotonic stack tăng</strong>.</p><p>Đóng góp = <code>arr[i] * left[i] * right[i]</code>.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int sumSubarrayMins(vector<int>& arr) {\n        const int MOD = 1'000'000'007;\n        int n = (int)arr.size();\n        vector<int> left(n), right(n);\n        vector<int> st;\n        for (int i = 0; i < n; i++) {\n            while (!st.empty() && arr[st.back()] >= arr[i]) st.pop_back();\n            left[i] = i - (st.empty() ? -1 : st.back());\n            st.push_back(i);\n        }\n        st.clear();\n        for (int i = n - 1; i >= 0; i--) {\n            while (!st.empty() && arr[st.back()] > arr[i]) st.pop_back();\n            right[i] = (st.empty() ? n : st.back()) - i;\n            st.push_back(i);\n        }\n        long long ans = 0;\n        for (int i = 0; i < n; i++) {\n            ans = (ans + 1LL * arr[i] * left[i] * right[i]) % MOD;\n        }\n        return (int)ans;\n    }\n};",
+            "java": "class Solution {\n    public int sumSubarrayMins(int[] arr) {\n        final int MOD = 1_000_000_007;\n        int n = arr.length;\n        int[] left = new int[n];\n        int[] right = new int[n];\n        Deque<Integer> st = new ArrayDeque<>();\n        for (int i = 0; i < n; i++) {\n            while (!st.isEmpty() && arr[st.peek()] >= arr[i]) st.pop();\n            left[i] = i - (st.isEmpty() ? -1 : st.peek());\n            st.push(i);\n        }\n        st.clear();\n        for (int i = n - 1; i >= 0; i--) {\n            while (!st.isEmpty() && arr[st.peek()] > arr[i]) st.pop();\n            right[i] = (st.isEmpty() ? n : st.peek()) - i;\n            st.push(i);\n        }\n        long ans = 0;\n        for (int i = 0; i < n; i++) {\n            ans = (ans + (long) arr[i] * left[i] * right[i]) % MOD;\n        }\n        return (int) ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def sumSubarrayMins(self, arr: List[int]) -> int:\n        MOD = 10**9 + 7\n        n = len(arr)\n        left = [0] * n\n        right = [0] * n\n        st = []\n        for i in range(n):\n            while st and arr[st[-1]] >= arr[i]:\n                st.pop()\n            left[i] = i - (st[-1] if st else -1)\n            st.append(i)\n        st = []\n        for i in range(n - 1, -1, -1):\n            while st and arr[st[-1]] > arr[i]:\n                st.pop()\n            right[i] = (st[-1] if st else n) - i\n            st.append(i)\n        return sum(arr[i] * left[i] * right[i] for i in range(n)) % MOD"
+          }
+        }
+      ]
+    },
+    {
+      "id": "primes",
+      "title": "DSA 1 · Prime Numbers",
+      "lead": "Sieve / primality / factorization.",
+      "problems": [
+        {
+          "id": "prime-in-diagonal",
+          "lc": 2614,
+          "title": "Prime In Diagonal",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/prime-in-diagonal/",
+          "statement": "<p>Ma trận vuông. Xét hai đường chéo chính và phụ. Trả về số nguyên tố lớn nhất trên hai đường chéo; nếu không có thì 0. 1 không phải nguyên tố.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Duyệt <code>nums[i][i]</code> và <code>nums[i][n−1−i]</code>. Kiểm tra nguyên tố bằng thử chia tới √x (bỏ qua chẵn sau 2). Giá trị ≤ 4·10<sup>6</sup>, √x ~ 2000 nên đủ nhanh. Cập nhật max.</p>",
+          "time": "O(n √M) — M max trên đường chéo",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\n    bool isPrime(int x) {\n        if (x < 2) return false;\n        if (x % 2 == 0) return x == 2;\n        for (int i = 3; 1LL * i * i <= x; i += 2) {\n            if (x % i == 0) return false;\n        }\n        return true;\n    }\npublic:\n    int diagonalPrime(vector<vector<int>>& nums) {\n        int n = (int)nums.size(), ans = 0;\n        for (int i = 0; i < n; i++) {\n            for (int v : {nums[i][i], nums[i][n - 1 - i]}) {\n                if (v > ans && isPrime(v)) ans = v;\n            }\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int diagonalPrime(int[][] nums) {\n        int n = nums.length, ans = 0;\n        for (int i = 0; i < n; i++) {\n            ans = Math.max(ans, primeOrZero(nums[i][i]));\n            ans = Math.max(ans, primeOrZero(nums[i][n - 1 - i]));\n        }\n        return ans;\n    }\n    private int primeOrZero(int x) {\n        return isPrime(x) ? x : 0;\n    }\n    private boolean isPrime(int x) {\n        if (x < 2) return false;\n        if (x % 2 == 0) return x == 2;\n        for (int i = 3; (long) i * i <= x; i += 2) {\n            if (x % i == 0) return false;\n        }\n        return true;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def diagonalPrime(self, nums: List[List[int]]) -> int:\n        def is_prime(x: int) -> bool:\n            if x < 2:\n                return False\n            if x % 2 == 0:\n                return x == 2\n            i = 3\n            while i * i <= x:\n                if x % i == 0:\n                    return False\n                i += 2\n            return True\n        n = len(nums)\n        ans = 0\n        for i in range(n):\n            for v in (nums[i][i], nums[i][n - 1 - i]):\n                if v > ans and is_prime(v):\n                    ans = v\n        return ans"
+          }
+        },
+        {
+          "id": "maximum-prime-difference",
+          "lc": 3115,
+          "title": "Maximum Prime Difference",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/maximum-prime-difference/",
+          "statement": "<p>Cho mảng số nguyên dương. Tìm hai chỉ số <code>i ≤ j</code> sao cho <code>nums[i]</code> và <code>nums[j]</code> đều nguyên tố, và <code>j − i</code> lớn nhất. Luôn tồn tại ít nhất một số nguyên tố.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Khoảng cách lớn nhất chính là (chỉ số nguyên tố phải nhất) − (trái nhất). Sàng Eratosthenes tới max(nums) (≤ 100) rồi một lần duyệt mảng.</p>",
+          "time": "O(n + M log log M) — M = max(nums)",
+          "space": "O(M)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maximumPrimeDifference(vector<int>& nums) {\n        int M = *max_element(nums.begin(), nums.end());\n        vector<char> isP(M + 1, 1);\n        isP[0] = isP[1] = 0;\n        for (int i = 2; 1LL * i * i <= M; i++) {\n            if (!isP[i]) continue;\n            for (int j = i * i; j <= M; j += i) isP[j] = 0;\n        }\n        int first = -1, last = -1;\n        for (int i = 0; i < (int)nums.size(); i++) {\n            if (isP[nums[i]]) {\n                if (first < 0) first = i;\n                last = i;\n            }\n        }\n        return last - first;\n    }\n};",
+            "java": "class Solution {\n    public int maximumPrimeDifference(int[] nums) {\n        int M = 0;\n        for (int x : nums) M = Math.max(M, x);\n        boolean[] isP = new boolean[M + 1];\n        Arrays.fill(isP, true);\n        if (M >= 0) isP[0] = false;\n        if (M >= 1) isP[1] = false;\n        for (int i = 2; (long) i * i <= M; i++) {\n            if (!isP[i]) continue;\n            for (int j = i * i; j <= M; j += i) isP[j] = false;\n        }\n        int first = -1, last = -1;\n        for (int i = 0; i < nums.length; i++) {\n            if (isP[nums[i]]) {\n                if (first < 0) first = i;\n                last = i;\n            }\n        }\n        return last - first;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def maximumPrimeDifference(self, nums: List[int]) -> int:\n        M = max(nums)\n        is_p = [True] * (M + 1)\n        is_p[0] = is_p[1] = False\n        i = 2\n        while i * i <= M:\n            if is_p[i]:\n                for j in range(i * i, M + 1, i):\n                    is_p[j] = False\n            i += 1\n        first = last = -1\n        for i, x in enumerate(nums):\n            if is_p[x]:\n                if first < 0:\n                    first = i\n                last = i\n        return last - first"
+          }
+        },
+        {
+          "id": "prime-pairs-with-target-sum",
+          "lc": 2761,
+          "title": "Prime Pairs With Target Sum",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/prime-pairs-with-target-sum/",
+          "statement": "<p>Cho số chẵn/lẻ <code>n</code>. Tìm mọi cặp <code>[x, y]</code> với <code>x + y = n</code>, <code>x ≤ y</code>, cả hai nguyên tố. Trả về các cặp theo <code>x</code> tăng dần.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Sàng Eratosthenes tới <code>n</code> (n ≤ 10<sup>6</sup>). Duyệt <code>x</code> từ 2 tới <code>n//2</code>; nếu <code>x</code> và <code>n−x</code> đều nguyên tố thì ghi nhận. Đây là Goldbach-style enumerate.</p>",
+          "time": "O(n log log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<vector<int>> findPrimePairs(int n) {\n        vector<char> isP(n + 1, 1);\n        if (n >= 0) isP[0] = 0;\n        if (n >= 1) isP[1] = 0;\n        for (int i = 2; 1LL * i * i <= n; i++) {\n            if (!isP[i]) continue;\n            for (int j = i * i; j <= n; j += i) isP[j] = 0;\n        }\n        vector<vector<int>> ans;\n        for (int x = 2; x <= n / 2; x++) {\n            if (isP[x] && isP[n - x]) ans.push_back({x, n - x});\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public List<List<Integer>> findPrimePairs(int n) {\n        boolean[] isP = new boolean[n + 1];\n        Arrays.fill(isP, true);\n        if (n >= 0) isP[0] = false;\n        if (n >= 1) isP[1] = false;\n        for (int i = 2; (long) i * i <= n; i++) {\n            if (!isP[i]) continue;\n            for (int j = i * i; j <= n; j += i) isP[j] = false;\n        }\n        List<List<Integer>> ans = new ArrayList<>();\n        for (int x = 2; x <= n / 2; x++) {\n            if (isP[x] && isP[n - x]) ans.add(Arrays.asList(x, n - x));\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def findPrimePairs(self, n: int) -> List[List[int]]:\n        is_p = [True] * (n + 1)\n        if n >= 0:\n            is_p[0] = False\n        if n >= 1:\n            is_p[1] = False\n        i = 2\n        while i * i <= n:\n            if is_p[i]:\n                for j in range(i * i, n + 1, i):\n                    is_p[j] = False\n            i += 1\n        ans = []\n        for x in range(2, n // 2 + 1):\n            if is_p[x] and is_p[n - x]:\n                ans.append([x, n - x])\n        return ans"
+          }
+        },
+        {
+          "id": "smallest-value-after-replacing-with-sum-of-prime-factors",
+          "lc": 2507,
+          "title": "Smallest Value After Replacing With Sum of Prime Factors",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/smallest-value-after-replacing-with-sum-of-prime-factors/",
+          "statement": "<p>Bắt đầu từ <code>n</code>. Lặp: thay n bằng tổng các thừa số nguyên tố (kể cả bội). Dừng khi n không đổi. Trả về giá trị cuối (nhỏ nhất đạt được).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Phân tích thừa số: thử chia từ 2 tới √n, cộng thừa số (kèm multiplicity), cộng nốt phần còn lại nếu &gt; 1. Số nguyên tố giữ nguyên (tổng = chính nó). Số hợp thì tổng thừa số &lt; n (trừ vài trường hợp nhỏ như 4 = 2+2), nên vòng lặp kết thúc nhanh. n ≤ 10<sup>5</sup>.</p>",
+          "time": "O(√n · số vòng)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\n    int factorSum(int x) {\n        int s = 0, y = x;\n        for (int i = 2; 1LL * i * i <= y; i++) {\n            while (y % i == 0) {\n                s += i;\n                y /= i;\n            }\n        }\n        if (y > 1) s += y;\n        return s;\n    }\npublic:\n    int smallestValue(int n) {\n        while (true) {\n            int nxt = factorSum(n);\n            if (nxt == n) return n;\n            n = nxt;\n        }\n    }\n};",
+            "java": "class Solution {\n    public int smallestValue(int n) {\n        while (true) {\n            int nxt = factorSum(n);\n            if (nxt == n) return n;\n            n = nxt;\n        }\n    }\n    private int factorSum(int x) {\n        int s = 0, y = x;\n        for (int i = 2; (long) i * i <= y; i++) {\n            while (y % i == 0) {\n                s += i;\n                y /= i;\n            }\n        }\n        if (y > 1) s += y;\n        return s;\n    }\n}",
+            "python": "class Solution:\n    def smallestValue(self, n: int) -> int:\n        def factor_sum(x: int) -> int:\n            s, y, i = 0, x, 2\n            while i * i <= y:\n                while y % i == 0:\n                    s += i\n                    y //= i\n                i += 1\n            if y > 1:\n                s += y\n            return s\n        while True:\n            nxt = factor_sum(n)\n            if nxt == n:\n                return n\n            n = nxt"
+          }
+        }
+      ]
+    },
+    {
+      "id": "prefix-sum",
+      "title": "DSA 1 · Prefix Sum",
+      "lead": "Prefix + hash. LC 525, 523, 1991.",
+      "problems": [
+        {
+          "id": "contiguous-array",
+          "lc": 525,
+          "title": "Contiguous Array",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/contiguous-array/",
+          "statement": "<p>Mảng nhị phân 0/1. Tìm độ dài subarray liên tiếp dài nhất có số lượng 0 bằng số lượng 1. Không có thì 0.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đổi 0 thành −1. Khi đó subarray cân bằng ↔ prefix sum hai đầu mút bằng nhau. Duyệt prefix <code>s</code>, hash map lưu <em>lần đầu</em> gặp mỗi <code>s</code>. Nếu <code>s</code> đã thấy tại j, đoạn (j+1 … i) cân bằng, độ dài <code>i − j</code>. Khởi tạo <code>{0: −1}</code> cho đoạn bắt đầu từ 0.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int findMaxLength(vector<int>& nums) {\n        unordered_map<int, int> first;\n        first[0] = -1;\n        int s = 0, ans = 0;\n        for (int i = 0; i < (int)nums.size(); i++) {\n            s += nums[i] == 1 ? 1 : -1;\n            if (first.count(s)) ans = max(ans, i - first[s]);\n            else first[s] = i;\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int findMaxLength(int[] nums) {\n        Map<Integer, Integer> first = new HashMap<>();\n        first.put(0, -1);\n        int s = 0, ans = 0;\n        for (int i = 0; i < nums.length; i++) {\n            s += nums[i] == 1 ? 1 : -1;\n            if (first.containsKey(s)) ans = Math.max(ans, i - first.get(s));\n            else first.put(s, i);\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def findMaxLength(self, nums: List[int]) -> int:\n        first = {0: -1}\n        s = ans = 0\n        for i, x in enumerate(nums):\n            s += 1 if x == 1 else -1\n            if s in first:\n                ans = max(ans, i - first[s])\n            else:\n                first[s] = i\n        return ans"
+          }
+        },
+        {
+          "id": "continuous-subarray-sum",
+          "lc": 523,
+          "title": "Continuous Subarray Sum",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/continuous-subarray-sum/",
+          "statement": "<p>Hỏi mảng có subarray độ dài <em>ít nhất 2</em> mà tổng chia hết cho <code>k</code> không (<code>k ≥ 1</code>).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Prefix sum modulo k: nếu hai prefix cùng số dư, đoạn giữa chia hết cho k. Hash map lưu index <em>đầu tiên</em> của mỗi remainder. Chỉ trả true khi khoảng cách index ≥ 2. Khởi tạo <code>{0: −1}</code> để nhận đoạn bắt đầu từ đầu mảng. Không ghi đè index cũ — cần lần xuất hiện sớm nhất.</p>",
+          "time": "O(n)",
+          "space": "O(min(n, k))",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    bool checkSubarraySum(vector<int>& nums, int k) {\n        unordered_map<int, int> seen;\n        seen[0] = -1;\n        int s = 0;\n        for (int i = 0; i < (int)nums.size(); i++) {\n            s += nums[i];\n            int r = s % k;\n            if (seen.count(r)) {\n                if (i - seen[r] >= 2) return true;\n            } else {\n                seen[r] = i;\n            }\n        }\n        return false;\n    }\n};",
+            "java": "class Solution {\n    public boolean checkSubarraySum(int[] nums, int k) {\n        Map<Integer, Integer> seen = new HashMap<>();\n        seen.put(0, -1);\n        int s = 0;\n        for (int i = 0; i < nums.length; i++) {\n            s += nums[i];\n            int r = s % k;\n            if (seen.containsKey(r)) {\n                if (i - seen.get(r) >= 2) return true;\n            } else {\n                seen.put(r, i);\n            }\n        }\n        return false;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def checkSubarraySum(self, nums: List[int], k: int) -> bool:\n        seen = {0: -1}\n        s = 0\n        for i, x in enumerate(nums):\n            s += x\n            r = s % k\n            if r in seen:\n                if i - seen[r] >= 2:\n                    return True\n            else:\n                seen[r] = i\n        return False"
+          }
+        },
+        {
+          "id": "find-the-middle-index-in-array",
+          "lc": 1991,
+          "title": "Find the Middle Index in Array",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/find-the-middle-index-in-array/",
+          "statement": "<p>Tìm index trái nhất sao cho tổng bên trái bằng tổng bên phải (không tính chính phần tử đó). Không có thì −1. (Giống LC 724 Pivot Index.)</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Tính <code>total</code>. Duyệt i, so sánh <code>left == total − left − nums[i]</code> (prefix/suffix). Nếu đúng, trả i; không thì cộng <code>nums[i]</code> vào left.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int findMiddleIndex(vector<int>& nums) {\n        int total = 0;\n        for (int x : nums) total += x;\n        int left = 0;\n        for (int i = 0; i < (int)nums.size(); i++) {\n            if (left == total - left - nums[i]) return i;\n            left += nums[i];\n        }\n        return -1;\n    }\n};",
+            "java": "class Solution {\n    public int findMiddleIndex(int[] nums) {\n        int total = 0;\n        for (int x : nums) total += x;\n        int left = 0;\n        for (int i = 0; i < nums.length; i++) {\n            if (left == total - left - nums[i]) return i;\n            left += nums[i];\n        }\n        return -1;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def findMiddleIndex(self, nums: List[int]) -> int:\n        total = sum(nums)\n        left = 0\n        for i, x in enumerate(nums):\n            if left == total - left - x:\n                return i\n            left += x\n        return -1"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "out": "src/dsa-homework/data/dsa1b.json",
+  "topics": [
+    {
+      "id": "binary-search",
+      "title": "DSA 1 · Binary Search",
+      "lead": "Binary search trên mảng sort hoặc trên không gian đáp án.",
+      "problems": [
+        {"id": "binary-search", "lc": 704, "title": "Binary Search", "difficulty": "Easy"},
+        {"id": "search-insert-position", "lc": 35, "title": "Search Insert Position", "difficulty": "Easy"},
+        {"id": "find-first-and-last-position-of-element-in-sorted-array", "lc": 34, "title": "Find First and Last Position of Element in Sorted Array", "difficulty": "Medium"},
+        {"id": "search-a-2d-matrix", "lc": 74, "title": "Search a 2D Matrix", "difficulty": "Medium"},
+        {"id": "successful-pairs-of-spells-and-potions", "lc": 2300, "title": "Successful Pairs of Spells and Potions", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "hashtable",
+      "title": "DSA 1 · Hash Table",
+      "lead": "Hash map / set, đếm tần suất.",
+      "problems": [
+        {"id": "find-lucky-integer-in-an-array", "lc": 1394, "title": "Find Lucky Integer in an Array", "difficulty": "Easy"},
+        {"id": "maximum-number-of-balls-in-a-box", "lc": 1742, "title": "Maximum Number of Balls in a Box", "difficulty": "Easy"},
+        {"id": "jewels-and-stones", "lc": 771, "title": "Jewels and Stones", "difficulty": "Easy"},
+        {"id": "optimal-partition-of-string", "lc": 2405, "title": "Optimal Partition of String", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "linked-list",
+      "title": "DSA 1 · Linked List",
+      "lead": "BTVN: Max Stack + LFU Cache — doubly linked list + hashmap.",
+      "problems": [
+        {"id": "max-stack", "lc": 716, "title": "Max Stack", "difficulty": "Hard", "url": "https://leetcode.com/problems/max-stack/", "note": "premium; cũng có lintcode max-stack"},
+        {"id": "lfu-cache", "lc": 460, "title": "LFU Cache", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "stack-queue",
+      "title": "DSA 1 · Stack & Queue",
+      "lead": "Stack / queue mô phỏng. Calculator dùng stack.",
+      "problems": [
+        {"id": "remove-all-adjacent-duplicates-in-string", "lc": 1047, "title": "Remove All Adjacent Duplicates In String", "difficulty": "Easy"},
+        {"id": "time-needed-to-buy-tickets", "lc": 2073, "title": "Time Needed to Buy Tickets", "difficulty": "Easy"},
+        {"id": "baseball-game", "lc": 682, "title": "Baseball Game", "difficulty": "Easy"},
+        {"id": "make-the-string-great", "lc": 1544, "title": "Make The String Great", "difficulty": "Easy"},
+        {"id": "minimum-string-length-after-removing-substrings", "lc": 2696, "title": "Minimum String Length After Removing Substrings", "difficulty": "Easy"},
+        {"id": "basic-calculator", "lc": 224, "title": "Basic Calculator", "difficulty": "Hard"},
+        {"id": "basic-calculator-ii", "lc": 227, "title": "Basic Calculator II", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "graph2-tree",
+      "title": "DSA 1 · Graph 2 (Binary Tree)",
+      "lead": "Homework là 3 bài tree. DFS đệ quy.",
+      "problems": [
+        {"id": "invert-binary-tree", "lc": 226, "title": "Invert Binary Tree", "difficulty": "Easy"},
+        {"id": "balanced-binary-tree", "lc": 110, "title": "Balanced Binary Tree", "difficulty": "Easy"},
+        {"id": "binary-tree-paths", "lc": 257, "title": "Binary Tree Paths", "difficulty": "Easy"}
+      ]
+    }
+  ]
+}

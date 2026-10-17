@@ -1,0 +1,428 @@
+{
+  "topics": [
+    {
+      "id": "array",
+      "title": "DSA 1 · Array",
+      "lead": "Bắt buộc + tuỳ chọn. Giải bằng mảng / đếm / prefix.",
+      "problems": [
+        {
+          "id": "find-all-numbers-disappeared-in-an-array",
+          "lc": 448,
+          "title": "Find All Numbers Disappeared in an Array",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/find-all-numbers-disappeared-in-an-array/",
+          "statement": "<p><strong>Bắt buộc.</strong> Cho mảng <code>nums</code> độ dài <code>n</code>, mỗi phần tử thuộc <code>[1, n]</code>. Một số giá trị có thể xuất hiện hai lần, khi đó một số khác trong <code>[1, n]</code> sẽ biến mất. Trả về mọi số không xuất hiện (thứ tự tuỳ ý).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đây là bài đánh dấu trên mảng: giá trị <code>x</code> “trỏ” tới chỉ số <code>x - 1</code>. Ta tận dụng chính <code>nums</code> làm bảng visited bằng cách đổi dấu ô được trỏ tới — không cần hash set (đúng topic Array, thêm O(1) bộ nhớ).</p>\n<ol>\n<li>Duyệt từng <code>nums[i]</code>. Lấy <code>idx = abs(nums[i]) - 1</code> (phải <code>abs</code> vì ô có thể đã bị đánh dấu âm ở bước trước).</li>\n<li>Nếu <code>nums[idx] &gt; 0</code> thì gán <code>nums[idx] = -nums[idx]</code>. Trùng lặp: ô đã âm thì bỏ qua, không nhân âm hai lần (sẽ mất dấu visited).</li>\n<li>Duyệt lại: nếu <code>nums[i] &gt; 0</code> thì <code>i + 1</code> chưa từng được trỏ tới → số bị thiếu. Đẩy vào đáp án.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Constraint bảo mọi giá trị nằm trong <code>[1, n]</code> nên không bao giờ ra ngoài biên. Không sort (chậm hơn, không cần). Không dùng mảng boolean phụ nếu muốn O(1) extra. Kết quả không yêu cầu thứ tự tăng dần.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> findDisappearedNumbers(vector<int>& nums) {\n        int n = (int)nums.size();\n        for (int i = 0; i < n; i++) {\n            int idx = abs(nums[i]) - 1;\n            if (nums[idx] > 0) nums[idx] = -nums[idx];\n        }\n        vector<int> ans;\n        for (int i = 0; i < n; i++) {\n            if (nums[i] > 0) ans.push_back(i + 1);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public List<Integer> findDisappearedNumbers(int[] nums) {\n        int n = nums.length;\n        for (int i = 0; i < n; i++) {\n            int idx = Math.abs(nums[i]) - 1;\n            if (nums[idx] > 0) nums[idx] = -nums[idx];\n        }\n        List<Integer> ans = new ArrayList<>();\n        for (int i = 0; i < n; i++) {\n            if (nums[i] > 0) ans.add(i + 1);\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def findDisappearedNumbers(self, nums: List[int]) -> List[int]:\n        n = len(nums)\n        for i in range(n):\n            idx = abs(nums[i]) - 1\n            if nums[idx] > 0:\n                nums[idx] = -nums[idx]\n        ans: List[int] = []\n        for i in range(n):\n            if nums[i] > 0:\n                ans.append(i + 1)\n        return ans"
+          }
+        },
+        {
+          "id": "range-sum-query-immutable",
+          "lc": 303,
+          "title": "Range Sum Query - Immutable",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/range-sum-query-immutable/",
+          "statement": "<p><strong>Bắt buộc.</strong> Cài lớp <code>NumArray</code>: khởi tạo với mảng <code>nums</code> không đổi, rồi trả lời nhiều truy vấn <code>sumRange(left, right)</code> = tổng <code>nums[left] + … + nums[right]</code> (hai đầu inclusive).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Mảng bất biến nên tính sẵn prefix sum một lần. Đặt <code>pref[0] = 0</code>, <code>pref[i + 1] = pref[i] + nums[i]</code> — tức <code>pref[k]</code> là tổng <code>k</code> phần tử đầu. Khi đó tổng đoạn <code>[left, right]</code> là <code>pref[right + 1] - pref[left]</code>.</p>\n<ol>\n<li>Trong constructor, cấp phát <code>pref</code> độ dài <code>n + 1</code> và điền trong một vòng O(n).</li>\n<li><code>sumRange</code> chỉ trừ hai phần tử prefix — O(1), không duyệt lại đoạn.</li>\n<li>Giữ <code>pref</code> là field của class (không phải hàm tĩnh <code>Solution</code>).</li>\n</ol>\n<p><strong>Lưu ý.</strong> <code>right</code> inclusive nên trừ <code>pref[right + 1]</code> chứ không phải <code>pref[right]</code>. Đoạn một phần tử: <code>left == right</code> vẫn đúng. Không dùng Fenwick/Segment Tree — overkill vì không có update. Cẩn thận overflow: đề LeetCode bảo tổng vừa <code>int</code>.</p>",
+          "time": "O(n) khởi tạo, O(1) mỗi truy vấn",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class NumArray {\n    vector<int> pref;\npublic:\n    NumArray(vector<int>& nums) {\n        int n = (int)nums.size();\n        pref.assign(n + 1, 0);\n        for (int i = 0; i < n; i++) {\n            pref[i + 1] = pref[i] + nums[i];\n        }\n    }\n\n    int sumRange(int left, int right) {\n        return pref[right + 1] - pref[left];\n    }\n};",
+            "java": "class NumArray {\n    private int[] pref;\n\n    public NumArray(int[] nums) {\n        int n = nums.length;\n        pref = new int[n + 1];\n        for (int i = 0; i < n; i++) {\n            pref[i + 1] = pref[i] + nums[i];\n        }\n    }\n\n    public int sumRange(int left, int right) {\n        return pref[right + 1] - pref[left];\n    }\n}",
+            "python": "from typing import List\n\nclass NumArray:\n    def __init__(self, nums: List[int]):\n        n = len(nums)\n        self.pref = [0] * (n + 1)\n        for i in range(n):\n            self.pref[i + 1] = self.pref[i] + nums[i]\n\n    def sumRange(self, left: int, right: int) -> int:\n        return self.pref[right + 1] - self.pref[left]"
+          }
+        },
+        {
+          "id": "can-place-flowers",
+          "lc": 605,
+          "title": "Can Place Flowers",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/can-place-flowers/",
+          "statement": "<p><strong>Bắt buộc.</strong> <code>flowerbed[i] = 1</code> đã có hoa, <code>0</code> là ô trống. Không được trồng hai hoa kề nhau. Hỏi có trồng thêm được <code>n</code> hoa không (được sửa mảng tại chỗ).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Greedy một lượt trái → phải trên mảng: gặp ô trống mà cả hai hàng xóm cũng trống (ngoài biên coi như trống) thì trồng ngay, giảm <code>n</code>. Trồng sớm không làm mất phương án vì để trống ô này chỉ có thể giúp ô <em>sau</em>, trong khi ô sau vẫn còn cơ hội nếu ta không trồng — nhưng nếu cả ba ô <code>000</code> thì trồng ô giữa hoặc ô trái đều cho cùng số hoa tối đa trên đoạn; chọn ô trái rồi tiếp tục là đủ.</p>\n<ol>\n<li>Viết helper <code>isEmpty(i)</code>: ngoài biên hoặc <code>flowerbed[i] == 0</code>.</li>\n<li>Duyệt <code>i</code>; nếu ô hiện tại và hai bên đều empty thì gán <code>flowerbed[i] = 1</code>, <code>n--</code>.</li>\n<li>Nếu <code>n</code> về 0 giữa đường thì trả <code>true</code> sớm. Kết thúc vòng: <code>n &lt;= 0</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> <code>n = 0</code> luôn true. Mảng một phần tử <code>[0]</code> trồng được 1 hoa. Quên đánh dấu đã trồng sẽ đặt hai hoa kề nhau. Không nhảy có <code>i += 2</code> sau khi trồng cũng được vì ô kế đã thấy 1; nhảy 2 chỉ là tối ưu nhỏ.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\n    bool isEmpty(const vector<int>& bed, int i) {\n        return i < 0 || i >= (int)bed.size() || bed[i] == 0;\n    }\npublic:\n    bool canPlaceFlowers(vector<int>& flowerbed, int n) {\n        if (n <= 0) return true;\n        int m = (int)flowerbed.size();\n        for (int i = 0; i < m; i++) {\n            if (!isEmpty(flowerbed, i)) continue;\n            if (isEmpty(flowerbed, i - 1) && isEmpty(flowerbed, i + 1)) {\n                flowerbed[i] = 1;\n                n--;\n                if (n == 0) return true;\n            }\n        }\n        return n <= 0;\n    }\n};",
+            "java": "class Solution {\n    private boolean isEmpty(int[] bed, int i) {\n        return i < 0 || i >= bed.length || bed[i] == 0;\n    }\n\n    public boolean canPlaceFlowers(int[] flowerbed, int n) {\n        if (n <= 0) return true;\n        for (int i = 0; i < flowerbed.length; i++) {\n            if (!isEmpty(flowerbed, i)) continue;\n            if (isEmpty(flowerbed, i - 1) && isEmpty(flowerbed, i + 1)) {\n                flowerbed[i] = 1;\n                n--;\n                if (n == 0) return true;\n            }\n        }\n        return n <= 0;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def canPlaceFlowers(self, flowerbed: List[int], n: int) -> bool:\n        def is_empty(i: int) -> bool:\n            return i < 0 or i >= len(flowerbed) or flowerbed[i] == 0\n\n        if n <= 0:\n            return True\n        for i in range(len(flowerbed)):\n            if not is_empty(i):\n                continue\n            if is_empty(i - 1) and is_empty(i + 1):\n                flowerbed[i] = 1\n                n -= 1\n                if n == 0:\n                    return True\n        return n <= 0"
+          }
+        },
+        {
+          "id": "product-of-array-except-self",
+          "lc": 238,
+          "title": "Product of Array Except Self",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/product-of-array-except-self/",
+          "statement": "<p><strong>Tuỳ chọn.</strong> Cho mảng <code>nums</code>, trả về <code>ans[i]</code> bằng tích mọi <code>nums[j]</code> với <code>j ≠ i</code>. Không dùng phép chia. Mảng có thể chứa 0.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Không được chia nên không thể lấy tích cả mảng rồi <code>prod / nums[i]</code> (hỏng khi có 0, và đề cấm chia). Dùng hai mảng prefix/suffix — đúng kỹ thuật Array:</p>\n<ol>\n<li><code>pref[i]</code> = tích <code>nums[0..i-1]</code> (bên trái i). Quy ước <code>pref[0] = 1</code>.</li>\n<li><code>suff[i]</code> = tích <code>nums[i+1..n-1]</code> (bên phải i). Quy ước <code>suff[n-1] = 1</code>.</li>\n<li><code>ans[i] = pref[i] * suff[i]</code>.</li>\n</ol>\n<p>Điền pref trái → phải, suff phải → trái, mỗi lượt O(n).</p>\n<p><strong>Lưu ý.</strong> Một số 0: mọi vị trí khác thành 0, vị trí của 0 nhận tích phần còn lại. Hai số 0: cả mảng đáp án 0. Có thể tối ưu còn O(1) extra bằng cách ghi pref vào <code>ans</code> rồi nhân suff ngược, nhưng homework Array nên giữ hai mảng prefix/suffix cho rõ. Đề bảo tích vừa 32-bit.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    vector<int> productExceptSelf(vector<int>& nums) {\n        int n = (int)nums.size();\n        vector<int> pref(n, 1), suff(n, 1);\n        for (int i = 1; i < n; i++) {\n            pref[i] = pref[i - 1] * nums[i - 1];\n        }\n        for (int i = n - 2; i >= 0; i--) {\n            suff[i] = suff[i + 1] * nums[i + 1];\n        }\n        vector<int> ans(n);\n        for (int i = 0; i < n; i++) {\n            ans[i] = pref[i] * suff[i];\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int[] productExceptSelf(int[] nums) {\n        int n = nums.length;\n        int[] pref = new int[n];\n        int[] suff = new int[n];\n        pref[0] = 1;\n        suff[n - 1] = 1;\n        for (int i = 1; i < n; i++) {\n            pref[i] = pref[i - 1] * nums[i - 1];\n        }\n        for (int i = n - 2; i >= 0; i--) {\n            suff[i] = suff[i + 1] * nums[i + 1];\n        }\n        int[] ans = new int[n];\n        for (int i = 0; i < n; i++) {\n            ans[i] = pref[i] * suff[i];\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def productExceptSelf(self, nums: List[int]) -> List[int]:\n        n = len(nums)\n        pref = [1] * n\n        suff = [1] * n\n        for i in range(1, n):\n            pref[i] = pref[i - 1] * nums[i - 1]\n        for i in range(n - 2, -1, -1):\n            suff[i] = suff[i + 1] * nums[i + 1]\n        return [pref[i] * suff[i] for i in range(n)]"
+          }
+        },
+        {
+          "id": "best-time-to-buy-and-sell-stock-ii",
+          "lc": 122,
+          "title": "Best Time to Buy and Sell Stock II",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock-ii/",
+          "statement": "<p><strong>Tuỳ chọn.</strong> Giá cổ phiếu theo ngày <code>prices[i]</code>. Có thể mua/bán nhiều lần nhưng cùng lúc chỉ giữ một cổ phiếu. Tìm lợi nhuận tối đa (không tính phí giao dịch).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Mọi uphill đều nên “thu hoạch”. Nếu nhìn đường giá như dãy đỉnh-đáy, tối ưu là mua mỗi đáy và bán mỗi đỉnh ngay sau đó. Tổng lợi nhuận đúng bằng tổng các hiệu dương giữa hai ngày liên tiếp: <code>max(0, prices[i] - prices[i-1])</code>. Đây là một lượt duyệt mảng, không cần DP trạng thái.</p>\n<ol>\n<li>Khởi tạo <code>ans = 0</code>.</li>\n<li>Với mỗi <code>i = 1..n-1</code>, nếu giá tăng thì cộng <code>prices[i] - prices[i-1]</code>.</li>\n<li>Trả <code>ans</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Mua rồi bán ngay ngày hôm sau (rồi mua lại) tương đương giữ xuyên suốt đoạn tăng — cùng một số tiền, nên cộng từng bước nhỏ là hợp lệ. Không được hold hai cổ phiếu. Dãy giảm hết → lời 0. Không nhầm với Stock I (chỉ một giao dịch).</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        int ans = 0;\n        for (int i = 1; i < (int)prices.size(); i++) {\n            if (prices[i] > prices[i - 1]) {\n                ans += prices[i] - prices[i - 1];\n            }\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int maxProfit(int[] prices) {\n        int ans = 0;\n        for (int i = 1; i < prices.length; i++) {\n            if (prices[i] > prices[i - 1]) {\n                ans += prices[i] - prices[i - 1];\n            }\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def maxProfit(self, prices: List[int]) -> int:\n        ans = 0\n        for i in range(1, len(prices)):\n            if prices[i] > prices[i - 1]:\n                ans += prices[i] - prices[i - 1]\n        return ans"
+          }
+        },
+        {
+          "id": "valid-sudoku",
+          "lc": 36,
+          "title": "Valid Sudoku",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/valid-sudoku/",
+          "statement": "<p><strong>Tuỳ chọn.</strong> Cho bảng Sudoku 9×9, ô trống là <code>'.'</code>, ô đã điền là ký tự <code>'1'..'9'</code>. Kiểm tra các ô đã điền có hợp lệ không: không trùng trong cùng hàng, cùng cột, cùng khối 3×3. Không cần bảng giải được hết.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Duyệt một lượt 81 ô, ghi nhận chữ số đã thấy bằng ba mảng boolean 9×9: theo hàng, theo cột, theo khối. Đúng topic Array (không HashSet). Chỉ số khối: <code>box = (i / 3) * 3 + (j / 3)</code> — 9 khối đánh số 0..8 trái→phải, trên→dưới.</p>\n<ol>\n<li>Với mỗi ô <code>(i, j)</code>, bỏ qua <code>'.'</code>.</li>\n<li>Chuyển <code>'1'..'9'</code> thành <code>d = 0..8</code>.</li>\n<li>Nếu <code>row[i][d]</code> hoặc <code>col[j][d]</code> hoặc <code>box[b][d]</code> đã true → trùng, trả false. Ngược lại đánh true cả ba.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Đây không phải solver Sudoku (không backtrack). Chỉ kiểm tra phần đã điền. Bảng luôn 9×9 nên time/space coi là O(1); viết O(n²) với n = 9 cũng được. Đừng dùng <code>int</code> cho ô — input là <code>char</code>.</p>",
+          "time": "O(1)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\n    int boxIndex(int i, int j) {\n        return (i / 3) * 3 + (j / 3);\n    }\npublic:\n    bool isValidSudoku(vector<vector<char>>& board) {\n        bool row[9][9] = {}, col[9][9] = {}, box[9][9] = {};\n        for (int i = 0; i < 9; i++) {\n            for (int j = 0; j < 9; j++) {\n                char ch = board[i][j];\n                if (ch == '.') continue;\n                int d = ch - '1';\n                int b = boxIndex(i, j);\n                if (row[i][d] || col[j][d] || box[b][d]) return false;\n                row[i][d] = col[j][d] = box[b][d] = true;\n            }\n        }\n        return true;\n    }\n};",
+            "java": "class Solution {\n    private int boxIndex(int i, int j) {\n        return (i / 3) * 3 + (j / 3);\n    }\n\n    public boolean isValidSudoku(char[][] board) {\n        boolean[][] row = new boolean[9][9];\n        boolean[][] col = new boolean[9][9];\n        boolean[][] box = new boolean[9][9];\n        for (int i = 0; i < 9; i++) {\n            for (int j = 0; j < 9; j++) {\n                char ch = board[i][j];\n                if (ch == '.') continue;\n                int d = ch - '1';\n                int b = boxIndex(i, j);\n                if (row[i][d] || col[j][d] || box[b][d]) return false;\n                row[i][d] = col[j][d] = box[b][d] = true;\n            }\n        }\n        return true;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def isValidSudoku(self, board: List[List[str]]) -> bool:\n        def box_index(i: int, j: int) -> int:\n            return (i // 3) * 3 + (j // 3)\n\n        row = [[False] * 9 for _ in range(9)]\n        col = [[False] * 9 for _ in range(9)]\n        box = [[False] * 9 for _ in range(9)]\n        for i in range(9):\n            for j in range(9):\n                ch = board[i][j]\n                if ch == \".\":\n                    continue\n                d = ord(ch) - ord(\"1\")\n                b = box_index(i, j)\n                if row[i][d] or col[j][d] or box[b][d]:\n                    return False\n                row[i][d] = col[j][d] = box[b][d] = True\n        return True"
+          }
+        }
+      ]
+    },
+    {
+      "id": "string",
+      "title": "DSA 1 · String",
+      "lead": "Bài tự luận trên slide + LeetCode. Duyệt chuỗi / đếm ký tự.",
+      "problems": [
+        {
+          "id": "string-reverse-check",
+          "title": "S1 đảo của S2",
+          "difficulty": "Easy",
+          "url": null,
+          "statement": "<p>Bài tự luận (không LeetCode). Cho hai chuỗi <code>s1</code>, <code>s2</code> (ký tự in được, so sánh theo từng vị trí). Kiểm tra <code>s1</code> có phải đảo ngược của <code>s2</code> không.</p>\n<p>API: <code>bool isReverse(s1, s2)</code> — Python <code>is_reverse(s1: str, s2: str) -&gt; bool</code>. Hai chuỗi rỗng là đảo của nhau. Phân biệt hoa thường.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đảo nghĩa là <code>s1[i] == s2[n - 1 - i]</code> với mọi <code>i</code>, và hai chuỗi cùng độ dài. Duyệt một lượt, không cần tạo chuỗi đảo phụ (tiết kiệm bộ nhớ, đúng tinh thần duyệt chuỗi).</p>\n<ol>\n<li>Nếu <code>len(s1) != len(s2)</code> trả false ngay.</li>\n<li>Với mỗi <code>i</code> từ 0 đến n-1, so <code>s1[i]</code> với <code>s2[n - 1 - i]</code>; lệch một ký tự thì false.</li>\n<li>Hết vòng → true.</li>\n</ol>\n<p><strong>Lưu ý.</strong> <code>s1 == reverse(s2)</code> dùng builtin cũng đúng nhưng tốn O(n) bộ nhớ copy. Palindrome là trường hợp riêng <code>s1 == s2</code>. Không trim khoảng trắng trừ khi đề yêu cầu — ở đây so khớp nguyên chuỗi.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "bool isReverse(const string& s1, const string& s2) {\n    if (s1.size() != s2.size()) return false;\n    int n = (int)s1.size();\n    for (int i = 0; i < n; i++) {\n        if (s1[i] != s2[n - 1 - i]) return false;\n    }\n    return true;\n}",
+            "java": "class Solution {\n    public boolean isReverse(String s1, String s2) {\n        if (s1.length() != s2.length()) return false;\n        int n = s1.length();\n        for (int i = 0; i < n; i++) {\n            if (s1.charAt(i) != s2.charAt(n - 1 - i)) return false;\n        }\n        return true;\n    }\n}",
+            "python": "def is_reverse(s1: str, s2: str) -> bool:\n    if len(s1) != len(s2):\n        return False\n    n = len(s1)\n    for i in range(n):\n        if s1[i] != s2[n - 1 - i]:\n            return False\n    return True"
+          }
+        },
+        {
+          "id": "count-letters",
+          "title": "Đếm tần suất chữ cái",
+          "difficulty": "Easy",
+          "url": null,
+          "statement": "<p>Bài tự luận (không LeetCode). Cho chuỗi <code>s</code> chỉ gồm chữ thường <code>a</code>–<code>z</code>. Đếm số lần xuất hiện mỗi chữ cái.</p>\n<p>API: trả về mảng 26 số nguyên, <code>freq[0]</code> = số lần <code>'a'</code>, …, <code>freq[25]</code> = số lần <code>'z'</code>. Python: <code>count_letters(s: str) -&gt; List[int]</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Alphabet cố định 26 ký tự nên dùng mảng đếm, không map. Mỗi ký tự <code>c</code> tăng <code>freq[c - 'a']</code>.</p>\n<ol>\n<li>Khởi tạo <code>freq[26] = 0</code>.</li>\n<li>Duyệt từng ký tự, tăng ô tương ứng.</li>\n<li>Trả cả 26 ô (kể cả chữ không xuất hiện = 0) để caller in theo ý muốn.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Đề slide chỉ chữ thường — không xử lý hoa, số, Unicode. Nếu cần in “những chữ xuất hiện”, lọc <code>freq[i] &gt; 0</code> khi xuất, không đổi API. Độ phức tạp O(n) thời gian, O(1) bộ nhớ (26 ô).</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "vector<int> countLetters(const string& s) {\n    vector<int> freq(26, 0);\n    for (char ch : s) {\n        freq[ch - 'a']++;\n    }\n    return freq;\n}",
+            "java": "class Solution {\n    public int[] countLetters(String s) {\n        int[] freq = new int[26];\n        for (int i = 0; i < s.length(); i++) {\n            freq[s.charAt(i) - 'a']++;\n        }\n        return freq;\n    }\n}",
+            "python": "from typing import List\n\ndef count_letters(s: str) -> List[int]:\n    freq = [0] * 26\n    for ch in s:\n        freq[ord(ch) - ord(\"a\")] += 1\n    return freq"
+          }
+        },
+        {
+          "id": "string-builtins",
+          "title": "Built-in string + độ phức tạp",
+          "difficulty": "Easy",
+          "url": null,
+          "statement": "<p>Bài tự luận (không LeetCode, không cần class <code>Solution</code> chạy judge). Liệt kê vài thao tác chuỗi phổ biến trên C++ / Java / Python kèm độ phức tạp, và viết hàm demo nhỏ — không dump cả thư viện string.</p>\n<p>API demo: <code>demoLength(s)</code>, <code>demoSubstr(s, start, length)</code>, <code>demoFind(s, needle)</code> (find trả <code>-1</code> nếu không có). Giả sử chỉ số hợp lệ cho substr.</p>",
+          "approach": "<p><strong>Ba thao tác hay dùng</strong> (cùng ý nghĩa, khác tên API):</p>\n<ol>\n<li><strong>Độ dài</strong> — C++ <code>s.size()</code> / <code>s.length()</code>, Java <code>s.length()</code>, Python <code>len(s)</code>: <strong>O(1)</strong> vì độ dài được lưu sẵn (không đếm lại từng ký tự).</li>\n<li><strong>Lấy đoạn</strong> — C++ <code>s.substr(pos, len)</code>, Java <code>s.substring(l, r)</code> (r exclusive), Python <code>s[l:r]</code>: <strong>O(k)</strong> với <code>k</code> = độ dài đoạn copy. Java hiện đại copy thành String mới; Python slicing cũng copy.</li>\n<li><strong>Tìm substring</strong> — C++ <code>s.find(t)</code> (không thấy = <code>npos</code>), Java <code>s.indexOf(t)</code>, Python <code>s.find(t)</code>: cài đặt thường hai vòng, worst-case <strong>O(|s| · |t|)</strong>. Một số runtime có thuật toán nhanh hơn (Boyer–Moore, SIMD) nhưng khi phân tích bài tập nên ghi O(n·m).</li>\n</ol>\n<p><strong>Lưu ý.</strong> C++ <code>substr</code> ném exception nếu <code>pos &gt; size</code>; Java <code>substring</code> ném nếu biên sai; Python slice “im lặng” cắt vào biên. Cộng chuỗi lặp trong vòng for: C++/Java dùng <code>string</code> + <code>+</code> có thể O(n²) — nên <code>ostringstream</code> / <code>StringBuilder</code> / list rồi <code>join</code>. Đây không phải bài viết lại STL.</p>",
+          "time": "O(1) length, O(k) substr, O(n·m) find",
+          "space": "O(k) cho bản copy substr",
+          "codes": {
+            "cpp": "int demoLength(const string& s) {\n    return (int)s.size();\n}\n\nstring demoSubstr(const string& s, int start, int length) {\n    return s.substr(start, length);\n}\n\nint demoFind(const string& s, const string& needle) {\n    auto pos = s.find(needle);\n    return pos == string::npos ? -1 : (int)pos;\n}",
+            "java": "class StringBuiltins {\n    static int demoLength(String s) {\n        return s.length();\n    }\n\n    static String demoSubstr(String s, int start, int length) {\n        return s.substring(start, start + length);\n    }\n\n    static int demoFind(String s, String needle) {\n        return s.indexOf(needle);\n    }\n}",
+            "python": "def demo_length(s: str) -> int:\n    return len(s)\n\ndef demo_substr(s: str, start: int, length: int) -> str:\n    return s[start:start + length]\n\ndef demo_find(s: str, needle: str) -> int:\n    return s.find(needle)"
+          }
+        },
+        {
+          "id": "valid-anagram",
+          "lc": 242,
+          "title": "Valid Anagram",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/valid-anagram/",
+          "statement": "<p>Cho hai chuỗi chữ thường <code>s</code>, <code>t</code>. Trả về true nếu <code>t</code> là hoán vị (anagram) của <code>s</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Anagram nghĩa là cùng multiset ký tự. Đếm tần suất 26 chữ cái của <code>s</code>, trừ dần bằng <code>t</code>. Topic String: mảng 26, không sort (sort cũng đúng nhưng O(n log n) và lệch topic).</p>\n<ol>\n<li>Khác độ dài → false (cắt nhanh, đồng thời bảo đảm nếu trừ không âm thì hai xâu khớp).</li>\n<li>Duyệt <code>s</code>, tăng <code>cnt[c - 'a']</code>.</li>\n<li>Duyệt <code>t</code>, giảm; nếu một ô xuống dưới 0 thì <code>t</code> có thừa ký tự đó → false.</li>\n</ol>\n<p><strong>Lưu ý.</strong> LeetCode 242 mặc định lowercase English. Nếu Unicode / Unicode case-folding thì phải map tổng quát hơn. Sort hai chuỗi rồi so sánh cũng pass nhưng chậm hơn và không luyện đếm ký tự.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    bool isAnagram(string s, string t) {\n        if (s.size() != t.size()) return false;\n        int cnt[26] = {};\n        for (char ch : s) cnt[ch - 'a']++;\n        for (char ch : t) {\n            int idx = ch - 'a';\n            cnt[idx]--;\n            if (cnt[idx] < 0) return false;\n        }\n        return true;\n    }\n};",
+            "java": "class Solution {\n    public boolean isAnagram(String s, String t) {\n        if (s.length() != t.length()) return false;\n        int[] cnt = new int[26];\n        for (int i = 0; i < s.length(); i++) cnt[s.charAt(i) - 'a']++;\n        for (int i = 0; i < t.length(); i++) {\n            int idx = t.charAt(i) - 'a';\n            cnt[idx]--;\n            if (cnt[idx] < 0) return false;\n        }\n        return true;\n    }\n}",
+            "python": "class Solution:\n    def isAnagram(self, s: str, t: str) -> bool:\n        if len(s) != len(t):\n            return False\n        cnt = [0] * 26\n        for ch in s:\n            cnt[ord(ch) - ord(\"a\")] += 1\n        for ch in t:\n            idx = ord(ch) - ord(\"a\")\n            cnt[idx] -= 1\n            if cnt[idx] < 0:\n                return False\n        return True"
+          }
+        },
+        {
+          "id": "shuffle-string",
+          "lc": 1528,
+          "title": "Shuffle String",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/shuffle-string/",
+          "statement": "<p>Cho chuỗi <code>s</code> và mảng <code>indices</code> cùng độ dài (hoán vị của <code>0..n-1</code>). Ký tự <code>s[i]</code> phải nằm ở vị trí <code>indices[i]</code> trong chuỗi kết quả. Trả về chuỗi sau khi xáo.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Tạo mảng ký tự độ dài n, đặt từng <code>s[i]</code> vào ô <code>indices[i]</code>, rồi ghép lại thành string. Một lượt duyệt.</p>\n<ol>\n<li>Cấp phát <code>out[n]</code>.</li>\n<li>Với mỗi i: <code>out[indices[i]] = s[i]</code>.</li>\n<li>Nối thành chuỗi (C++ <code>string(out.begin(), out.end())</code>, Java <code>new String(out)</code>, Python <code>''.join</code>).</li>\n</ol>\n<p><strong>Lưu ý.</strong> <code>indices</code> là permutation nên không đụng độ. Đừng permute in-place theo cycle nếu chưa quen — dễ lệch chỉ số và không cần thiết với n ≤ 100. Tạo string bằng cộng từng ký tự trong Java/C++ có thể chậm; dùng buffer như trên.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    string restoreString(string s, vector<int>& indices) {\n        int n = (int)s.size();\n        string out(n, '\\0');\n        for (int i = 0; i < n; i++) {\n            out[indices[i]] = s[i];\n        }\n        return out;\n    }\n};",
+            "java": "class Solution {\n    public String restoreString(String s, int[] indices) {\n        char[] out = new char[s.length()];\n        for (int i = 0; i < s.length(); i++) {\n            out[indices[i]] = s.charAt(i);\n        }\n        return new String(out);\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def restoreString(self, s: str, indices: List[int]) -> str:\n        out = [\"\"] * len(s)\n        for i, ch in enumerate(s):\n            out[indices[i]] = ch\n        return \"\".join(out)"
+          }
+        },
+        {
+          "id": "split-a-string-in-balanced-strings",
+          "lc": 1221,
+          "title": "Split a String in Balanced Strings",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/split-a-string-in-balanced-strings/",
+          "statement": "<p>Chuỗi <code>s</code> chỉ gồm <code>'L'</code> và <code>'R'</code>, bản thân nó luôn balanced (số L = số R). Một chuỗi con balanced cũng có số L = số R. Tách <code>s</code> thành nhiều đoạn balanced liên tiếp sao cho <strong>số đoạn là tối đa</strong>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Greedy cắt sớm nhất có thể: đi từ trái, giữ biến <code>bal</code> (+1 cho R, −1 cho L). Mỗi lần <code>bal</code> về 0 thì vừa khép một đoạn balanced — cắt và đếm +1. Cắt sớm luôn tối ưu vì phần còn lại của một balanced string vẫn balanced, và số đoạn nhiều hơn khi mỗi đoạn ngắn hơn.</p>\n<ol>\n<li><code>bal = 0</code>, <code>ans = 0</code>.</li>\n<li>Duyệt từng ký tự, cập nhật <code>bal</code>.</li>\n<li>Khi <code>bal == 0</code>, tăng <code>ans</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Không cần stack thật — chỉ counter. Đừng đòi đoạn con phải là subsequence không liên tiếp; đề là split liên tiếp phủ cả s. Ký hiệu L/R đối xứng: đảo dấu vẫn đúng.</p>",
+          "time": "O(n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int balancedStringSplit(string s) {\n        int bal = 0, ans = 0;\n        for (char ch : s) {\n            bal += (ch == 'R') ? 1 : -1;\n            if (bal == 0) ans++;\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int balancedStringSplit(String s) {\n        int bal = 0, ans = 0;\n        for (int i = 0; i < s.length(); i++) {\n            bal += s.charAt(i) == 'R' ? 1 : -1;\n            if (bal == 0) ans++;\n        }\n        return ans;\n    }\n}",
+            "python": "class Solution:\n    def balancedStringSplit(self, s: str) -> int:\n        bal = 0\n        ans = 0\n        for ch in s:\n            bal += 1 if ch == \"R\" else -1\n            if bal == 0:\n                ans += 1\n        return ans"
+          }
+        },
+        {
+          "id": "goal-parser-interpretation",
+          "lc": 1678,
+          "title": "Goal Parser Interpretation",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/goal-parser-interpretation/",
+          "statement": "<p>Goal Parser đọc lệnh <code>command</code> gồm các token: <code>\"G\"</code> → <code>\"G\"</code>, <code>\"()\"</code> → <code>\"o\"</code>, <code>\"(al)\"</code> → <code>\"al\"</code>. Token ghép liền nhau. Trả về chuỗi diễn giải.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Duyệt con trỏ <code>i</code> một lượt, nhìn 1 ký tự (hoặc 2/4) để nhận token — parse chuỗi, không regex.</p>\n<ol>\n<li>Nếu <code>command[i] == 'G'</code>: viết G, <code>i += 1</code>.</li>\n<li>Else đây là token ngoặc. Nếu ký tự kế là <code>')'</code> thì token <code>()</code> → <code>o</code>, <code>i += 2</code>.</li>\n<li>Ngược lại token <code>(al)</code> → <code>al</code>, <code>i += 4</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Đề bảo input luôn hợp lệ nên không cần kiểm tra hết biên. Đừng <code>replace(\"()\", \"o\")</code> rồi <code>replace(\"(al)\", \"al\")</code> nếu chưa chắc thứ tự — với đề này không đụng nhau nên replace cũng pass, nhưng duyệt một lượt rõ ràng hơn và O(n) chắc. Dùng StringBuilder / list để tránh cộng chuỗi O(n²).</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    string interpret(string command) {\n        string ans;\n        int i = 0, n = (int)command.size();\n        while (i < n) {\n            if (command[i] == 'G') {\n                ans.push_back('G');\n                i += 1;\n            } else if (command[i + 1] == ')') {\n                ans.push_back('o');\n                i += 2;\n            } else {\n                ans += \"al\";\n                i += 4;\n            }\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public String interpret(String command) {\n        StringBuilder ans = new StringBuilder();\n        int i = 0, n = command.length();\n        while (i < n) {\n            if (command.charAt(i) == 'G') {\n                ans.append('G');\n                i += 1;\n            } else if (command.charAt(i + 1) == ')') {\n                ans.append('o');\n                i += 2;\n            } else {\n                ans.append(\"al\");\n                i += 4;\n            }\n        }\n        return ans.toString();\n    }\n}",
+            "python": "class Solution:\n    def interpret(self, command: str) -> str:\n        ans: list[str] = []\n        i = 0\n        n = len(command)\n        while i < n:\n            if command[i] == \"G\":\n                ans.append(\"G\")\n                i += 1\n            elif command[i + 1] == \")\":\n                ans.append(\"o\")\n                i += 2\n            else:\n                ans.append(\"al\")\n                i += 4\n        return \"\".join(ans)"
+          }
+        },
+        {
+          "id": "decode-the-message",
+          "lc": 2325,
+          "title": "Decode the Message",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/decode-the-message/",
+          "statement": "<p>Tạo bảng thay thế từ <code>key</code>: bỏ qua khoảng trắng và chữ trùng, chữ thường <em>đầu tiên</em> map sang <code>'a'</code>, chữ mới tiếp theo sang <code>'b'</code>, … Cho <code>message</code> (chữ thường và space), giải mã: space giữ nguyên, chữ thay theo bảng.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Bảng 26 ô (mảng, không hashmap): <code>mp[c - 'a']</code> = chữ đã map, −1 nếu chưa. Duyệt <code>key</code> lần đầu gặp chữ thì gán thứ tự 0,1,2,… Rồi duyệt <code>message</code> thay thế.</p>\n<ol>\n<li>Helper <code>buildMap(key)</code> điền mảng 26, biến <code>next</code> chạy từ 0 (tức <code>'a'</code>).</li>\n<li>Với message: space thì copy space; chữ thì <code>'a' + mp[ch - 'a']</code>.</li>\n<li>Đề bảo <code>key</code> chứa đủ 26 chữ nên mọi chữ trong message đều có map.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Đừng map space. Chữ trùng trong key chỉ tính lần đầu. Thứ tự map theo lần xuất hiện trong key, không phải alphabet của key. Dùng StringBuilder / list.</p>",
+          "time": "O(|key| + |message|)",
+          "space": "O(|message|)",
+          "codes": {
+            "cpp": "class Solution {\n    void buildMap(const string& key, int mp[26]) {\n        fill(mp, mp + 26, -1);\n        int next = 0;\n        for (char ch : key) {\n            if (ch == ' ') continue;\n            int idx = ch - 'a';\n            if (mp[idx] == -1) mp[idx] = next++;\n        }\n    }\npublic:\n    string decodeMessage(string key, string message) {\n        int mp[26];\n        buildMap(key, mp);\n        string ans;\n        ans.reserve(message.size());\n        for (char ch : message) {\n            if (ch == ' ') ans.push_back(' ');\n            else ans.push_back(char('a' + mp[ch - 'a']));\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    private int[] buildMap(String key) {\n        int[] mp = new int[26];\n        Arrays.fill(mp, -1);\n        int next = 0;\n        for (int i = 0; i < key.length(); i++) {\n            char ch = key.charAt(i);\n            if (ch == ' ') continue;\n            int idx = ch - 'a';\n            if (mp[idx] == -1) mp[idx] = next++;\n        }\n        return mp;\n    }\n\n    public String decodeMessage(String key, String message) {\n        int[] mp = buildMap(key);\n        StringBuilder ans = new StringBuilder();\n        for (int i = 0; i < message.length(); i++) {\n            char ch = message.charAt(i);\n            if (ch == ' ') ans.append(' ');\n            else ans.append((char) ('a' + mp[ch - 'a']));\n        }\n        return ans.toString();\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def decodeMessage(self, key: str, message: str) -> str:\n        def build_map(k: str) -> List[int]:\n            mp = [-1] * 26\n            nxt = 0\n            for ch in k:\n                if ch == \" \":\n                    continue\n                idx = ord(ch) - ord(\"a\")\n                if mp[idx] == -1:\n                    mp[idx] = nxt\n                    nxt += 1\n            return mp\n\n        mp = build_map(key)\n        out: list[str] = []\n        for ch in message:\n            if ch == \" \":\n                out.append(\" \")\n            else:\n                out.append(chr(ord(\"a\") + mp[ord(ch) - ord(\"a\")]))\n        return \"\".join(out)"
+          }
+        },
+        {
+          "id": "calculate-digit-sum-of-a-string",
+          "lc": 2243,
+          "title": "Calculate Digit Sum of a String",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/calculate-digit-sum-of-a-string/",
+          "statement": "<p>Cho chuỗi chữ số <code>s</code> và số nguyên <code>k</code>. Lặp: chia <code>s</code> thành nhóm liên tiếp độ dài <code>k</code> (nhóm cuối có thể ngắn hơn), thay mỗi nhóm bằng <em>tổng các chữ số</em> viết thập phân, ghép lại thành <code>s</code> mới. Dừng khi <code>len(s) ≤ k</code>, trả về <code>s</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Mô phỏng đúng đề: mỗi vòng quét <code>s</code> theo bước k, helper <code>sumGroup</code> cộng chữ số rồi <code>to_string</code> (tổng có thể ≥ 10, thành 2+ ký tự).</p>\n<ol>\n<li>While <code>s.size() &gt; k</code>: dựng chuỗi mới từ các nhóm.</li>\n<li>Nhóm <code>[i, min(i+k, n))</code>; cộng <code>s[j] - '0'</code>; append dạng thập phân.</li>\n<li>Gán <code>s</code> = chuỗi mới. Khi độ dài ≤ k thì return.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Nhóm cuối ngắn hơn k vẫn cộng bình thường. Không được lấy modulo hay chỉ giữ một chữ số — “135” là string, không phải int. Số vòng lặp nhỏ: mỗi vòng độ dài co (trừ trường hợp k=2 với toàn 9, độ dài có thể giữ một vòng rồi giảm). Tổng thời gian vẫn O(n). Dùng buffer, đừng cộng string kiểu naive trong Java.</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\n    string sumGroup(const string& s, int l, int r) {\n        int tot = 0;\n        for (int i = l; i < r; i++) tot += s[i] - '0';\n        return to_string(tot);\n    }\npublic:\n    string digitSum(string s, int k) {\n        while ((int)s.size() > k) {\n            string nxt;\n            int n = (int)s.size();\n            for (int i = 0; i < n; i += k) {\n                int r = min(i + k, n);\n                nxt += sumGroup(s, i, r);\n            }\n            s.swap(nxt);\n        }\n        return s;\n    }\n};",
+            "java": "class Solution {\n    private String sumGroup(String s, int l, int r) {\n        int tot = 0;\n        for (int i = l; i < r; i++) tot += s.charAt(i) - '0';\n        return String.valueOf(tot);\n    }\n\n    public String digitSum(String s, int k) {\n        while (s.length() > k) {\n            StringBuilder nxt = new StringBuilder();\n            for (int i = 0; i < s.length(); i += k) {\n                int r = Math.min(i + k, s.length());\n                nxt.append(sumGroup(s, i, r));\n            }\n            s = nxt.toString();\n        }\n        return s;\n    }\n}",
+            "python": "class Solution:\n    def digitSum(self, s: str, k: int) -> str:\n        def sum_group(group: str) -> str:\n            tot = 0\n            for ch in group:\n                tot += ord(ch) - ord(\"0\")\n            return str(tot)\n\n        while len(s) > k:\n            parts: list[str] = []\n            for i in range(0, len(s), k):\n                parts.append(sum_group(s[i:i + k]))\n            s = \"\".join(parts)\n        return s"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recursion",
+      "title": "DSA 1 · Recursion",
+      "lead": "Đệ quy, base case rõ. Có Tower of Hanoi (không LeetCode).",
+      "problems": [
+        {
+          "id": "power-of-four",
+          "lc": 342,
+          "title": "Power of Four",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/power-of-four/",
+          "statement": "<p>Cho số nguyên <code>n</code>. Trả về true nếu tồn tại số nguyên <code>x ≥ 0</code> sao cho <code>n == 4^x</code>. Ví dụ 1 = 4^0, 16 = 4^2; 8 và số âm không phải.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Topic Recursion: chia <code>n</code> cho 4 cho tới khi về 1. Base case rõ, không dùng bit-trick (<code>n &amp; (n-1)</code> + modulo 3) dù cũng đúng.</p>\n<ol>\n<li>Nếu <code>n ≤ 0</code> → false (4^x luôn dương).</li>\n<li>Nếu <code>n == 1</code> → true (4^0).</li>\n<li>Nếu <code>n % 4 != 0</code> → false (không chia hết thì không thể là lũy thừa 4).</li>\n<li>Đệ quy <code>isPowerOfFour(n / 4)</code> (chia nguyên).</li>\n</ol>\n<p><strong>Lưu ý.</strong> Phân biệt power of two: 8 = 2^3 nhưng 8 % 4 == 0 rồi 2 không chia hết 4. Số âm / 0 loại ngay, tránh modulo với số âm. Độ sâu stack O(log n). Loop cũng được nhưng buổi này bắt đệ quy.</p>",
+          "time": "O(log n)",
+          "space": "O(log n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    bool isPowerOfFour(int n) {\n        if (n <= 0) return false;\n        if (n == 1) return true;\n        if (n % 4 != 0) return false;\n        return isPowerOfFour(n / 4);\n    }\n};",
+            "java": "class Solution {\n    public boolean isPowerOfFour(int n) {\n        if (n <= 0) return false;\n        if (n == 1) return true;\n        if (n % 4 != 0) return false;\n        return isPowerOfFour(n / 4);\n    }\n}",
+            "python": "class Solution:\n    def isPowerOfFour(self, n: int) -> bool:\n        if n <= 0:\n            return False\n        if n == 1:\n            return True\n        if n % 4 != 0:\n            return False\n        return self.isPowerOfFour(n // 4)"
+          }
+        },
+        {
+          "id": "base-7",
+          "lc": 504,
+          "title": "Base 7",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/base-7/",
+          "statement": "<p>Cho số nguyên <code>num</code>. Trả về biểu diễn cơ số 7 dưới dạng chuỗi (có dấu trừ nếu âm). Ví dụ 100 → <code>\"202\"</code>, −7 → <code>\"-10\"</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đổi cơ số bằng đệ quy: chữ số thấp nhất là <code>num % 7</code>, phần còn lại là <code>num / 7</code> viết base 7. Nối chữ số thấp <em>sau</em> kết quả đệ quy thì ra thứ tự đúng (high digit trước), không cần reverse.</p>\n<ol>\n<li>Âm: trả <code>\"-\" + convert(-num)</code>. Constraint |num| ≤ 10^7 nên không tràn khi đảo dấu.</li>\n<li>Base: <code>num &lt; 7</code> (kể cả 0) → một chữ số <code>to_string(num)</code>.</li>\n<li>Bước đệ quy: <code>convert(num / 7) + to_string(num % 7)</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> 0 phải ra <code>\"0\"</code>, không phải chuỗi rỗng — vì vậy base là <code>num &lt; 7</code> chứ không phải <code>num == 0</code> return empty. Đừng lấy remainder rồi đẩy vào stack rồi pop nếu đã nối đuôi từ đệ quy. Không dùng <code>Integer.toString(num, 7)</code> nếu mục tiêu là luyện đệ quy.</p>",
+          "time": "O(log n)",
+          "space": "O(log n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    string convertToBase7(int num) {\n        if (num < 0) return \"-\" + convertToBase7(-num);\n        if (num < 7) return to_string(num);\n        return convertToBase7(num / 7) + to_string(num % 7);\n    }\n};",
+            "java": "class Solution {\n    public String convertToBase7(int num) {\n        if (num < 0) return \"-\" + convertToBase7(-num);\n        if (num < 7) return String.valueOf(num);\n        return convertToBase7(num / 7) + (num % 7);\n    }\n}",
+            "python": "class Solution:\n    def convertToBase7(self, num: int) -> str:\n        if num < 0:\n            return \"-\" + self.convertToBase7(-num)\n        if num < 7:\n            return str(num)\n        return self.convertToBase7(num // 7) + str(num % 7)"
+          }
+        },
+        {
+          "id": "tower-of-hanoi",
+          "title": "Tower of Hanoi",
+          "difficulty": "Medium",
+          "url": null,
+          "statement": "<p>Bài tự luận (không LeetCode). Có 3 cọc <code>src</code>, <code>aux</code>, <code>dst</code> và <code>n</code> đĩa xếp nhỏ trên lớn ở <code>src</code>. Chuyển cả tháp sang <code>dst</code>, mỗi lần một đĩa, không đặt đĩa lớn lên đĩa nhỏ. In các bước.</p>\n<p>API: <code>moves(n, src, dst, aux)</code> trả về danh sách chuỗi <code>\"{from} -&gt; {to}\"</code>, theo thứ tự thực hiện. Ví dụ <code>n = 2</code>, A→C (B trung gian): <code>A -&gt; B</code>, <code>A -&gt; C</code>, <code>B -&gt; C</code>.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Định lý cổ điển: để chuyển n đĩa A→C (B phụ):</p>\n<ol>\n<li>Chuyển n−1 đĩa A→B, dùng C làm phụ.</li>\n<li>Chuyển đĩa lớn nhất A→C (một bước).</li>\n<li>Chuyển n−1 đĩa B→C, dùng A làm phụ.</li>\n</ol>\n<p>Base: n = 0 không làm gì (hoặc n = 1 chỉ một bước A→C — nằm trong công thức vì n−1 = 0). Helper <code>rec(k, a, c, b)</code> ghi bước vào list.</p>\n<p><strong>Lưu ý.</strong> Số bước đúng 2^n − 1; đừng dựng recursion tree bằng tay với n lớn. Thứ tự tham số dễ nhầm: luôn nghĩ “from → to, other là phụ”. In theo thứ tự gọi, không DFS ngược. Stack đệ quy O(n), bộ nhớ lưu kết quả O(2^n).</p>",
+          "time": "O(2^n)",
+          "space": "O(n) stack, O(2^n) lưu bước",
+          "codes": {
+            "cpp": "class Solution {\n    void rec(int k, const string& a, const string& c, const string& b, vector<string>& ans) {\n        if (k == 0) return;\n        rec(k - 1, a, b, c, ans);\n        ans.push_back(a + \" -> \" + c);\n        rec(k - 1, b, c, a, ans);\n    }\npublic:\n    vector<string> moves(int n, string src, string dst, string aux) {\n        vector<string> ans;\n        rec(n, src, dst, aux, ans);\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    private void rec(int k, String a, String c, String b, List<String> ans) {\n        if (k == 0) return;\n        rec(k - 1, a, b, c, ans);\n        ans.add(a + \" -> \" + c);\n        rec(k - 1, b, c, a, ans);\n    }\n\n    public List<String> moves(int n, String src, String dst, String aux) {\n        List<String> ans = new ArrayList<>();\n        rec(n, src, dst, aux, ans);\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\ndef moves(n: int, src: str, dst: str, aux: str) -> List[str]:\n    ans: List[str] = []\n\n    def rec(k: int, a: str, c: str, b: str) -> None:\n        if k == 0:\n            return\n        rec(k - 1, a, b, c)\n        ans.append(f\"{a} -> {c}\")\n        rec(k - 1, b, c, a)\n\n    rec(n, src, dst, aux)\n    return ans"
+          }
+        },
+        {
+          "id": "k-th-symbol-in-grammar",
+          "lc": 779,
+          "title": "K-th Symbol in Grammar",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/k-th-symbol-in-grammar/",
+          "statement": "<p>Hàng 1: <code>0</code>. Hàng sau thay <code>0 → 01</code>, <code>1 → 10</code>. Độ dài hàng <code>n</code> là 2^{n-1}. Tìm ký tự thứ <code>k</code> (1-indexed) trên hàng <code>n</code>. Không được dựng cả hàng (n ≤ 30).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Hàng n gồm hai nửa: nửa đầu <strong>sao chép</strong> hàng n−1, nửa sau là <strong>đảo bit</strong> của hàng n−1. Vậy không cần chuỗi 2^{n-1}:</p>\n<ol>\n<li>Base: n = 1 → 0.</li>\n<li><code>half = 2^{n-2}</code> = độ dài hàng n−1.</li>\n<li>Nếu <code>k ≤ half</code>: ký tự giống <code>kth(n-1, k)</code>.</li>\n<li>Nếu <code>k &gt; half</code>: đảo của <code>kth(n-1, k - half)</code>, tức <code>1 - đó</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> <code>k</code> 1-indexed; lệch một đơn vị là WA ngay. <code>1 &lt;&lt; (n-2)</code> an toàn vì n ≤ 30 → half ≤ 2^28. Không đệ quy theo “cha” kiểu index/2 rồi đếm số lần ở nửa phải (cũng đúng, tương đương số bit 1 của k-1): cách chia nửa trên dễ giảng hơn. Stack O(n).</p>",
+          "time": "O(n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int kthGrammar(int n, int k) {\n        if (n == 1) return 0;\n        int half = 1 << (n - 2);\n        if (k <= half) return kthGrammar(n - 1, k);\n        return 1 - kthGrammar(n - 1, k - half);\n    }\n};",
+            "java": "class Solution {\n    public int kthGrammar(int n, int k) {\n        if (n == 1) return 0;\n        int half = 1 << (n - 2);\n        if (k <= half) return kthGrammar(n - 1, k);\n        return 1 - kthGrammar(n - 1, k - half);\n    }\n}",
+            "python": "class Solution:\n    def kthGrammar(self, n: int, k: int) -> int:\n        if n == 1:\n            return 0\n        half = 1 << (n - 2)\n        if k <= half:\n            return self.kthGrammar(n - 1, k)\n        return 1 - self.kthGrammar(n - 1, k - half)"
+          }
+        },
+        {
+          "id": "happy-number",
+          "lc": 202,
+          "title": "Happy Number",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/happy-number/",
+          "statement": "<p>Thay số bằng tổng bình phương các chữ số, lặp lại. Nếu tới 1 thì happy; nếu rơi vào chu trình thì không. Cho <code>n ≥ 1</code>, kiểm tra happy.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Đệ quy trên giá trị kế tiếp. Base: 1 → true. Nếu giá trị đã thấy rồi → cycle → false. Helper <code>squareSum</code> tách khỏi hàm đệ quy cho gọn.</p>\n<ol>\n<li><code>squareSum(x)</code>: lần lượt lấy <code>x % 10</code>, cộng bình phương, <code>x /= 10</code>.</li>\n<li><code>rec(x, seen)</code>: nếu x == 1 return true; nếu insert vào seen thất bại (đã có) return false; gọi <code>rec(squareSum(x), seen)</code>.</li>\n<li>Bắt đầu <code>rec(n, ∅)</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Mọi số không happy đi vào cycle nổi tiếng 4 → 16 → 37 → 58 → 89 → 145 → 42 → 20 → 4, nên có thể thêm base <code>n == 4 → false</code> và bỏ set — gọn nhưng hơi “ma thuật”. Floyd (rùa–thỏ) cũng phát hiện cycle, không đệ quy lắm. Constraint n ≥ 1 nên không lo 0 tự lặp. Số chữ số giảm nhanh về dưới 3 chữ số nên số trạng thái seen rất nhỏ.</p>",
+          "time": "O(log n)",
+          "space": "O(log n)",
+          "codes": {
+            "cpp": "class Solution {\n    int squareSum(int x) {\n        int s = 0;\n        while (x > 0) {\n            int d = x % 10;\n            s += d * d;\n            x /= 10;\n        }\n        return s;\n    }\n\n    bool rec(int x, unordered_set<int>& seen) {\n        if (x == 1) return true;\n        if (!seen.insert(x).second) return false;\n        return rec(squareSum(x), seen);\n    }\npublic:\n    bool isHappy(int n) {\n        unordered_set<int> seen;\n        return rec(n, seen);\n    }\n};",
+            "java": "class Solution {\n    private int squareSum(int x) {\n        int s = 0;\n        while (x > 0) {\n            int d = x % 10;\n            s += d * d;\n            x /= 10;\n        }\n        return s;\n    }\n\n    private boolean rec(int x, Set<Integer> seen) {\n        if (x == 1) return true;\n        if (!seen.add(x)) return false;\n        return rec(squareSum(x), seen);\n    }\n\n    public boolean isHappy(int n) {\n        return rec(n, new HashSet<Integer>());\n    }\n}",
+            "python": "from typing import Set\n\nclass Solution:\n    def isHappy(self, n: int) -> bool:\n        def square_sum(x: int) -> int:\n            s = 0\n            while x > 0:\n                d = x % 10\n                s += d * d\n                x //= 10\n            return s\n\n        def rec(x: int, seen: Set[int]) -> bool:\n            if x == 1:\n                return True\n            if x in seen:\n                return False\n            seen.add(x)\n            return rec(square_sum(x), seen)\n\n        return rec(n, set())"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sorting",
+      "title": "DSA 1 · Sorting",
+      "lead": "Sort rồi duyệt, hoặc merge hai mảng đã sort.",
+      "problems": [
+        {
+          "id": "height-checker",
+          "lc": 1051,
+          "title": "Height Checker",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/height-checker/",
+          "statement": "<p>Hàng học sinh có chiều cao <code>heights[i]</code>. Thứ tự đúng là không giảm. Đếm số vị trí mà học sinh hiện tại <em>không</em> đứng đúng chỗ so với dãy đã sắp xếp tăng dần (không cần mô phỏng đổi chỗ).</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Topic Sorting: copy mảng, sort thành <code>expected</code>, đếm số i mà <code>heights[i] != expected[i]</code>.</p>\n<ol>\n<li>Sao chép <code>heights</code> (Java <code>clone</code>, C++ copy vector, Python <code>sorted</code> tạo list mới).</li>\n<li>Sort tăng dần.</li>\n<li>Một vòng zip/so sánh, tăng bộ đếm khi lệch.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Đây không phải số swap tối thiểu (khoảng cách Kendall, v.v.) — chỉ đếm vị trí sai. Trùng chiều cao: sort ổn định hay không không ảnh hưởng vì so giá trị. Constraint heights[i] ≤ 100 nên counting sort O(n) cũng được, nhưng buổi Sorting dùng comparison sort cho thống nhất.</p>",
+          "time": "O(n log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int heightChecker(vector<int>& heights) {\n        vector<int> expected = heights;\n        sort(expected.begin(), expected.end());\n        int ans = 0;\n        for (int i = 0; i < (int)heights.size(); i++) {\n            if (heights[i] != expected[i]) ans++;\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int heightChecker(int[] heights) {\n        int[] expected = heights.clone();\n        Arrays.sort(expected);\n        int ans = 0;\n        for (int i = 0; i < heights.length; i++) {\n            if (heights[i] != expected[i]) ans++;\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def heightChecker(self, heights: List[int]) -> int:\n        expected = sorted(heights)\n        ans = 0\n        for a, b in zip(heights, expected):\n            if a != b:\n                ans += 1\n        return ans"
+          }
+        },
+        {
+          "id": "merge-sorted-array",
+          "lc": 88,
+          "title": "Merge Sorted Array",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/merge-sorted-array/",
+          "statement": "<p><code>nums1</code> độ dài <code>m + n</code>: <code>m</code> phần tử đầu đã sort, <code>n</code> ô cuối là chỗ trống (0). <code>nums2</code> có <code>n</code> phần tử đã sort. Merge hai dãy vào <code>nums1</code> tại chỗ, kết quả không giảm. Hàm <code>void</code> — sửa <code>nums1</code>, không return.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Merge hai mảng đã sort, nhưng ghi từ <em>cuối</em> <code>nums1</code> để không đè lên phần tử chưa xét. Ba con trỏ: <code>i = m-1</code> (đuôi nums1 hợp lệ), <code>j = n-1</code> (đuôi nums2), <code>w = m+n-1</code> (ô ghi).</p>\n<ol>\n<li>Lặp khi còn phần tử nums2 (<code>j ≥ 0</code>): chọn số lớn hơn giữa <code>nums1[i]</code> và <code>nums2[j]</code> (nếu i còn), ghi vào <code>nums1[w]</code>, lùi con trỏ tương ứng và <code>w</code>.</li>\n<li>Nếu nums1 hết trước (<code>i &lt; 0</code>) thì luôn lấy nums2.</li>\n<li>Nếu nums2 hết trước thì phần đầu nums1 đã đúng chỗ — không cần copy.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Merge từ đầu sẽ đè dữ liệu. <code>m = 0</code>: copy hết nums2. <code>n = 0</code>: vòng lặp không chạy. So sánh <code>&gt;</code> không <code>≥</code> cũng được (ổn định không bắt buộc). Đây là bước “merge” của merge-sort, đúng topic Sorting.</p>",
+          "time": "O(m + n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    void merge(vector<int>& nums1, int m, vector<int>& nums2, int n) {\n        int i = m - 1, j = n - 1, w = m + n - 1;\n        while (j >= 0) {\n            if (i >= 0 && nums1[i] > nums2[j]) nums1[w--] = nums1[i--];\n            else nums1[w--] = nums2[j--];\n        }\n    }\n};",
+            "java": "class Solution {\n    public void merge(int[] nums1, int m, int[] nums2, int n) {\n        int i = m - 1, j = n - 1, w = m + n - 1;\n        while (j >= 0) {\n            if (i >= 0 && nums1[i] > nums2[j]) nums1[w--] = nums1[i--];\n            else nums1[w--] = nums2[j--];\n        }\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def merge(self, nums1: List[int], m: int, nums2: List[int], n: int) -> None:\n        i, j, w = m - 1, n - 1, m + n - 1\n        while j >= 0:\n            if i >= 0 and nums1[i] > nums2[j]:\n                nums1[w] = nums1[i]\n                i -= 1\n            else:\n                nums1[w] = nums2[j]\n                j -= 1\n            w -= 1"
+          }
+        },
+        {
+          "id": "minimum-cost-of-buying-candies-with-discount",
+          "lc": 2144,
+          "title": "Minimum Cost of Buying Candies With Discount",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/minimum-cost-of-buying-candies-with-discount/",
+          "statement": "<p>Mua hết kẹo với giá <code>cost[i]</code>. Khuyến mãi: mỗi khi trả tiền 2 viên, được tặng thêm 1 viên có giá ≤ min của 2 viên vừa mua (chọn viên tặng trong số còn lại). Tìm số tiền tối thiểu để lấy hết.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Muốn đồ tặng là những viên <em>đắt vừa phải nhưng rẻ hơn cặp đang trả</em> — thực tế: sort giảm dần, mỗi nhóm 3 viên liên tiếp thì viên thứ 3 (rẻ nhất nhóm) free, hai viên đắt hơn phải trả. Đây là greedy sau sort.</p>\n<ol>\n<li>Sort <code>cost</code> giảm dần.</li>\n<li>Duyệt với chỉ số i; cộng <code>cost[i]</code> khi <code>i % 3 != 2</code> (bỏ viên 2, 5, 8, … 0-indexed).</li>\n<li>Viên lẻ cuối (không đủ nhóm 3) vẫn phải trả — công thức trên tự xử.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Sort tăng rồi tặng viên rẻ nhất toàn cục là sai: khuyến mãi gắn với từng “giao dịch 2+1”, phải tặng viên rẻ nhất <em>trong</em> ba viên đang xét, nên nhóm 3 viên đắt nhất, rồi 3 viên tiếp, … Một viên: trả đủ. Hai viên: trả cả hai, không được tặng.</p>",
+          "time": "O(n log n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int minimumCost(vector<int>& cost) {\n        sort(cost.rbegin(), cost.rend());\n        int ans = 0;\n        for (int i = 0; i < (int)cost.size(); i++) {\n            if (i % 3 != 2) ans += cost[i];\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int minimumCost(int[] cost) {\n        Arrays.sort(cost);\n        int ans = 0, n = cost.length;\n        for (int t = 0; t < n; t++) {\n            if (t % 3 != 2) ans += cost[n - 1 - t];\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def minimumCost(self, cost: List[int]) -> int:\n        cost.sort(reverse=True)\n        ans = 0\n        for i, c in enumerate(cost):\n            if i % 3 != 2:\n                ans += c\n        return ans"
+          }
+        },
+        {
+          "id": "make-array-zero-by-subtracting-equal-amounts",
+          "lc": 2357,
+          "title": "Make Array Zero by Subtracting Equal Amounts",
+          "difficulty": "Easy",
+          "url": "https://leetcode.com/problems/make-array-zero-by-subtracting-equal-amounts/",
+          "statement": "<p>Mỗi thao tác: chọn <code>x &gt; 0</code> sao cho <code>x</code> ≤ mọi phần tử dương hiện tại, rồi trừ <code>x</code> khỏi mọi phần tử ≥ <code>x</code>. Tìm số thao tác tối thiểu để toàn mảng thành 0.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Thao tác tối ưu luôn chọn <code>x</code> đúng bằng min dương hiện tại — trừ x thì min đó thành 0, các số lớn hơn giảm x, thứ tự tương đối giữa các giá trị dương khác nhau vẫn giữ. Mỗi giá trị dương phân biệt cần đúng một thao tác. Vậy đáp án = số giá trị dương unique.</p>\n<ol>\n<li>Topic Sorting: sort mảng, duyệt, đếm lần giá trị dương mới xuất hiện (khác phần tử trước).</li>\n<li>Bỏ qua 0 — không tốn thao tác.</li>\n<li>Trùng giá trị: cùng lúc về 0, không thêm bước.</li>\n</ol>\n<p><strong>Lưu ý.</strong> HashSet các số &gt; 0 cũng đúng O(n) nhưng lệch topic Sorting. Mảng toàn 0 → 0. Không mô phỏng trừ thật (chậm, không cần). Chứng minh ngắn: sau sort các dương u1 &lt; u2 &lt; … &lt; uk, lần i chọn x = ui − u{i-1} (u0=0); k lần.</p>",
+          "time": "O(n log n)",
+          "space": "O(1)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int minimumOperations(vector<int>& nums) {\n        sort(nums.begin(), nums.end());\n        int ans = 0, prev = 0;\n        for (int x : nums) {\n            if (x == 0) continue;\n            if (x != prev) {\n                ans++;\n                prev = x;\n            }\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int minimumOperations(int[] nums) {\n        Arrays.sort(nums);\n        int ans = 0, prev = 0;\n        for (int x : nums) {\n            if (x == 0) continue;\n            if (x != prev) {\n                ans++;\n                prev = x;\n            }\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def minimumOperations(self, nums: List[int]) -> int:\n        nums.sort()\n        ans = 0\n        prev = 0\n        for x in nums:\n            if x == 0:\n                continue\n            if x != prev:\n                ans += 1\n                prev = x\n        return ans"
+          }
+        },
+        {
+          "id": "widest-vertical-area-between-two-points-containing-no-points",
+          "lc": 1637,
+          "title": "Widest Vertical Area Between Two Points Containing No Points",
+          "difficulty": "Medium",
+          "url": "https://leetcode.com/problems/widest-vertical-area-between-two-points-containing-no-points/",
+          "statement": "<p>Cho các điểm <code>points[i] = [xi, yi]</code> trên mặt phẳng. Vertical area là vùng giữa hai đường thẳng đứng x = a và x = b (a &lt; b) sao cho không có điểm nào có hoành độ <em>nằm chặt</em> trong (a, b). Trả về độ rộng lớn nhất b − a.</p>",
+          "approach": "<p><strong>Ý tưởng.</strong> Chiều rộng chỉ phụ thuộc hoành độ: hai đường tối ưu luôn đi qua hai hoành độ liên tiếp sau khi sort. Điểm nằm giữa theo x mới “phá” vùng; tung độ không ảnh hưởng (vùng kéo cao vô hạn).</p>\n<ol>\n<li>Lấy mọi <code>xi</code> ra mảng (hoặc sort in-place theo x).</li>\n<li>Sort tăng.</li>\n<li>Duyệt cặp liên tiếp, lấy max <code>xs[i] - xs[i-1]</code>.</li>\n</ol>\n<p><strong>Lưu ý.</strong> Hai điểm cùng x → gap 0, không đóng góp. Không cần convex hull hay geometry khác. n ≥ 2 theo đề. Space O(n) nếu copy xi; O(1) extra nếu sort <code>points</code> theo x rồi duyệt.</p>",
+          "time": "O(n log n)",
+          "space": "O(n)",
+          "codes": {
+            "cpp": "class Solution {\npublic:\n    int maxWidthOfVerticalArea(vector<vector<int>>& points) {\n        vector<int> xs;\n        xs.reserve(points.size());\n        for (auto& p : points) xs.push_back(p[0]);\n        sort(xs.begin(), xs.end());\n        int ans = 0;\n        for (int i = 1; i < (int)xs.size(); i++) {\n            ans = max(ans, xs[i] - xs[i - 1]);\n        }\n        return ans;\n    }\n};",
+            "java": "class Solution {\n    public int maxWidthOfVerticalArea(int[][] points) {\n        int n = points.length;\n        int[] xs = new int[n];\n        for (int i = 0; i < n; i++) xs[i] = points[i][0];\n        Arrays.sort(xs);\n        int ans = 0;\n        for (int i = 1; i < n; i++) {\n            ans = Math.max(ans, xs[i] - xs[i - 1]);\n        }\n        return ans;\n    }\n}",
+            "python": "from typing import List\n\nclass Solution:\n    def maxWidthOfVerticalArea(self, points: List[List[int]]) -> int:\n        xs = sorted(p[0] for p in points)\n        ans = 0\n        for i in range(1, len(xs)):\n            ans = max(ans, xs[i] - xs[i - 1])\n        return ans"
+          }
+        }
+      ]
+    }
+  ]
+}

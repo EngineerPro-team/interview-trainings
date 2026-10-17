@@ -1,0 +1,120 @@
+{
+  "out": "src/dsa-homework/data/dsa3.json",
+  "topics": [
+    {
+      "id": "rolling-hash",
+      "title": "DSA 3 · Rolling Hash",
+      "lead": "Rolling hash, không KMP.",
+      "problems": [
+        {"id": "sum-of-scores-of-built-strings", "lc": 2223, "title": "Sum of Scores of Built Strings", "difficulty": "Hard"},
+        {"id": "shortest-palindrome-rh", "lc": 214, "title": "Shortest Palindrome", "difficulty": "Hard", "url": "https://leetcode.com/problems/shortest-palindrome/", "note": "rolling hash"},
+        {"id": "maximum-deletions-on-a-string", "lc": 2430, "title": "Maximum Deletions on a String", "difficulty": "Hard"},
+        {"id": "longest-duplicate-substring", "lc": 1044, "title": "Longest Duplicate Substring", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "kmp",
+      "title": "DSA 3 · KMP",
+      "lead": "Prefix-function / KMP. Cùng đề Z-function nhưng kỹ thuật KMP.",
+      "problems": [
+        {"id": "remove-all-occurrences-of-a-substring-kmp", "lc": 1910, "title": "Remove All Occurrences of a Substring", "difficulty": "Medium", "url": "https://leetcode.com/problems/remove-all-occurrences-of-a-substring/"},
+        {"id": "form-array-by-concatenating-subarrays-of-another-array-kmp", "lc": 1764, "title": "Form Array by Concatenating Subarrays of Another Array", "difficulty": "Medium", "url": "https://leetcode.com/problems/form-array-by-concatenating-subarrays-of-another-array/"},
+        {"id": "camelcase-matching-kmp", "lc": 1023, "title": "Camelcase Matching", "difficulty": "Medium", "url": "https://leetcode.com/problems/camelcase-matching/"}
+      ]
+    },
+    {
+      "id": "z-function",
+      "title": "DSA 3 · Z-Function",
+      "lead": "Z-array, không KMP.",
+      "problems": [
+        {"id": "remove-all-occurrences-of-a-substring-z", "lc": 1910, "title": "Remove All Occurrences of a Substring", "difficulty": "Medium", "url": "https://leetcode.com/problems/remove-all-occurrences-of-a-substring/"},
+        {"id": "form-array-by-concatenating-subarrays-of-another-array-z", "lc": 1764, "title": "Form Array by Concatenating Subarrays of Another Array", "difficulty": "Medium", "url": "https://leetcode.com/problems/form-array-by-concatenating-subarrays-of-another-array/"},
+        {"id": "camelcase-matching-z", "lc": 1023, "title": "Camelcase Matching", "difficulty": "Medium", "url": "https://leetcode.com/problems/camelcase-matching/"}
+      ]
+    },
+    {
+      "id": "graph-dp",
+      "title": "DSA 3 · Graph Traversal + DP",
+      "lead": "Tarjan / MST / lifting.",
+      "problems": [
+        {"id": "minimum-edge-weight-equilibrium-queries-in-a-tree", "lc": 2846, "title": "Minimum Edge Weight Equilibrium Queries in a Tree", "difficulty": "Hard"},
+        {"id": "find-critical-and-pseudo-critical-edges-in-minimum-spanning-tree", "lc": 1489, "title": "Find Critical and Pseudo-Critical Edges in Minimum Spanning Tree", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "bs-dp",
+      "title": "DSA 3 · Binary Search + DP",
+      "lead": "Gộp 3 bản slide.",
+      "problems": [
+        {"id": "maximum-earnings-from-taxi", "lc": 2008, "title": "Maximum Earnings From Taxi", "difficulty": "Medium"},
+        {"id": "divide-chocolate", "lc": 1231, "title": "Divide Chocolate", "difficulty": "Hard", "note": "premium"},
+        {"id": "longest-arithmetic-subsequence", "lc": 1027, "title": "Longest Arithmetic Subsequence", "difficulty": "Medium"},
+        {"id": "find-two-non-overlapping-sub-arrays-each-with-target-sum", "lc": 1477, "title": "Find Two Non-overlapping Sub-arrays Each With Target Sum", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "sort-dp",
+      "title": "DSA 3 · Sorting + DP",
+      "lead": "Sort rồi DP.",
+      "problems": [
+        {"id": "maximum-height-by-stacking-cuboids", "lc": 1691, "title": "Maximum Height by Stacking Cuboids", "difficulty": "Hard"},
+        {"id": "maximum-strictly-increasing-cells-in-a-matrix", "lc": 2713, "title": "Maximum Strictly Increasing Cells in a Matrix", "difficulty": "Hard"},
+        {"id": "maximum-number-of-events-that-can-be-attended-ii", "lc": 1751, "title": "Maximum Number of Events That Can Be Attended II", "difficulty": "Hard"},
+        {"id": "minimum-time-to-make-array-sum-at-most-x", "lc": 2809, "title": "Minimum Time to Make Array Sum At Most x", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "bitmask-dp",
+      "title": "DSA 3 · DP & Bitmask",
+      "lead": "DP trên mask.",
+      "problems": [
+        {"id": "number-of-squareful-arrays", "lc": 996, "title": "Number of Squareful Arrays", "difficulty": "Hard"},
+        {"id": "find-the-shortest-superstring", "lc": 943, "title": "Find the Shortest Superstring", "difficulty": "Hard"},
+        {"id": "parallel-courses-ii", "lc": 1494, "title": "Parallel Courses II", "difficulty": "Hard"},
+        {"id": "maximum-students-taking-exam", "lc": 1349, "title": "Maximum Students Taking Exam", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "bit-trie",
+      "title": "DSA 3 · Bitmask & Trie",
+      "lead": "Binary trie.",
+      "problems": [
+        {"id": "maximum-xor-of-two-numbers-in-an-array", "lc": 421, "title": "Maximum XOR of Two Numbers in an Array", "difficulty": "Medium"},
+        {"id": "count-pairs-with-xor-in-a-range", "lc": 1803, "title": "Count Pairs With XOR in a Range", "difficulty": "Hard"},
+        {"id": "dr-evil-underscores", "title": "Dr. Evil Underscores", "difficulty": "Hard", "url": "https://codeforces.com/problemset/problem/1285/D", "note": "Codeforces 1285D"}
+      ]
+    },
+    {
+      "id": "tree-dp",
+      "title": "DSA 3 · DP on Trees",
+      "lead": "Tree DP / reroot.",
+      "problems": [
+        {"id": "maximum-sum-bst-in-binary-tree", "lc": 1373, "title": "Maximum Sum BST in Binary Tree", "difficulty": "Hard"},
+        {"id": "count-ways-to-build-rooms-in-an-ant-colony", "lc": 1916, "title": "Count Ways to Build Rooms in an Ant Colony", "difficulty": "Hard"},
+        {"id": "smallest-missing-genetic-value-in-each-subtree", "lc": 2003, "title": "Smallest Missing Genetic Value in Each Subtree", "difficulty": "Hard"},
+        {"id": "minimize-the-total-price-of-the-trips", "lc": 2646, "title": "Minimize the Total Price of the Trips", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "topo-dp",
+      "title": "DSA 3 · Topological Sort + DP",
+      "lead": "Topo rồi DP trên DAG.",
+      "problems": [
+        {"id": "find-eventual-safe-states", "lc": 802, "title": "Find Eventual Safe States", "difficulty": "Medium"},
+        {"id": "find-all-possible-recipes-from-given-supplies", "lc": 2115, "title": "Find All Possible Recipes from Given Supplies", "difficulty": "Medium"},
+        {"id": "course-schedule-iv", "lc": 1462, "title": "Course Schedule IV", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "combinatorics",
+      "title": "DSA 3 · Combinatorics",
+      "lead": "Tổ hợp + modulo + DP đếm.",
+      "problems": [
+        {"id": "number-of-ways-to-rearrange-sticks-with-k-sticks-visible", "lc": 1866, "title": "Number of Ways to Rearrange Sticks With K Sticks Visible", "difficulty": "Hard"},
+        {"id": "probability-of-a-two-boxes-having-the-same-number-of-distinct-balls", "lc": 1467, "title": "Probability of a Two Boxes Having the Same Number of Distinct Balls", "difficulty": "Hard"},
+        {"id": "count-ways-to-make-array-with-product", "lc": 1735, "title": "Count Ways to Make Array With Product", "difficulty": "Hard"},
+        {"id": "minimum-number-of-operations-to-make-string-sorted", "lc": 1830, "title": "Minimum Number of Operations to Make String Sorted", "difficulty": "Hard"}
+      ]
+    }
+  ]
+}

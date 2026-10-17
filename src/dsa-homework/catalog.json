@@ -1,0 +1,70 @@
+{
+  "notice": "<strong>Nguồn:</strong> mục <em>Homework</em> cuối mỗi slide DSA 1 / 2 / 3. Bài live-coding trên slide không đưa vào đây. <strong>DSA 1 · Graph 1</strong> không có homework (chỉ representation). Một số deck trùng (Trie Java/Quang, UnionFind, Partition, DP on Trees, Binary Search + DP) đã gộp. KMP và Z-function giao cùng 3 bài — mỗi topic giải bằng kỹ thuật của topic đó. Trang này <strong>không nằm trên menu / sitemap</strong>.",
+  "courses": [
+    {
+      "id": "dsa1",
+      "title": "DSA 1",
+      "topics": [
+        {"id": "array", "title": "DSA 1 · Array", "slide": "1. Array", "lead": "Mandatory + optional trên slide homework. Ưu tiên thao tác mảng / đếm / prefix, không nhảy sang hash nếu không cần."},
+        {"id": "string", "title": "DSA 1 · String", "slide": "2. String", "lead": "Gồm bài tự luận trên slide và các bài LeetCode. Giải bằng duyệt chuỗi / đếm ký tự."},
+        {"id": "recursion", "title": "DSA 1 · Recursion", "slide": "3. Recursion", "lead": "Mọi bài dùng đệ quy (có thể kèm memo nếu cần), chia base case / recursive case rõ."},
+        {"id": "sorting", "title": "DSA 1 · Sorting", "slide": "4. Sorting", "lead": "Sort rồi duyệt, hoặc merge hai mảng đã sort."},
+        {"id": "binary-search", "title": "DSA 1 · Binary Search", "slide": "5. Binary Search", "lead": "Binary search trên mảng sort hoặc trên không gian đáp án."},
+        {"id": "hashtable", "title": "DSA 1 · Hash Table", "slide": "6. HashTable", "lead": "Đếm tần suất / set — đúng topic hash table."},
+        {"id": "linked-list", "title": "DSA 1 · Linked List", "slide": "7+8. Linked list", "lead": "Slide đánh dấu BTVN: Max Stack và LFU Cache — dùng doubly linked list + hash map."},
+        {"id": "stack-queue", "title": "DSA 1 · Stack & Queue", "slide": "9. Stack _ Queue", "lead": "Stack cho dấu ngoặc / calculator; queue cho mô phỏng."},
+        {"id": "graph2-tree", "title": "DSA 1 · Graph 2 (Binary Tree)", "slide": "11. Graph 2", "lead": "Homework là 3 bài binary tree. DFS đệ quy trên cây."},
+        {"id": "bfs", "title": "DSA 1 · BFS", "slide": "12. BFS", "lead": "Multi-source / grid BFS."},
+        {"id": "dfs", "title": "DSA 1 · Depth First Search", "slide": "13. Depth First Search", "lead": "DFS trên graph (đồ thị tổng quát, không phải grid)."},
+        {"id": "island", "title": "DSA 1 · Island / Matrix Traversal", "slide": "14. Island_Matrix_Traversal", "lead": "DFS/BFS trên grid. Path With Minimum Effort: binary search + DFS/BFS trên grid (vẫn traversal)."},
+        {"id": "topo", "title": "DSA 1 · Topological Sort", "slide": "15. Topological sort", "lead": "Kahn / DFS topo, có thể nhiều thứ tự."},
+        {"id": "intervals", "title": "DSA 1 · Intervals", "slide": "16. Intervals", "lead": "Sort theo đầu/cuối, sweep line / greedy interval."},
+        {"id": "heap", "title": "DSA 1 · Heap", "slide": "17. Heap", "lead": "Mandatory + optional. Dùng heap (ưu tiên), không sort-all nếu heap đủ."},
+        {"id": "greedy", "title": "DSA 1 · Greedy", "slide": "18. Greedy", "lead": "Slide không có heading Homework riêng — lấy 4 bài Practice cuối buổi."},
+        {"id": "divide-conquer", "title": "DSA 1 · Divide and Conquer", "slide": "19. Divide and Conquer", "lead": "Chia đôi / quickselect / merge đếm cặp. Top K Frequent giải bằng Quickselect (khác bài Heap)."},
+        {"id": "monotonic", "title": "DSA 1 · Monotonic Stack / Queue", "slide": "20. Monotonic Stack _ Queue", "lead": "Monotonic stack hoặc deque."},
+        {"id": "primes", "title": "DSA 1 · Prime Numbers", "slide": "21. Prime Numbers", "lead": "Sieve / thử nguyên tố / phân tích thừa số."},
+        {"id": "prefix-sum", "title": "DSA 1 · Prefix Sum", "slide": "22. Prefix sum", "lead": "Prefix + hash (LC 525, 523, 1991)."}
+      ]
+    },
+    {
+      "id": "dsa2",
+      "title": "DSA 2",
+      "topics": [
+        {"id": "bit", "title": "DSA 2 · Bit Manipulation", "slide": "1. Bit Manipulation", "lead": "Toán bit, bitmask enumerate, XOR property."},
+        {"id": "adv-tree", "title": "DSA 2 · Advanced Tree", "slide": "2. Advanced Tree", "lead": "BST insert/delete, traversal, build tree."},
+        {"id": "trie", "title": "DSA 2 · Trie", "slide": "3. Trie", "lead": "Gộp homework Trie Quang + Java: Word Break II, Word Search II, Search Suggestions, Map Sum Pairs, Max XOR with element. Bắt buộc Trie (kể cả bit-trie)."},
+        {"id": "union-find", "title": "DSA 2 · Union-Find", "slide": "4. UnionFind", "lead": "DSU + path compression + union by rank."},
+        {"id": "adv-bs", "title": "DSA 2 · Advanced Binary Search", "slide": "5. Advanced Binary Search", "lead": "Binary search trên đáp án (predicate)."},
+        {"id": "two-pointers", "title": "DSA 2 · Two Pointers", "slide": "6. Two Pointers", "lead": "Two pointers / fast-slow trên mảng hoặc linked list."},
+        {"id": "sliding-window", "title": "DSA 2 · Sliding Window", "slide": "7. Sliding Window", "lead": "Cửa sổ trượt cố định hoặc co giãn."},
+        {"id": "bt1", "title": "DSA 2 · Backtracking 1", "slide": "8. Backtracking 1", "lead": "Backtrack thuần, cắt nhánh, không memo."},
+        {"id": "bt2", "title": "DSA 2 · Backtracking 2 + Memo", "slide": "9. Backtracking 2 with memoization", "lead": "DFS + memo (top-down DP)."},
+        {"id": "dp-knap", "title": "DSA 2 · DP (LCS / LIS / Knapsack)", "slide": "10. Dynamic programming (LCS, LIS, KNAP)", "lead": "Knapsack / unbounded-group DP."},
+        {"id": "dp-coin-stock", "title": "DSA 2 · DP (Coin / Stock)", "slide": "11. Dynamic programming (COIN, STOCK)", "lead": "Coin change variants và stock DP."},
+        {"id": "partition-dp", "title": "DSA 2 · Partition DP", "slide": "12. Partition problems", "lead": "DP chia mảng / subset-sum / meet-in-the-middle."},
+        {"id": "dijkstra", "title": "DSA 2 · Dijkstra", "slide": "13. Dijkstra", "lead": "0-1 BFS hoặc Dijkstra với heap. Maze II/III là premium — vẫn giải."},
+        {"id": "game-theory", "title": "DSA 2 · Game Theory", "slide": "14. Game Theory", "lead": "DP win/lose hoặc greedy game."},
+        {"id": "parser1", "title": "DSA 2 · String Parser 1", "slide": "15. String parser 1", "lead": "Recursive descent / stack parser."},
+        {"id": "parser2", "title": "DSA 2 · String Parser 2", "slide": "16. String parser 2", "lead": "Chỉ 2 bài homework (không gồm live-coding Text Justification)."}
+      ]
+    },
+    {
+      "id": "dsa3",
+      "title": "DSA 3",
+      "topics": [
+        {"id": "rolling-hash", "title": "DSA 3 · Rolling Hash", "slide": "2. Rolling Hash", "lead": "Double hash + binary search khi cần. Không dùng KMP ở topic này."},
+        {"id": "kmp", "title": "DSA 3 · KMP", "slide": "3. KMP", "lead": "Dùng prefix-function / KMP table. Cùng đề với Z-function nhưng kỹ thuật khác."},
+        {"id": "z-function", "title": "DSA 3 · Z-Function", "slide": "4. Z Function", "lead": "Dùng Z-array, không KMP."},
+        {"id": "graph-dp", "title": "DSA 3 · Graph Traversal + DP", "slide": "5. Graph traversal + DP", "lead": "Tarjan / MST / binary lifting trên cây — đúng tinh thần traversal + DP."},
+        {"id": "bs-dp", "title": "DSA 3 · Binary Search + DP", "slide": "6. Binary Search + DP", "lead": "Gộp homework 3 bản slide: taxi, divide chocolate, LAS, two non-overlapping target. Kết hợp BS + DP khi được."},
+        {"id": "sort-dp", "title": "DSA 3 · Sorting + DP", "slide": "7. Sorting + DP", "lead": "Sort trước rồi DP (LIS-like / assignment)."},
+        {"id": "bitmask-dp", "title": "DSA 3 · DP & Bitmask", "slide": "8. DP & Bitmask", "lead": "DP trên mask."},
+        {"id": "bit-trie", "title": "DSA 3 · Bitmask & Trie", "slide": "9. Bitmask & Trie", "lead": "Binary trie 31/32 bit. Dr. Evil Underscores = Codeforces 1285D."},
+        {"id": "tree-dp", "title": "DSA 3 · DP on Trees", "slide": "10. DP on Trees", "lead": "Reroot / postorder tree DP / binary lifting nếu cần."},
+        {"id": "topo-dp", "title": "DSA 3 · Topological Sort + DP", "slide": "11. Topological sort + DP", "lead": "Topo order rồi DP trên DAG."},
+        {"id": "combinatorics", "title": "DSA 3 · Combinatorics", "slide": "12. Combinatorics", "lead": "Tổ hợp + modulo + DP đếm."}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "out": "src/dsa-homework/data/dsa1d.json",
+  "topics": [
+    {
+      "id": "heap",
+      "title": "DSA 1 · Heap",
+      "lead": "Mandatory + optional. Dùng heap.",
+      "problems": [
+        {"id": "merge-k-sorted-lists", "lc": 23, "title": "Merge k Sorted Lists", "difficulty": "Hard", "tier": "mandatory"},
+        {"id": "top-k-frequent-elements", "lc": 347, "title": "Top K Frequent Elements", "difficulty": "Medium", "tier": "mandatory", "note": "heap, không quickselect"},
+        {"id": "smallest-number-in-infinite-set", "lc": 2336, "title": "Smallest Number in Infinite Set", "difficulty": "Medium", "tier": "mandatory"},
+        {"id": "remove-stones-to-minimize-the-total", "lc": 1962, "title": "Remove Stones to Minimize the Total", "difficulty": "Medium", "tier": "mandatory"},
+        {"id": "k-closest-points-to-origin", "lc": 973, "title": "K Closest Points to Origin", "difficulty": "Medium", "tier": "optional"},
+        {"id": "kth-smallest-element-in-a-sorted-matrix", "lc": 378, "title": "Kth Smallest Element in a Sorted Matrix", "difficulty": "Medium", "tier": "optional"},
+        {"id": "maximum-subsequence-score", "lc": 2542, "title": "Maximum Subsequence Score", "difficulty": "Medium", "tier": "optional"}
+      ]
+    },
+    {
+      "id": "greedy",
+      "title": "DSA 1 · Greedy",
+      "lead": "4 bài Practice cuối slide (không có heading Homework).",
+      "problems": [
+        {"id": "maximize-sum-of-array-after-k-negations", "lc": 1005, "title": "Maximize Sum Of Array After K Negations", "difficulty": "Easy"},
+        {"id": "jump-game", "lc": 55, "title": "Jump Game", "difficulty": "Medium"},
+        {"id": "jump-game-ii", "lc": 45, "title": "Jump Game II", "difficulty": "Medium"},
+        {"id": "gas-station", "lc": 134, "title": "Gas Station", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "divide-conquer",
+      "title": "DSA 1 · Divide and Conquer",
+      "lead": "Chia đôi / quickselect / merge đếm. Top K Frequent = Quickselect (khác Heap).",
+      "problems": [
+        {"id": "top-k-frequent-elements-dc", "lc": 347, "title": "Top K Frequent Elements", "difficulty": "Medium", "url": "https://leetcode.com/problems/top-k-frequent-elements/", "note": "quickselect, không heap"},
+        {"id": "super-pow", "lc": 372, "title": "Super Pow", "difficulty": "Medium"},
+        {"id": "beautiful-array", "lc": 932, "title": "Beautiful Array", "difficulty": "Medium"},
+        {"id": "number-of-pairs-satisfying-inequality", "lc": 2426, "title": "Number of Pairs Satisfying Inequality", "difficulty": "Hard"}
+      ]
+    },
+    {
+      "id": "monotonic",
+      "title": "DSA 1 · Monotonic Stack / Queue",
+      "lead": "Monotonic stack hoặc deque.",
+      "problems": [
+        {"id": "remove-duplicate-letters", "lc": 316, "title": "Remove Duplicate Letters", "difficulty": "Medium"},
+        {"id": "online-stock-span", "lc": 901, "title": "Online Stock Span", "difficulty": "Medium"},
+        {"id": "jump-game-vi", "lc": 1696, "title": "Jump Game VI", "difficulty": "Medium"},
+        {"id": "132-pattern", "lc": 456, "title": "132 Pattern", "difficulty": "Medium"},
+        {"id": "sum-of-subarray-minimums", "lc": 907, "title": "Sum of Subarray Minimums", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "primes",
+      "title": "DSA 1 · Prime Numbers",
+      "lead": "Sieve / primality / factorization.",
+      "problems": [
+        {"id": "prime-in-diagonal", "lc": 2614, "title": "Prime In Diagonal", "difficulty": "Easy"},
+        {"id": "maximum-prime-difference", "lc": 3115, "title": "Maximum Prime Difference", "difficulty": "Medium"},
+        {"id": "prime-pairs-with-target-sum", "lc": 2761, "title": "Prime Pairs With Target Sum", "difficulty": "Medium"},
+        {"id": "smallest-value-after-replacing-with-sum-of-prime-factors", "lc": 2507, "title": "Smallest Value After Replacing With Sum of Prime Factors", "difficulty": "Medium"}
+      ]
+    },
+    {
+      "id": "prefix-sum",
+      "title": "DSA 1 · Prefix Sum",
+      "lead": "Prefix + hash. LC 525, 523, 1991.",
+      "problems": [
+        {"id": "contiguous-array", "lc": 525, "title": "Contiguous Array", "difficulty": "Medium"},
+        {"id": "continuous-subarray-sum", "lc": 523, "title": "Continuous Subarray Sum", "difficulty": "Medium"},
+        {"id": "find-the-middle-index-in-array", "lc": 1991, "title": "Find the Middle Index in Array", "difficulty": "Easy"}
+      ]
+    }
+  ]
+}
