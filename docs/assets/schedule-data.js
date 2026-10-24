@@ -15,8 +15,8 @@ window.SCHEDULE = [
     course: "behaviour-interview-course",
     label: "Behavioral Interview",
     date: "2027-01-09",
-    dayVi: "Tối T2 & chiều T7 hàng tuần", dayEn: "Mon evening & Sat afternoon",
-    time: "T2 21:30–23:30 · T7 14:00–16:00",
+    dayVi: "Tối T2 & sáng T7 hàng tuần", dayEn: "Mon evening & Sat morning",
+    time: "T2 21:30–23:30 · T7 10:00–11:59",
     durVi: "12 buổi · 6 tuần", durEn: "12 sessions · 6 weeks",
   },
   {
