@@ -20,6 +20,14 @@ window.SCHEDULE = [
     durVi: "12 buổi · 6 tuần", durEn: "12 sessions · 6 weeks",
   },
   {
+    course: "crash-course-build-world-class-pet-project",
+    label: "Crash Course",
+    date: "2027-01-09",
+    dayVi: "Tối Thứ 7 hàng tuần", dayEn: "Saturday evenings",
+    time: "21:00–22:30",
+    durVi: "10 buổi · 10 tuần", durEn: "10 sessions · 10 weeks",
+  },
+  {
     course: "khoa-hoc-system-design-interview-big-tech",
     label: "System Design Interview Level 1",
     date: "2027-01-03",
@@ -30,7 +38,7 @@ window.SCHEDULE = [
   {
     course: "computer-science-fundamental-interview",
     label: "CS Fundamentals · K09",
-    date: "2026-11-07",
+    date: "2026-11-14",
     dayVi: "Chiều Thứ 7 hàng tuần", dayEn: "Saturday afternoons",
     time: "16:00–18:00",
     durVi: "12 buổi · 12 tuần", durEn: "12 sessions · 12 weeks",
