@@ -4835,6 +4835,66 @@ a.faq-cta:hover { transform: translateY(-1px); }
   }
 }
 
+/* ===================== MENTORPRO SIDE RAIL ===================== */
+.mp-rail {
+  display: none;
+  position: fixed;
+  z-index: 45;
+  left: 10px;
+  top: 84px;
+  width: min(156px, calc((100vw - 1200px) / 2 - 18px));
+}
+.mp-rail[hidden] {
+  display: none !important;
+}
+@media (min-width: 1440px) {
+  .mp-rail {
+    display: block;
+  }
+}
+.mp-rail__link {
+  display: block;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 18px 40px rgba(11, 29, 58, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.mp-rail__link:hover {
+  text-decoration: none;
+  transform: translateY(-3px);
+  box-shadow:
+    0 22px 48px rgba(11, 29, 58, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+.mp-rail__link img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(100vh - 200px);
+  object-fit: cover;
+  object-position: top center;
+}
+.mp-rail__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(11, 29, 58, 0.72);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mp-rail__close:hover {
+  background: rgba(11, 29, 58, 0.92);
+}
+
 /* ===================== FLOATING CTAs — Đặt lịch tư vấn ===================== */
 .cta-stack {
   position: fixed;
